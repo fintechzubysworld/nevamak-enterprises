@@ -4,123 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NEVAMAK Enterprises – Supply Chain Dashboard</title>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        body {
-            background: #f0f2f5;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1300px;
-            margin: auto;
-        }
-        header {
-            background: #0a3d62;
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .logo h1 {
-            margin: 0;
-            font-size: 1.8rem;
-        }
-        .logo p {
-            margin: 5px 0 0;
-            opacity: 0.8;
-        }
-        .nav-links a {
-            color: white;
-            text-decoration: none;
-            background: #3c6382;
-            padding: 8px 16px;
-            border-radius: 30px;
-            margin-left: 12px;
-            display: inline-block;
-            transition: 0.2s;
-        }
-        .nav-links a:hover {
-            background: #1e3799;
-        }
-        .stats {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 16px;
-            padding: 18px;
-            flex: 1;
-            min-width: 180px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            border-left: 6px solid #0a3d62;
-        }
-        .stat-card h3 {
-            margin: 0 0 10px;
-            font-size: 1rem;
-            color: #555;
-        }
-        .stat-card .number {
-            font-size: 2.2rem;
-            font-weight: bold;
-            margin: 0;
-            color: #0a3d62;
-        }
-        .shipments-table {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            text-align: left;
-            padding: 12px;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background: #f8f9fa;
-            color: #2c3e50;
-        }
-        .status {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            display: inline-block;
-        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: auto; }
+        header { background: #0a3d62; color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .logo h1 { margin: 0; font-size: 1.8rem; }
+        .logo p { margin: 5px 0 0; opacity: 0.8; }
+        .nav-links a { color: white; text-decoration: none; background: #3c6382; padding: 8px 16px; border-radius: 30px; margin-left: 12px; display: inline-block; transition: 0.2s; }
+        .nav-links a:hover { background: #1e3799; }
+        .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
+        .stat-card { background: white; border-radius: 16px; padding: 18px; flex: 1; min-width: 180px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 6px solid #0a3d62; }
+        .stat-card h3 { margin: 0 0 10px; font-size: 1rem; color: #555; }
+        .stat-card .number { font-size: 2rem; font-weight: bold; margin: 0; color: #0a3d62; }
+        .shipments-table { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; color: #2c3e50; }
+        .status { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; display: inline-block; }
         .status-dispatched { background: #ffeaa7; color: #b85c00; }
         .status-delivered { background: #d4edda; color: #155724; }
         .status-partial { background: #fff3cd; color: #856404; }
-        .status-discrepancy { background: #f8d7da; color: #721c24; }
-        .badge {
-            background: #e2e3e5;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-        }
-        footer {
-            text-align: center;
-            margin-top: 40px;
-            color: #7f8c8d;
-        }
+        .badge { background: #e2e3e5; padding: 4px 8px; border-radius: 20px; font-size: 0.75rem; }
+        footer { text-align: center; margin-top: 40px; color: #7f8c8d; }
+        .cost-cell { font-family: monospace; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -142,24 +51,25 @@
         <div class="stat-card"><h3>To Abuja</h3><p class="number" id="toAbuja">-</p></div>
         <div class="stat-card"><h3>To Portharcourt</h3><p class="number" id="toPH">-</p></div>
         <div class="stat-card"><h3>Delivered ✅</h3><p class="number" id="deliveredCount">-</p></div>
+        <div class="stat-card"><h3>Total Goods Value (₦)</h3><p class="number" id="totalValue">-</p></div>
+        <div class="stat-card"><h3>Total Transport (₦)</h3><p class="number" id="totalTransport">-</p></div>
     </div>
 
     <div class="shipments-table">
         <h2>📋 Live Shipments Overview</h2>
         <table id="shipmentsTable">
             <thead>
-                <tr><th>Shipment ID</th><th>Sender</th><th>Destination</th><th>Items</th><th>Status</th><th>Last Update</th></tr>
+                <tr><th>ID</th><th>Sender</th><th>Dest.</th><th>Items</th><th>Goods Value (₦)</th><th>Transport (₦)</th><th>Status</th><th>Last Update</th></tr>
             </thead>
             <tbody id="shipmentsBody">
-                <tr><td colspan="6">Loading shipments...</td></tr>
+                <tr><td colspan="8">Loading shipments......</td></tr>
             </tbody>
         </table>
     </div>
-    <footer>NEVAMAK Connect – Real-time Firebase Sync | Supply Representatives: Lagos, Abuja, PH</footer>
+    <footer>NEVAMAK Connect – Real-time Firebase Sync | Costs included</footer>
 </div>
 
 <script>
-    // ==================== NEVAMAK FIREBASE CONFIG ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -169,14 +79,13 @@
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
         measurementId: "G-MZ8NT6KK8N"
     };
-    // ==============================================================
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     function updateStatsAndTable() {
         db.collection("shipments").onSnapshot((snapshot) => {
             let total = 0, abuja = 0, ph = 0, delivered = 0;
+            let totalGoodsValue = 0, totalTransportCost = 0;
             const rows = [];
             snapshot.forEach(doc => {
                 const data = doc.data();
@@ -185,15 +94,27 @@
                 if (data.destinationBranch === "Portharcourt") ph++;
                 if (data.status === "Delivered") delivered++;
                 
+                // Calculate total goods value for this shipment
+                let shipmentGoodsValue = 0;
+                if (data.items) {
+                    data.items.forEach(item => {
+                        shipmentGoodsValue += (item.totalItemCost || 0);
+                    });
+                }
+                totalGoodsValue += shipmentGoodsValue;
+                totalTransportCost += (data.transportCost || 0);
+                
                 const statusClass = `status status-${data.status?.toLowerCase().replace(/\s/g, '') || 'dispatched'}`;
                 const itemsShort = data.items ? data.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ") : "-";
-                const lastUpdate = data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleDateString() : new Date(data.createdAt?.toDate()).toLocaleDateString();
+                const lastUpdate = data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleDateString() : (data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "N/A");
                 
                 rows.push(`<tr>
                     <td><strong>${doc.id.slice(0,8)}</strong></td>
                     <td>${data.senderName || "—"}</td>
                     <td><span class="badge">${data.destinationBranch}</span></td>
-                    <td>${itemsShort.substring(0,50)}</td>
+                    <td>${itemsShort.substring(0,60)}</td>
+                    <td class="cost-cell">₦${shipmentGoodsValue.toLocaleString()}</td>
+                    <td class="cost-cell">₦${(data.transportCost || 0).toLocaleString()}</td>
                     <td><span class="${statusClass}">${data.status}</span></td>
                     <td>${lastUpdate}</td>
                 </tr>`);
@@ -202,17 +123,12 @@
             document.getElementById("toAbuja").innerText = abuja;
             document.getElementById("toPH").innerText = ph;
             document.getElementById("deliveredCount").innerText = delivered;
-            document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='6'>No shipments yet. Create from Lagos Dispatch.</td></tr>";
+            document.getElementById("totalValue").innerText = `₦${totalGoodsValue.toLocaleString()}`;
+            document.getElementById("totalTransport").innerText = `₦${totalTransportCost.toLocaleString()}`;
+            document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='8'>No shipments yet. Create from Lagos Dispatch.</td></tr>";
         });
     }
     updateStatsAndTable();
-</script>
-    <script>
-  firebase.firestore().collection("shipments").onSnapshot((snap) => {
-    console.log("🔥 Firestore connected, shipments count:", snap.size);
-  }, (error) => {
-    console.error("❌ Firestore error:", error);
-  });
 </script>
 </body>
 </html>
