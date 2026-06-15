@@ -2,28 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NEVAMAK – Port Harcourt Receiving</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
-        *{ font-family: 'Segoe UI', sans-serif; }
-        body{ background: #eef2fa; margin: 0; padding: 20px; }
-        .card{ background: white; border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .shipment-card{ border-left: 6px solid #e67e22; margin: 20px 0; padding: 15px; background: #fef9e6; border-radius: 20px; }
-        button{ background: #e67e22; border: none; padding: 8px 18px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        input{ padding: 6px; border-radius: 10px; border: 1px solid #aaa; margin: 5px; width: 100px; }
-        .nav a, .logout-btn{ background: #2c3e50; color: white; text-decoration: none; padding: 6px 16px; border-radius: 30px; margin-right: 12px; display: inline-block; border: none; cursor: pointer; }
-        .cost-info{ background: #fff0db; padding: 8px; border-radius: 12px; margin: 10px 0; }
+        *{ font-family: system-ui, -apple-system; }
+        body{ background: #eef2fa; margin: 0; padding: 12px; }
+        .card, .shipment-card{ background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .shipment-card{ border-left: 6px solid #e67e22; }
+        button{ background: #e67e22; color: white; padding: 12px 20px; border-radius: 48px; border: none; font-size: 1rem; width: 100%; margin-top: 8px; cursor: pointer; }
+        input{ padding: 10px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin: 4px 0; }
+        .nav{ display: flex; gap: 10px; margin-bottom: 16px; }
+        .nav button{ background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .item-row{ background: #fef9e6; padding: 12px; border-radius: 20px; margin-bottom: 12px; }
+        .cost-info{ background: #fff0db; padding: 8px; border-radius: 16px; margin: 8px 0; }
+        .input-group{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .input-group input{ flex: 1; min-width: 80px; }
+        h2{ font-size: 1.3rem; }
+        @media (max-width: 500px) { .input-group { flex-direction: column; } }
     </style>
 </head>
 <body>
 <div class="nav">
-    <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+    <button id="logoutBtn">🚪 Logout</button>
 </div>
-<h2>🌊 NEXT Cash & Carry – PORT HARCOURT Branch</h2>
-<p>Supply Representative – Receive goods, record discrepancies & GRN</p>
-<div id="phShipments" class="card">Fetching incoming shipments...</div>
+<h2>🌊 Port Harcourt Receiving</h2>
+<div id="phShipments" class="card">Loading...</div>
 
 <script>
     const firebaseConfig = {
@@ -45,48 +51,40 @@
         if (userDoc.data()?.role !== 'ph_rep') {
             await auth.signOut();
             window.location.href = 'login.html';
-        } else {
-            loadPHShipments();
-        }
+        } else loadPH();
     });
-
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    async function loadPHShipments() {
-        const querySnap = await db.collection("shipments")
-            .where("destinationBranch", "==", "Portharcourt")
-            .where("status", "in", ["Dispatched", "Partially Delivered"])
-            .get();
-        const container = document.getElementById("phShipments");
-        if(querySnap.empty){ container.innerHTML = "<div class='card'>No pending receipts for Port Harcourt.</div>"; return; }
-        
-        let docs = [];
-        querySnap.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
-        docs.sort((a,b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0));
-        
-        let html = `<h3>📥 Pending deliveries (PH)</h3>`;
-        for(const { id, data: ship } of docs){
+    async function loadPH() {
+        const snap = await db.collection("shipments").where("destinationBranch","==","Portharcourt").where("status","in",["Dispatched","Partially Delivered"]).get();
+        if(snap.empty) { document.getElementById("phShipments").innerHTML = "<div class='card'>No pending shipments</div>"; return; }
+        let docs = []; snap.forEach(d => docs.push({id:d.id, data:d.data()}));
+        docs.sort((a,b)=>(b.data.createdAt?.toDate()||0)-(a.data.createdAt?.toDate()||0));
+        let html = "";
+        for(const {id, data: ship} of docs){
             const items = ship.items;
-            const totalGoodsValue = items.reduce((sum, it) => sum + (it.totalItemCost || 0), 0);
+            const totalGoods = items.reduce((s,i)=>s+(i.totalItemCost||0),0);
             html += `<div class="shipment-card" id="ph-${id}">
-                        <strong>🚚 Shipment ID: ${id.slice(0,8)}</strong> | Sender: ${ship.senderName}<br>
-                        <div class="cost-info">🚛 Transport: ₦${(ship.transportCost || 0).toLocaleString()} | Goods: ₦${totalGoodsValue.toLocaleString()}</div>
-                        <em>Items:</em><div id="ph-items-${id}">`;
+                        <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName}</h3>
+                        <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div>`;
             for(let idx=0; idx<items.length; idx++){
                 const it = items[idx];
                 const pending = it.orderedQty - (it.receivedQty + it.damageQty);
-                html += `<div style="margin: 10px 0; border-bottom: 1px solid #ccc;">
-                            📦 ${it.itemName} (₦${it.unitPrice?.toLocaleString()}/unit) | Ordered: ${it.orderedQty} | Already OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}<br>
-                            ➕ Receive good units: <input type="number" id="ph_recv_${id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
-                            🛑 Additional damaged: <input type="number" id="ph_dam_${id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
+                html += `<div class="item-row">
+                            <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit)<br>
+                            Ordered: ${it.orderedQty} | OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}
+                            <div class="input-group">
+                                <input type="number" id="ph_recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}">
+                                <input type="number" id="ph_dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}">
+                            </div>
                           </div>`;
             }
-            html += `<div><label>Receiving Officer (PH):</label> <input type="text" id="ph_rep_${id}" placeholder="Name"></div>
-                     <div><label>GRN Number:</label> <input type="text" id="ph_grn_${id}" placeholder="GRN-PH-001"></div>
-                     <button onclick="receivePH('${id}')">✅ Receive & Submit</button>
+            html += `<div><input type="text" id="ph_rep_${id}" placeholder="Receiving Officer Name"></div>
+                     <div><input type="text" id="ph_grn_${id}" placeholder="GRN Number"></div>
+                     <button onclick="receivePH('${id}')">✅ Confirm Receipt</button>
                      </div>`;
         }
-        container.innerHTML = html;
+        document.getElementById("phShipments").innerHTML = html;
     }
 
     window.receivePH = async (shipId) => {
@@ -102,21 +100,21 @@
                 updated = true;
                 items[i].receivedQty = (items[i].receivedQty||0) + addRecv;
                 items[i].damageQty = (items[i].damageQty||0) + addDam;
-                if(items[i].receivedQty + items[i].damageQty > items[i].orderedQty){
-                    alert(`Adjusting ${items[i].itemName} – total exceeds ordered.`);
+                if(items[i].receivedQty+items[i].damageQty > items[i].orderedQty){
+                    alert(`Adjusting ${items[i].itemName}`);
                     items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
                 }
             }
         }
-        if(!updated) return alert("No receiving quantities entered.");
+        if(!updated) return alert("Enter quantities");
         const officer = document.getElementById(`ph_rep_${shipId}`).value.trim();
-        const grnVal = document.getElementById(`ph_grn_${shipId}`).value.trim();
-        if(!officer) return alert("Enter receiving rep name.");
-        let allDelivered = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
+        const grn = document.getElementById(`ph_grn_${shipId}`).value.trim();
+        if(!officer) return alert("Enter receiving officer");
+        const allDelivered = items.every(it => (it.receivedQty+it.damageQty) >= it.orderedQty);
         const finalStatus = allDelivered ? "Delivered" : "Partially Delivered";
-        await docRef.update({ items, status: finalStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep: officer, grnNumber: grnVal || `GRN-PH-${Date.now()}`, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
-        alert(`Port Harcourt: ${finalStatus} status recorded. GRN: ${grnVal}`);
-        loadPHShipments();
+        await docRef.update({ items, status:finalStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep:officer, grnNumber:grn||`GRN-PH-${Date.now()}` });
+        alert(`Port Harcourt: ${finalStatus}`);
+        loadPH();
     };
 </script>
 </body>
