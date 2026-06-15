@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NEVAMAK – Port Harcourt Receiving</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        *{ font-family: 'Segoe UI', sans-serif; }
+        body{ background: #eef2fa; margin: 0; padding: 20px; }
+        .card{ background: white; border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .shipment-card{ border-left: 6px solid #e67e22; margin: 20px 0; padding: 15px; background: #fef9e6; border-radius: 20px; }
+        button{ background: #e67e22; border: none; padding: 8px 18px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        input{ padding: 6px; border-radius: 10px; border: 1px solid #aaa; margin: 5px; width: 100px; }
+        .nav a{ background: #2c3e50; color: white; text-decoration: none; padding: 6px 16px; border-radius: 30px; margin-right: 12px; display: inline-block; }
+    </style>
+</head>
+<body>
+<div class="nav"><a href="index.html">🏠 Dashboard</a><a href="lagos_dispatch.html">📤 Lagos</a><a href="receive_abuja.html">🏢 Abuja</a></div>
+<h2>🌊 NEXT Cash & Carry – PORT HARCOURT Branch</h2>
+<p>Supply Representative – Receive goods, record discrepancies & GRN</p>
+<div id="phShipments" class="card">Fetching incoming shipments...</div>
+
+<script>
+    const firebaseConfig = { apiKey: "YOUR_API_KEY", authDomain: "YOUR_PROJECT.firebaseapp.com", projectId: "YOUR_PROJECT_ID", storageBucket: "YOUR_PROJECT.appspot.com", messagingSenderId: "YOUR_SENDER_ID", appId: "YOUR_APP_ID" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    async function loadPHShipments() {
+        const querySnap = await db.collection("shipments").where("destinationBranch", "==", "Portharcourt").where("status", "in", ["Dispatched", "Partially Delivered"]).orderBy("createdAt", "desc").get();
+        const container = document.getElementById("phShipments");
+        if(querySnap.empty){ container.innerHTML = "<div class='card'>No pending receipts for Port Harcourt.</div>"; return; }
+        let html = `<h3>📥 Pending deliveries (PH)</h3>`;
+        for(const docSnap of querySnap.docs){
+            const data = docSnap.data();
+            const items = data.items;
+            html += `<div class="shipment-card" id="ph-${docSnap.id}">
+                        <strong>🚚 Shipment ID: ${docSnap.id.slice(0,8)}</strong> | Sender: ${data.senderName}<br>
+                        <em>Items status:</em><div id="ph-items-${docSnap.id}">`;
+            for(let idx=0; idx<items.length; idx++){
+                const it = items[idx];
+                const pending = it.orderedQty - (it.receivedQty + it.damageQty);
+                html += `<div style="margin: 10px 0; border-bottom: 1px solid #ccc;">
+                            📦 ${it.itemName} | Ordered: ${it.orderedQty} | Already OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}<br>
+                            ➕ Receive good units: <input type="number" id="ph_recv_${docSnap.id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
+                            🛑 Additional damaged: <input type="number" id="ph_dam_${docSnap.id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
+                          </div>`;
+            }
+            html += `<div><label>Receiving Officer (PH):</label> <input type="text" id="ph_rep_${docSnap.id}" placeholder="Name"></div>
+                     <div><label>GRN Number:</label> <input type="text" id="ph_grn_${docSnap.id}" placeholder="GRN-PH-001"></div>
+                     <button onclick="receivePH('${docSnap.id}')">✅ Receive & Submit</button>
+                     </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    window.receivePH = async (shipId) => {
+        const docRef = db.collection("shipments").doc(shipId);
+        const doc = await docRef.get();
+        const data = doc.data();
+        let items = [...data.items];
+        let updated = false;
+        for(let i=0; i<items.length; i++){
+            const addRecv = parseInt(document.getElementById(`ph_recv_${shipId}_${i}`)?.value || 0);
+            const addDam = parseInt(document.getElementById(`ph_dam_${shipId}_${i}`)?.value || 0);
+            if(addRecv>0 || addDam>0){
+                updated = true;
+                items[i].receivedQty = (items[i].receivedQty||0) + addRecv;
+                items[i].damageQty = (items[i].damageQty||0) + addDam;
+                if(items[i].receivedQty + items[i].damageQty > items[i].orderedQty){
+                    alert(`Adjusting ${items[i].itemName} – total exceeds ordered.`);
+                    items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
+                }
+            }
+        }
+        if(!updated) return alert("No receiving quantities entered.");
+        const officer = document.getElementById(`ph_rep_${shipId}`).value.trim();
+        const grnVal = document.getElementById(`ph_grn_${shipId}`).value.trim();
+        if(!officer) return alert("Enter receiving rep name.");
+        let allDelivered = true;
+        items.forEach(it => { if(it.receivedQty + it.damageQty < it.orderedQty) allDelivered = false; });
+        const finalStatus = allDelivered ? "Delivered" : "Partially Delivered";
+        await docRef.update({
+            items: items,
+            status: finalStatus,
+            receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+            receivingRep: officer,
+            grnNumber: grnVal || `GRN-PH-${Date.now()}`,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert(`Port Harcourt: ${finalStatus} status recorded. GRN: ${grnVal}`);
+        loadPHShipments();
+    };
+    loadPHShipments();
+</script>
+</body>
+</html>
