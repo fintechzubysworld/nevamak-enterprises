@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEVAMAK Enterprises – Supply Chain Dashboard</title>
+    <title>NEVAMAK – Dashboard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -13,8 +14,8 @@
         header { background: #0a3d62; color: white; padding: 20px; border-radius: 12px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .logo h1 { margin: 0; font-size: 1.8rem; }
         .logo p { margin: 5px 0 0; opacity: 0.8; }
-        .nav-links a { color: white; text-decoration: none; background: #3c6382; padding: 8px 16px; border-radius: 30px; margin-left: 12px; display: inline-block; transition: 0.2s; }
-        .nav-links a:hover { background: #1e3799; }
+        .nav-links a, .logout-btn { color: white; text-decoration: none; background: #3c6382; padding: 8px 16px; border-radius: 30px; margin-left: 12px; display: inline-block; transition: 0.2s; cursor: pointer; border: none; font-size: 1rem; }
+        .nav-links a:hover, .logout-btn:hover { background: #1e3799; }
         .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px; }
         .stat-card { background: white; border-radius: 16px; padding: 18px; flex: 1; min-width: 180px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 6px solid #0a3d62; }
         .stat-card h3 { margin: 0 0 10px; font-size: 1rem; color: #555; }
@@ -28,8 +29,8 @@
         .status-delivered { background: #d4edda; color: #155724; }
         .status-partial { background: #fff3cd; color: #856404; }
         .badge { background: #e2e3e5; padding: 4px 8px; border-radius: 20px; font-size: 0.75rem; }
-        footer { text-align: center; margin-top: 40px; color: #7f8c8d; }
         .cost-cell { font-family: monospace; font-weight: bold; }
+        footer { text-align: center; margin-top: 40px; color: #7f8c8d; }
     </style>
 </head>
 <body>
@@ -37,12 +38,12 @@
     <header>
         <div class="logo">
             <h1>🚛 NEVAMAK Enterprises</h1>
-            <p>Supply Chain Intelligence | Lagos → Abuja & Port Harcourt</p>
+            <p id="roleBadge"></p>
         </div>
         <div class="nav-links">
             <a href="lagos_dispatch.html">📦 Lagos Dispatch</a>
-            <a href="receive_abuja.html">🏢 Abuja Receiving</a>
-            <a href="receive_ph.html">🌊 Port Harcourt Receiving</a>
+            <a href="admin_create_user.html" id="adminPanelLink" style="display:none;">👑 Admin Panel</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
 
@@ -58,15 +59,11 @@
     <div class="shipments-table">
         <h2>📋 Live Shipments Overview</h2>
         <table id="shipmentsTable">
-            <thead>
-                <tr><th>ID</th><th>Sender</th><th>Dest.</th><th>Items</th><th>Goods Value (₦)</th><th>Transport (₦)</th><th>Status</th><th>Last Update</th></tr>
-            </thead>
-            <tbody id="shipmentsBody">
-                <tr><td colspan="8">Loading shipments......</td></tr>
-            </tbody>
+            <thead><tr><th>ID</th><th>Sender</th><th>Dest.</th><th>Items</th><th>Goods Value (₦)</th><th>Transport (₦)</th><th>Status</th><th>Last Update</th></tr></thead>
+            <tbody id="shipmentsBody"><tr><td colspan="8">Loading...</td></tr></tbody>
         </table>
     </div>
-    <footer>NEVAMAK Connect – Real-time Firebase Sync | Costs included</footer>
+    <footer>NEVAMAK Connect – Admin/Lagos Sender Access</footer>
 </div>
 
 <script>
@@ -80,9 +77,36 @@
         measurementId: "G-MZ8NT6KK8N"
     };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
 
-    function updateStatsAndTable() {
+    let currentRole = null;
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const role = userDoc.data()?.role;
+        if (!role || (role !== 'admin' && role !== 'lagos_sender')) {
+            await auth.signOut();
+            window.location.href = 'login.html';
+            return;
+        }
+        currentRole = role;
+        document.getElementById('roleBadge').innerText = `Logged in as: ${role}`;
+        if (role === 'admin') {
+            document.getElementById('adminPanelLink').style.display = 'inline-block';
+        }
+        startFirestoreListener();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    function startFirestoreListener() {
         db.collection("shipments").onSnapshot((snapshot) => {
             let total = 0, abuja = 0, ph = 0, delivered = 0;
             let totalGoodsValue = 0, totalTransportCost = 0;
@@ -94,13 +118,8 @@
                 if (data.destinationBranch === "Portharcourt") ph++;
                 if (data.status === "Delivered") delivered++;
                 
-                // Calculate total goods value for this shipment
                 let shipmentGoodsValue = 0;
-                if (data.items) {
-                    data.items.forEach(item => {
-                        shipmentGoodsValue += (item.totalItemCost || 0);
-                    });
-                }
+                if (data.items) data.items.forEach(item => shipmentGoodsValue += (item.totalItemCost || 0));
                 totalGoodsValue += shipmentGoodsValue;
                 totalTransportCost += (data.transportCost || 0);
                 
@@ -126,9 +145,11 @@
             document.getElementById("totalValue").innerText = `₦${totalGoodsValue.toLocaleString()}`;
             document.getElementById("totalTransport").innerText = `₦${totalTransportCost.toLocaleString()}`;
             document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='8'>No shipments yet. Create from Lagos Dispatch.</td></tr>";
+        }, (error) => {
+            console.error("Firestore error:", error);
+            alert("Permission denied. Make sure you are logged in and security rules are set correctly.");
         });
     }
-    updateStatsAndTable();
 </script>
 </body>
 </html>
