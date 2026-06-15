@@ -8,23 +8,24 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
         .container { max-width: 1200px; margin: auto; }
         header { background: #0a3d62; color: white; padding: 16px; border-radius: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .logo h1 { margin: 0; font-size: 1.5rem; }
         .logo p { margin: 4px 0 0; font-size: 0.75rem; opacity: 0.8; }
         .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
-        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 8px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; display: inline-block; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 8px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
         .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
         .stat-card { background: white; border-radius: 20px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #0a3d62; }
         .stat-card h3 { margin: 0 0 6px; font-size: 0.85rem; color: #555; }
-        .stat-card .number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #0a3d62; word-break: break-word; }
-        .shipments-table { background: white; border-radius: 20px; padding: 16px; overflow-x: auto; }
+        .stat-card .number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #0a3d62; }
+        .section-card { background: white; border-radius: 20px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
+        .section-title { font-size: 1.2rem; margin-top: 0; margin-bottom: 12px; color: #0a3d62; }
         table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th, td { text-align: left; padding: 12px 8px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
+        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
         th { background: #f8f9fa; }
-        .status { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; display: inline-block; white-space: nowrap; }
+        .status { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; }
         .status-dispatched { background: #ffeaa7; color: #b85c00; }
         .status-delivered { background: #d4edda; color: #155724; }
         .status-partial { background: #fff3cd; color: #856404; }
@@ -36,6 +37,7 @@
             .stat-card .number { font-size: 1.3rem; }
             header { flex-direction: column; text-align: center; }
         }
+        .return-row { background: #fff3e0; }
     </style>
 </head>
 <body>
@@ -49,23 +51,40 @@
         </div>
     </header>
 
+    <!-- Stats -->
     <div class="stats">
         <div class="stat-card"><h3>Total Shipments</h3><p class="number" id="totalShipments">-</p></div>
         <div class="stat-card"><h3>To Abuja</h3><p class="number" id="toAbuja">-</p></div>
-        <div class="stat-card"><h3>To Portharcourt</h3><p class="number" id="toPH">-</p></div>
+        <div class="stat-card"><h3>To PH</h3><p class="number" id="toPH">-</p></div>
         <div class="stat-card"><h3>Delivered ✅</h3><p class="number" id="deliveredCount">-</p></div>
         <div class="stat-card"><h3>Goods Value (₦)</h3><p class="number" id="totalValue">-</p></div>
         <div class="stat-card"><h3>Transport (₦)</h3><p class="number" id="totalTransport">-</p></div>
+        <div class="stat-card"><h3>Returned Items</h3><p class="number" id="returnedCount">-</p></div>
     </div>
 
-    <div class="shipments-table">
-        <h2 style="font-size:1.2rem;">📋 Live Shipments</h2>
-        <table id="shipmentsTable">
-            <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th></tr></thead>
-            <tbody id="shipmentsBody"><tr><td colspan="8">Loading...</td></tr></tbody>
-        </table>
+    <!-- Shipments Table -->
+    <div class="section-card">
+        <h2 class="section-title">📋 Live Shipments</h2>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th></tr></thead>
+                <tbody id="shipmentsBody"><tr><td colspan="8">Loading...</td></tr></tbody>
+            </table>
+        </div>
     </div>
-    <footer>NEVAMAK Connect</footer>
+
+    <!-- Returned Goods Table -->
+    <div class="section-card">
+        <h2 class="section-title">🔄 Returned Goods</h2>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead><tr><th>Date</th><th>Branch</th><th>Shipment ID</th><th>Item</th><th>Qty Returned</th><th>Reason</th><th>Recorded By</th></tr></thead>
+                <tbody id="returnsBody"><tr><td colspan="7">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer>NEVAMAK Connect – Real-time Sync</footer>
 </div>
 
 <script>
@@ -81,7 +100,6 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    let currentRole = null;
 
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
@@ -92,15 +110,14 @@
             window.location.href = 'login.html';
             return;
         }
-        currentRole = role;
         document.getElementById('roleBadge').innerText = `Role: ${role}`;
         if (role === 'admin') document.getElementById('adminPanelLink').style.display = 'inline-block';
-        startFirestoreListener();
+        startListeners();
     });
-
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    function startFirestoreListener() {
+    function startListeners() {
+        // Shipments listener
         db.collection("shipments").onSnapshot((snapshot) => {
             let total = 0, abuja = 0, ph = 0, delivered = 0, totalGoods = 0, totalTrans = 0;
             const rows = [];
@@ -117,7 +134,16 @@
                 const statusClass = `status status-${data.status?.toLowerCase().replace(/\s/g, '') || 'dispatched'}`;
                 const itemsShort = data.items ? data.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0, 40) : "-";
                 const lastUpdate = data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleDateString() : (data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "N/A");
-                rows.push(`<tr><td><strong>${doc.id.slice(0,6)}</strong></td><td>${data.senderName || "—"}</td><td><span class="badge">${data.destinationBranch}</span></td><td>${itemsShort}</td><td class="cost-cell">₦${goods.toLocaleString()}</td><td class="cost-cell">₦${(data.transportCost||0).toLocaleString()}</td><td><span class="${statusClass}">${data.status}</span></td><td>${lastUpdate}</td></tr>`);
+                rows.push(`<tr>
+                    <td><strong>${doc.id.slice(0,6)}</strong></td>
+                    <td>${data.senderName || "—"}</td>
+                    <td><span class="badge">${data.destinationBranch}</span></td>
+                    <td>${itemsShort}</td>
+                    <td class="cost-cell">₦${goods.toLocaleString()}</td>
+                    <td class="cost-cell">₦${(data.transportCost||0).toLocaleString()}</td>
+                    <td><span class="${statusClass}">${data.status}</span></td>
+                    <td>${lastUpdate}</td>
+                </tr>`);
             });
             document.getElementById("totalShipments").innerText = total;
             document.getElementById("toAbuja").innerText = abuja;
@@ -126,7 +152,28 @@
             document.getElementById("totalValue").innerText = `₦${totalGoods.toLocaleString()}`;
             document.getElementById("totalTransport").innerText = `₦${totalTrans.toLocaleString()}`;
             document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='8'>No shipments yet</td></tr>";
-        }, (err) => { console.error(err); alert("Permission error. Check security rules."); });
+        }, err => console.error(err));
+
+        // Returns listener
+        db.collection("returns").orderBy("date", "desc").onSnapshot(snap => {
+            let returnRows = "";
+            let totalReturnedQty = 0;
+            snap.forEach(doc => {
+                const r = doc.data();
+                totalReturnedQty += r.returnedQty;
+                returnRows += `<tr>
+                    <td>${new Date(r.date?.toDate()).toLocaleDateString()}</td>
+                    <td>${r.branch}</td>
+                    <td>${r.shipmentId.slice(0,6)}</td>
+                    <td>${r.itemName}</td>
+                    <td>${r.returnedQty}</td>
+                    <td>${r.reason || "-"}</td>
+                    <td>${r.createdBy || "-"}</td>
+                </tr>`;
+            });
+            document.getElementById("returnedCount").innerText = totalReturnedQty;
+            document.getElementById("returnsBody").innerHTML = returnRows || "<tr><td colspan='7'>No returns recorded</td></tr>";
+        });
     }
 </script>
 </body>
