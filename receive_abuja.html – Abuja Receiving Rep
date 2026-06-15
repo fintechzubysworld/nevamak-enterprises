@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEVAMAK – Abuja Receiving (NEXT Cash & Carry)</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        *{ font-family: system-ui; }
+        body{ background: #eef2f5; padding: 20px; }
+        .card{ background: white; border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .shipment-card{ border-left: 5px solid #2c3e50; margin-bottom: 20px; padding: 15px; background: #fefefe; border-radius: 16px; }
+        button{ background: #2c3e50; color: white; padding: 6px 12px; border-radius: 30px; border: none; cursor: pointer; }
+        input{ padding: 6px; width: 100px; border-radius: 8px; border: 1px solid #ccc; }
+        .nav a{ background: #0a3d62; color: white; text-decoration: none; padding: 6px 15px; border-radius: 30px; margin-right: 12px; display: inline-block; }
+        .item-row{ display: flex; gap: 15px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+<div class="nav" style="margin-bottom:20px;"><a href="index.html">🏠 Dashboard</a><a href="lagos_dispatch.html">📦 Lagos</a><a href="receive_ph.html">🌊 PH Receiving</a></div>
+<h2>🏢 NEXT Cash & Carry – ABUJA Branch</h2>
+<p>Supply Representative (Receiving) – confirm incoming goods from Lagos</p>
+<div id="shipmentsList" class="card">Loading pending shipments...</div>
+
+<script>
+    const firebaseConfig = { apiKey: "YOUR_API_KEY", authDomain: "YOUR_PROJECT.firebaseapp.com", projectId: "YOUR_PROJECT_ID", storageBucket: "YOUR_PROJECT.appspot.com", messagingSenderId: "YOUR_SENDER_ID", appId: "YOUR_APP_ID" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    async function loadShipments() {
+        const snapshot = await db.collection("shipments").where("destinationBranch", "==", "Abuja").where("status", "in", ["Dispatched", "Partially Delivered"]).orderBy("createdAt", "desc").get();
+        const container = document.getElementById("shipmentsList");
+        if(snapshot.empty) { container.innerHTML = "<div class='card'>✅ No pending shipments for Abuja. All goods received.</div>"; return; }
+        
+        let html = `<div><strong>📦 Shipments awaiting receiving action</strong></div>`;
+        for (const docSnap of snapshot.docs) {
+            const ship = docSnap.data();
+            const items = ship.items;
+            html += `<div class="shipment-card" id="ship-${docSnap.id}">
+                        <h3>Shipment #${docSnap.id.slice(0,8)} | Vehicle: ${ship.vehicleNo || "N/A"} | Sender: ${ship.senderName}</h3>
+                        <div id="items-area-${docSnap.id}">`;
+            for(let idx=0; idx<items.length; idx++){
+                const it = items[idx];
+                const remaining = it.orderedQty - (it.receivedQty + it.damageQty);
+                html += `<div class="item-row" data-itemidx="${idx}">
+                            <strong>${it.itemName}</strong> (Ordered: ${it.orderedQty}) 
+                            Already received: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${remaining}
+                            <br>➕ Additional received: <input type="number" id="recv_${docSnap.id}_${idx}" value="0" min="0" max="${remaining}" style="width:80px">
+                            🛑 Additional damaged: <input type="number" id="dam_${docSnap.id}_${idx}" value="0" min="0" max="${remaining}" style="width:80px">
+                          </div>`;
+            }
+            html += `<div><label>Receiving Rep Name: </label><input type="text" id="repName_${docSnap.id}" placeholder="e.g., Chidi Abuja"></div>
+                     <div><label>GRN Reference: </label><input type="text" id="grn_${docSnap.id}" placeholder="GRN-ABJ-001"></div>
+                     <button onclick="receiveShipment('${docSnap.id}')">✅ Confirm Receipt & Update Inventory</button>
+                     </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    window.receiveShipment = async (shipId) => {
+        const docRef = db.collection("shipments").doc(shipId);
+        const doc = await docRef.get();
+        if(!doc.exists) return;
+        const data = doc.data();
+        let items = [...data.items];
+        let anyUpdate = false;
+        for(let i=0; i<items.length; i++){
+            const addRecv = parseInt(document.getElementById(`recv_${shipId}_${i}`)?.value || 0);
+            const addDam = parseInt(document.getElementById(`dam_${shipId}_${i}`)?.value || 0);
+            if(addRecv>0 || addDam>0){
+                anyUpdate = true;
+                items[i].receivedQty = (items[i].receivedQty || 0) + addRecv;
+                items[i].damageQty = (items[i].damageQty || 0) + addDam;
+                // Clamp
+                if(items[i].receivedQty + items[i].damageQty > items[i].orderedQty){
+                    alert(`Over-receipt on ${items[i].itemName}. Adjusting.`);
+                    let total = items[i].receivedQty + items[i].damageQty;
+                    if(total > items[i].orderedQty) items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
+                }
+            }
+        }
+        if(!anyUpdate) return alert("No quantity entered for receiving.");
+        const receivingRep = document.getElementById(`repName_${shipId}`).value.trim();
+        const grn = document.getElementById(`grn_${shipId}`).value.trim();
+        if(!receivingRep) return alert("Please enter receiving rep name.");
+        
+        let allCompleted = true;
+        for(let it of items){
+            if(it.receivedQty + it.damageQty < it.orderedQty) allCompleted = false;
+        }
+        const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
+        
+        await docRef.update({
+            items: items,
+            status: newStatus,
+            receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+            receivingRep: receivingRep,
+            grnNumber: grn || `GRN-${Date.now()}`,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert(`✅ ${newStatus} - Goods receipt completed. GRN: ${grn}`);
+        loadShipments(); // refresh
+    };
+    loadShipments();
+</script>
+</body>
+</html>
