@@ -2,25 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NEVAMAK – Lagos Dispatch</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
         *{ box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        body{ background: #f4f7fc; margin: 0; padding: 20px; }
-        .container{ max-width: 1200px; margin: auto; }
-        .card{ background: white; border-radius: 24px; padding: 24px; margin-bottom: 30px; box-shadow: 0 6px 14px rgba(0,0,0,0.05); }
-        h2{ margin-top: 0; color: #0a3d62; }
-        input, select, button{ padding: 10px; border-radius: 10px; border: 1px solid #ccc; font-size: 1rem; margin: 5px 0; }
-        button{ background: #0a3d62; color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover{ background: #1e3799; }
-        .item-row{ display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-        .item-row input{ flex: 1; min-width: 120px; }
+        body{ background: #f4f7fc; margin: 0; padding: 12px; }
+        .container{ max-width: 700px; margin: auto; }
+        .card{ background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2{ margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
+        input, select, button{ width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
+        button{ background: #0a3d62; color: white; font-weight: bold; border: none; cursor: pointer; }
+        .item-row{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .item-row input{ flex: 1; margin: 0; }
         .add-btn{ background: #27ae60; }
-        .nav{ display: flex; gap: 15px; margin-bottom: 20px; align-items: center; }
-        .nav a, .logout-btn{ text-decoration: none; background: #2c3e50; color: white; padding: 6px 15px; border-radius: 30px; border: none; cursor: pointer; }
-        .cost-summary{ background: #e8f0fe; padding: 10px; border-radius: 12px; margin-top: 15px; }
+        .removeItem{ background: #e74c3c; padding: 12px; width: auto; min-width: 60px; }
+        .cost-summary{ background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; }
+        .nav{ display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav a, .logout-btn{ background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        table{ width: 100%; border-collapse: collapse; min-width: 500px; }
+        th, td{ padding: 10px; text-align: left; font-size: 0.85rem; border-bottom: 1px solid #ddd; }
+        .cost-cell{ font-family: monospace; }
+        .scroll{ overflow-x: auto; }
     </style>
 </head>
 <body>
@@ -30,42 +35,36 @@
         <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
     <div class="card">
-        <h2>📤 Create New Dispatch (Lagos Warehouse)</h2>
+        <h2>📤 New Dispatch (Lagos)</h2>
         <form id="dispatchForm">
-            <label>Supply Representative Name (Lagos):</label><br>
-            <input type="text" id="senderName" placeholder="e.g., Ade Lagos Rep" required><br><br>
-            <label>Destination Branch:</label><br>
+            <input type="text" id="senderName" placeholder="Lagos Rep Name" required>
             <select id="destBranch">
-                <option value="Abuja">NEXT Cash & Carry - Abuja</option>
-                <option value="Portharcourt">NEXT Cash & Carry - Port Harcourt</option>
-            </select><br><br>
-            <label>Vehicle / Waybill #:</label><br>
-            <input type="text" id="vehicleNo" placeholder="Optional"><br><br>
-            <label>Transportation Cost (₦):</label><br>
-            <input type="number" id="transportCost" placeholder="e.g., 150000" value="0" step="1000"><br><br>
-            <label>Items (product, quantity, price per unit):</label>
+                <option value="Abuja">Abuja</option>
+                <option value="Portharcourt">Port Harcourt</option>
+            </select>
+            <input type="text" id="vehicleNo" placeholder="Vehicle / Waybill #">
+            <input type="number" id="transportCost" placeholder="Transport Cost (₦)" value="0">
+            <label>Items (name, qty, price):</label>
             <div id="itemsContainer">
                 <div class="item-row">
                     <input type="text" placeholder="Item name" class="itemName">
-                    <input type="number" placeholder="Quantity" class="itemQty">
-                    <input type="number" placeholder="Price per unit (₦)" class="itemPrice">
-                    <button type="button" class="removeItem" style="background:#e74c3c;">✖</button>
+                    <input type="number" placeholder="Qty" class="itemQty">
+                    <input type="number" placeholder="Price/unit" class="itemPrice">
+                    <button type="button" class="removeItem">✖</button>
                 </div>
             </div>
-            <button type="button" id="addItemBtn" class="add-btn">+ Add another product</button>
-            <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
-            <br>
-            <button type="submit">🚛 Dispatch Shipment</button>
+            <button type="button" id="addItemBtn" class="add-btn">+ Add product</button>
+            <div class="cost-summary" id="costPreview">Goods value: ₦0</div>
+            <button type="submit">🚛 Dispatch</button>
         </form>
     </div>
     <div class="card">
-        <h2>📦 Recent Shipments from Lagos</h2>
-        <div style="overflow-x: auto;">
+        <h2>📦 Recent Shipments</h2>
+        <div class="scroll">
             <table id="recentShipments">
-                <thead><tr><th>ID</th><th>Dest.</th><th>Items</th><th>Goods Value</th><th>Transport</th><th>Status</th><th>Date</th>}</thead>
-                <tbody><tr><td colspan="7">Loading...</td></tr>
-            </tbody>
-        寸�
+                <thead><tr><th>ID</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th></tr></thead>
+                <tbody><tr><td colspan="7">Loading...</td></tr></tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -84,7 +83,6 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // Auth & role check
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         const userDoc = await db.collection('users').doc(user.uid).get();
@@ -92,80 +90,59 @@
         if (role !== 'admin' && role !== 'lagos_sender') {
             await auth.signOut();
             window.location.href = 'login.html';
-            return;
-        }
-        // Start Firestore listeners after auth
-        loadRecentShipments();
+        } else loadRecent();
     });
-
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // Dynamic items
     const itemsContainer = document.getElementById("itemsContainer");
     document.getElementById("addItemBtn").addEventListener("click", () => {
-        const newRow = document.createElement("div");
-        newRow.className = "item-row";
-        newRow.innerHTML = `<input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><input type="number" placeholder="Price per unit (₦)" class="itemPrice"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button>`;
-        itemsContainer.appendChild(newRow);
-        attachRemoveEvent(newRow);
-        updateCostPreview();
+        const div = document.createElement("div");
+        div.className = "item-row";
+        div.innerHTML = `<input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Qty" class="itemQty"><input type="number" placeholder="Price/unit" class="itemPrice"><button type="button" class="removeItem">✖</button>`;
+        itemsContainer.appendChild(div);
+        div.querySelector(".removeItem").onclick = () => div.remove();
+        updatePreview();
     });
-    function attachRemoveEvent(row) { row.querySelector(".removeItem")?.addEventListener("click", () => { row.remove(); updateCostPreview(); }); }
-    function updateCostPreview() {
+    function updatePreview() {
         let total = 0;
-        document.querySelectorAll(".item-row").forEach(row => {
-            const qty = parseInt(row.querySelector(".itemQty")?.value || 0);
-            const price = parseFloat(row.querySelector(".itemPrice")?.value || 0);
+        document.querySelectorAll(".item-row").forEach(r => {
+            const qty = parseInt(r.querySelector(".itemQty")?.value || 0);
+            const price = parseFloat(r.querySelector(".itemPrice")?.value || 0);
             total += qty * price;
         });
         document.getElementById("costPreview").innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
     }
-    document.getElementById("itemsContainer").addEventListener("input", updateCostPreview);
-    
+    itemsContainer.addEventListener("input", updatePreview);
     document.getElementById("dispatchForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
         const vehicleNo = document.getElementById("vehicleNo").value.trim();
         const transportCost = parseFloat(document.getElementById("transportCost").value) || 0;
-        const rows = document.querySelectorAll(".item-row");
-        let items = [];
-        for(let row of rows){
+        const items = [];
+        document.querySelectorAll(".item-row").forEach(row => {
             const name = row.querySelector(".itemName").value.trim();
             const qty = parseInt(row.querySelector(".itemQty").value);
             const price = parseFloat(row.querySelector(".itemPrice").value);
-            if(name && qty > 0 && price >= 0){
-                items.push({ itemName: name, orderedQty: qty, unitPrice: price, totalItemCost: qty * price, receivedQty: 0, damageQty: 0 });
-            }
-        }
-        if(items.length === 0) return alert("Add at least one product.");
-        if(!senderName) return alert("Enter rep name.");
-        await db.collection("shipments").add({ senderName, destinationBranch: destBranch, vehicleNo, transportCost, items, status: "Dispatched", createdAt: firebase.firestore.FieldValue.serverTimestamp(), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
-        alert("✅ Shipment dispatched to " + destBranch);
+            if(name && qty>0 && price>=0) items.push({ itemName: name, orderedQty: qty, unitPrice: price, totalItemCost: qty*price, receivedQty:0, damageQty:0 });
+        });
+        if(!items.length || !senderName) return alert("Fill all fields");
+        await db.collection("shipments").add({ senderName, destinationBranch: destBranch, vehicleNo, transportCost, items, status: "Dispatched", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        alert("Dispatched to " + destBranch);
         document.getElementById("dispatchForm").reset();
-        document.getElementById("itemsContainer").innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><input type="number" placeholder="Price per unit (₦)" class="itemPrice"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button></div>`;
-        updateCostPreview();
+        itemsContainer.innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Qty" class="itemQty"><input type="number" placeholder="Price/unit" class="itemPrice"><button type="button" class="removeItem">✖</button></div>`;
+        updatePreview();
     });
-
-    function loadRecentShipments() {
-        db.collection("shipments").orderBy("createdAt", "desc").limit(20).onSnapshot((snap) => {
+    function loadRecent() {
+        db.collection("shipments").orderBy("createdAt","desc").limit(20).onSnapshot(snap => {
             let html = "";
             snap.forEach(doc => {
-                const data = doc.data();
-                let goodsValue = 0;
-                if(data.items) data.items.forEach(i => goodsValue += (i.totalItemCost || 0));
-                const itemsShort = data.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ") + (data.items?.length>2?"...":"");
-                html += `<tr>
-                            <td>${doc.id.slice(0,6)}</td>
-                            <td>${data.destinationBranch}</td>
-                            <td>${itemsShort}</td>
-                            <td class="cost-cell">₦${goodsValue.toLocaleString()}</td>
-                            <td class="cost-cell">₦${(data.transportCost||0).toLocaleString()}</td>
-                            <td>${data.status}</td>
-                            <td>${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "recent"}</td>
-                          </tr>`;
+                const d = doc.data();
+                let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
+                const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
+                html += `<tr><td>${doc.id.slice(0,5)}</td><td>${d.destinationBranch}</td><td>${itemsShort}</td><td class="cost-cell">₦${goods.toLocaleString()}</td><td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td><td>${d.status}</td><td>${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ""}</td></tr>`;
             });
-            document.getElementById("recentShipments").querySelector("tbody").innerHTML = html || "<tr><td colspan='7'>No shipments yet</td></tr>";
+            document.querySelector("#recentShipments tbody").innerHTML = html || "<tr><td colspan='7'>No shipments</td></tr>";
         });
     }
 </script>
