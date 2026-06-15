@@ -20,6 +20,161 @@
         .info { color: #27ae60; text-align: center; margin-top: 10px; }
         .setup-btn { background: #e67e22; margin-top: 20px; }
         .setup-btn:hover { background: #d35400; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🚛 NEVAMAK Enterprises</h1>
+    <div class="sub">Supply Chain Portal</div>
+    <input type="email" id="email" placeholder="Email" autocomplete="email">
+    <input type="password" id="password" placeholder="Password">
+    <button id="loginBtn">Sign In</button>
+    <div id="message" class="error"></div>
+    <div id="setupAdminContainer" style="display:none;">
+        <button id="setupAdminBtn" class="setup-btn">🔧 Create Default Admin (admin@nevamak.com / admin123)</button>
+        <div class="info">Click once to create the admin account.</div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // Check if any admin exists
+    async function checkAdminExists() {
+        try {
+            const snapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
+            if (!snapshot.empty) {
+                document.getElementById('setupAdminContainer').style.display = 'none';
+            } else {
+                document.getElementById('setupAdminContainer').style.display = 'block';
+            }
+        } catch (err) {
+            console.warn(err);
+            document.getElementById('setupAdminContainer').style.display = 'block';
+        }
+    }
+    checkAdminExists();
+
+    // Create default admin account (Auth + Firestore)
+    document.getElementById('setupAdminBtn')?.addEventListener('click', async () => {
+        const adminEmail = 'admin@nevamak.com';
+        const adminPassword = 'admin123';
+        try {
+            let uid;
+            try {
+                // Try to create auth user
+                const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
+                uid = userCred.user.uid;
+            } catch (err) {
+                if (err.code === 'auth/email-already-in-use') {
+                    // User exists in Auth, get their UID
+                    const user = await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+                    uid = user.user.uid;
+                    await auth.signOut();
+                } else {
+                    throw err;
+                }
+            }
+            // Create Firestore user document
+            await db.collection('users').doc(uid).set({
+                email: adminEmail,
+                role: 'admin',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert('✅ Admin account is ready!\nEmail: admin@nevamak.com\nPassword: admin123\nPlease sign in.');
+            document.getElementById('setupAdminContainer').style.display = 'none';
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    });
+
+    // Login
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const messageDiv = document.getElementById('message');
+        messageDiv.innerText = '';
+        try {
+            const userCred = await auth.signInWithEmailAndPassword(email, password);
+            const uid = userCred.user.uid;
+            let userDoc = await db.collection('users').doc(uid).get();
+            
+            // SPECIAL FIX: If email is default admin and doc missing, create it automatically
+            if (!userDoc.exists && email === 'admin@nevamak.com') {
+                await db.collection('users').doc(uid).set({
+                    email: email,
+                    role: 'admin',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                userDoc = await db.collection('users').doc(uid).get();
+            }
+            
+            if (!userDoc.exists) {
+                await auth.signOut();
+                throw new Error('User role not found. Please ask the admin to create your account via Admin Panel.');
+            }
+            const role = userDoc.data().role;
+            if (role === 'admin' || role === 'lagos_sender') {
+                window.location.href = 'index.html';
+            } else if (role === 'abuja_rep') {
+                window.location.href = 'receive_abuja.html';
+            } else if (role === 'ph_rep') {
+                window.location.href = 'receive_ph.html';
+            } else {
+                throw new Error('Invalid role: ' + role);
+            }
+        } catch (err) {
+            messageDiv.innerText = err.message;
+        }
+    });
+
+    // Auto-redirect if already logged in
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                const role = userDoc.data().role;
+                if (role === 'admin' || role === 'lagos_sender') window.location.href = 'index.html';
+                else if (role === 'abuja_rep') window.location.href = 'receive_abuja.html';
+                else if (role === 'ph_rep') window.location.href = 'receive_ph.html';
+            }
+        }
+    });
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEVAMAK – Login</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: linear-gradient(135deg, #0a3d62, #3c6382); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; padding: 20px; }
+        .card { background: white; max-width: 450px; width: 100%; padding: 30px; border-radius: 32px; box-shadow: 0 20px 35px rgba(0,0,0,0.2); }
+        h1 { color: #0a3d62; margin-bottom: 5px; }
+        .sub { color: #555; margin-bottom: 25px; font-size: 0.9rem; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 40px; font-size: 1rem; }
+        button { width: 100%; padding: 12px; background: #0a3d62; color: white; border: none; border-radius: 40px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button:hover { background: #1e3799; }
+        .error { color: #e74c3c; margin-top: 10px; text-align: center; }
+        .info { color: #27ae60; text-align: center; margin-top: 10px; }
+        .setup-btn { background: #e67e22; margin-top: 20px; }
+        .setup-btn:hover { background: #d35400; }
         .admin-only { border-top: 1px solid #ddd; margin-top: 20px; padding-top: 20px; }
     </style>
 </head>
