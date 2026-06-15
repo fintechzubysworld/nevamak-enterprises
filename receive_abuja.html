@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEVAMAK – Abuja Receiving (NEXT Cash & Carry)</title>
+    <title>NEVAMAK – Abuja Receiving with Costs</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
@@ -15,6 +14,7 @@
         input{ padding: 6px; width: 100px; border-radius: 8px; border: 1px solid #ccc; }
         .nav a{ background: #0a3d62; color: white; text-decoration: none; padding: 6px 15px; border-radius: 30px; margin-right: 12px; display: inline-block; }
         .item-row{ display: flex; gap: 15px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+        .cost-info{ background: #f1f9f9; padding: 8px; border-radius: 12px; margin: 8px 0; font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -24,7 +24,6 @@
 <div id="shipmentsList" class="card">Loading pending shipments...</div>
 
 <script>
-    // ==================== NEVAMAK FIREBASE CONFIG ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -34,36 +33,47 @@
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
         measurementId: "G-MZ8NT6KK8N"
     };
-    // ==============================================================
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     async function loadShipments() {
-        const snapshot = await db.collection("shipments").where("destinationBranch", "==", "Abuja").where("status", "in", ["Dispatched", "Partially Delivered"]).orderBy("createdAt", "desc").get();
+        const snapshot = await db.collection("shipments")
+            .where("destinationBranch", "==", "Abuja")
+            .where("status", "in", ["Dispatched", "Partially Delivered"])
+            .get();
         const container = document.getElementById("shipmentsList");
         if(snapshot.empty) { container.innerHTML = "<div class='card'>✅ No pending shipments for Abuja. All goods received.</div>"; return; }
         
+        // Client-side sort by createdAt desc
+        let docs = [];
+        snapshot.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
+        docs.sort((a,b) => {
+            let dateA = a.data.createdAt?.toDate() || new Date(0);
+            let dateB = b.data.createdAt?.toDate() || new Date(0);
+            return dateB - dateA;
+        });
+        
         let html = `<div><strong>📦 Shipments awaiting receiving action</strong></div>`;
-        for (const docSnap of snapshot.docs) {
-            const ship = docSnap.data();
+        for (const { id, data: ship } of docs) {
             const items = ship.items;
-            html += `<div class="shipment-card" id="ship-${docSnap.id}">
-                        <h3>Shipment #${docSnap.id.slice(0,8)} | Vehicle: ${ship.vehicleNo || "N/A"} | Sender: ${ship.senderName}</h3>
-                        <div id="items-area-${docSnap.id}">`;
+            const totalGoodsValue = items.reduce((sum, it) => sum + (it.totalItemCost || 0), 0);
+            html += `<div class="shipment-card" id="ship-${id}">
+                        <h3>Shipment #${id.slice(0,8)} | Vehicle: ${ship.vehicleNo || "N/A"} | Sender: ${ship.senderName}</h3>
+                        <div class="cost-info">📊 Transport Cost: ₦${(ship.transportCost || 0).toLocaleString()} | Total Goods Value: ₦${totalGoodsValue.toLocaleString()}</div>
+                        <div id="items-area-${id}">`;
             for(let idx=0; idx<items.length; idx++){
                 const it = items[idx];
                 const remaining = it.orderedQty - (it.receivedQty + it.damageQty);
                 html += `<div class="item-row" data-itemidx="${idx}">
-                            <strong>${it.itemName}</strong> (Ordered: ${it.orderedQty}) 
-                            Already received: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${remaining}
-                            <br>➕ Additional received: <input type="number" id="recv_${docSnap.id}_${idx}" value="0" min="0" max="${remaining}" style="width:80px">
-                            🛑 Additional damaged: <input type="number" id="dam_${docSnap.id}_${idx}" value="0" min="0" max="${remaining}" style="width:80px">
+                            <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit) 
+                            Ordered: ${it.orderedQty} | Already OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${remaining}
+                            <br>➕ Additional received: <input type="number" id="recv_${id}_${idx}" value="0" min="0" max="${remaining}" style="width:80px">
+                            🛑 Additional damaged: <input type="number" id="dam_${id}_${idx}" value="0" min="0" max="${remaining}" style="width:80px">
                           </div>`;
             }
-            html += `<div><label>Receiving Rep Name: </label><input type="text" id="repName_${docSnap.id}" placeholder="e.g., Chidi Abuja"></div>
-                     <div><label>GRN Reference: </label><input type="text" id="grn_${docSnap.id}" placeholder="GRN-ABJ-001"></div>
-                     <button onclick="receiveShipment('${docSnap.id}')">✅ Confirm Receipt & Update Inventory</button>
+            html += `<div><label>Receiving Rep Name: </label><input type="text" id="repName_${id}" placeholder="e.g., Chidi Abuja"></div>
+                     <div><label>GRN Reference: </label><input type="text" id="grn_${id}" placeholder="GRN-ABJ-001"></div>
+                     <button onclick="receiveShipment('${id}')">✅ Confirm Receipt & Update Inventory</button>
                      </div>`;
         }
         container.innerHTML = html;
@@ -114,13 +124,6 @@
         loadShipments(); // refresh
     };
     loadShipments();
-</script>
-    <script>
-  firebase.firestore().collection("shipments").onSnapshot((snap) => {
-    console.log("🔥 Firestore connected, shipments count:", snap.size);
-  }, (error) => {
-    console.error("❌ Firestore error:", error);
-  });
 </script>
 </body>
 </html>
