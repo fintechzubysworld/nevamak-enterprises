@@ -2,36 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NEVAMAK – Admin: Create User</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEVAMAK – Admin Create User</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
         *{ font-family: 'Segoe UI', sans-serif; }
-        body{ background: #f0f2f5; padding: 20px; }
-        .card{ max-width: 600px; margin: auto; background: white; border-radius: 24px; padding: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        input, select, button{ width: 100%; padding: 10px; margin: 8px 0; border-radius: 40px; border: 1px solid #ccc; }
-        button{ background: #0a3d62; color: white; font-weight: bold; cursor: pointer; }
+        body{ background: #f0f2f5; margin: 0; padding: 16px; }
+        .card{ max-width: 500px; margin: auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        input, select, button{ width: 100%; padding: 14px; margin: 8px 0; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; }
+        button{ background: #0a3d62; color: white; font-weight: bold; border: none; cursor: pointer; }
         .logout-btn{ background: #e74c3c; margin-top: 20px; }
+        .nav{ display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
+        .nav a, .logout-btn2{ background: #2c3e50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 40px; border: none; cursor: pointer; }
         .success{ color: green; }
         .error{ color: red; }
-        .nav{ margin-bottom: 20px; }
-        .nav a{ background: #2c3e50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 30px; }
     </style>
 </head>
 <body>
 <div class="card">
     <div class="nav">
         <a href="index.html">🏠 Dashboard</a>
-        <button id="logoutBtn" style="width:auto; float:right;">🚪 Logout</button>
+        <button id="logoutBtn" class="logout-btn2">🚪 Logout</button>
     </div>
-    <h2>👥 Create New User</h2>
+    <h2>👥 Create User</h2>
     <input type="email" id="userEmail" placeholder="Email">
     <input type="password" id="userPassword" placeholder="Password">
     <select id="userRole">
         <option value="lagos_sender">Lagos Sender</option>
         <option value="abuja_rep">Abuja Representative</option>
-        <option value="ph_rep">Port Harcourt Representative</option>
+        <option value="ph_rep">Port Harcourt Rep</option>
         <option value="admin">Admin</option>
     </select>
     <button id="createUserBtn">➕ Create User</button>
@@ -52,40 +53,27 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // Check admin role
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.data()?.role !== 'admin') {
-            alert('Only admin can access this page.');
+            alert('Only admin can access');
             window.location.href = 'index.html';
         }
     });
-
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
-
     document.getElementById('createUserBtn').addEventListener('click', async () => {
         const email = document.getElementById('userEmail').value.trim();
         const password = document.getElementById('userPassword').value;
         const role = document.getElementById('userRole').value;
-        if (!email || !password) {
-            document.getElementById('message').innerText = 'Fill all fields.';
-            return;
-        }
+        if (!email || !password) { document.getElementById('message').innerText = 'Fill all fields'; return; }
         try {
             const userCred = await auth.createUserWithEmailAndPassword(email, password);
-            const uid = userCred.user.uid;
-            await db.collection('users').doc(uid).set({
-                email: email,
-                role: role,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            document.getElementById('message').innerHTML = `<span class="success">✅ User ${email} created with role ${role}.</span>`;
+            await db.collection('users').doc(userCred.user.uid).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            document.getElementById('message').innerHTML = `<span class="success">✅ ${email} created as ${role}</span>`;
             document.getElementById('userEmail').value = '';
             document.getElementById('userPassword').value = '';
-        } catch (err) {
-            document.getElementById('message').innerHTML = `<span class="error">❌ ${err.message}</span>`;
-        }
+        } catch (err) { document.getElementById('message').innerHTML = `<span class="error">❌ ${err.message}</span>`; }
     });
 </script>
 </body>
