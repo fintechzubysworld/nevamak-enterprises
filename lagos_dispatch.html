@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEVAMAK – Lagos Dispatch</title>
+    <title>NEVAMAK – Lagos Dispatch with Costs</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
@@ -16,12 +16,11 @@
         button{ background: #0a3d62; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
         button:hover{ background: #1e3799; }
         .item-row{ display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-        .item-row input{ flex: 1; }
+        .item-row input{ flex: 1; min-width: 120px; }
         .add-btn{ background: #27ae60; margin-top: 5px; }
-        .shipment-list table{ width: 100%; border-collapse: collapse; }
-        th, td{ text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
         .nav{ display: flex; gap: 15px; margin-bottom: 20px; }
         .nav a{ text-decoration: none; background: #2c3e50; color: white; padding: 6px 15px; border-radius: 30px; }
+        .cost-summary{ background: #e8f0fe; padding: 10px; border-radius: 12px; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -43,15 +42,20 @@
             </select><br><br>
             <label>Vehicle / Waybill #:</label><br>
             <input type="text" id="vehicleNo" placeholder="Optional"><br><br>
-            <label>Items (product & quantity):</label>
+            <label>Transportation Cost (₦):</label><br>
+            <input type="number" id="transportCost" placeholder="e.g., 150000" value="0" step="1000"><br><br>
+            <label>Items (product, quantity, price per unit):</label>
             <div id="itemsContainer">
                 <div class="item-row">
                     <input type="text" placeholder="Item name" class="itemName">
                     <input type="number" placeholder="Quantity" class="itemQty">
+                    <input type="number" placeholder="Price per unit (₦)" class="itemPrice">
                     <button type="button" class="removeItem" style="background:#e74c3c;">✖</button>
                 </div>
             </div>
-            <button type="button" id="addItemBtn" class="add-btn">+ Add another product</button><br><br>
+            <button type="button" id="addItemBtn" class="add-btn">+ Add another product</button>
+            <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
+            <br>
             <button type="submit">🚛 Dispatch Shipment</button>
         </form>
     </div>
@@ -60,16 +64,15 @@
         <h2>📦 Recent Shipments from Lagos</h2>
         <div style="overflow-x: auto;">
             <table id="recentShipments">
-                <thead><tr><th>ID</th><th>Destination</th><th>Items</th><th>Status</th><th>Date</th>}</thead>
-                <tbody><tr><td colspan="5">Loading...</td></tr>
+                <thead><tr><th>ID</th><th>Dest.</th><th>Items</th><th>Goods Value</th><th>Transport</th><th>Status</th><th>Date</th>}</thead>
+                <tbody><tr><td colspan="7">Loading...</td></tr>
             </tbody>
-        </table>
+        }</table>
         </div>
     </div>
 </div>
 
 <script>
-    // ==================== NEVAMAK FIREBASE CONFIG ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -79,8 +82,6 @@
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
         measurementId: "G-MZ8NT6KK8N"
     };
-    // ==============================================================
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
@@ -89,37 +90,59 @@
     document.getElementById("addItemBtn").addEventListener("click", () => {
         const newRow = document.createElement("div");
         newRow.className = "item-row";
-        newRow.innerHTML = `<input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button>`;
+        newRow.innerHTML = `<input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><input type="number" placeholder="Price per unit (₦)" class="itemPrice"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button>`;
         itemsContainer.appendChild(newRow);
         attachRemoveEvent(newRow);
+        updateCostPreview();
     });
     function attachRemoveEvent(row) {
-        row.querySelector(".removeItem")?.addEventListener("click", () => row.remove());
+        row.querySelector(".removeItem")?.addEventListener("click", () => { row.remove(); updateCostPreview(); });
     }
-    document.querySelectorAll(".removeItem").forEach(btn => btn.addEventListener("click", function(){ this.closest(".item-row").remove(); }));
-
+    document.querySelectorAll(".removeItem").forEach(btn => btn.addEventListener("click", function(){ this.closest(".item-row").remove(); updateCostPreview(); }));
+    
+    function updateCostPreview() {
+        let total = 0;
+        document.querySelectorAll(".item-row").forEach(row => {
+            const qty = parseInt(row.querySelector(".itemQty")?.value || 0);
+            const price = parseFloat(row.querySelector(".itemPrice")?.value || 0);
+            total += qty * price;
+        });
+        document.getElementById("costPreview").innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
+    }
+    document.getElementById("itemsContainer").addEventListener("input", updateCostPreview);
+    
     // Create shipment
     document.getElementById("dispatchForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
         const vehicleNo = document.getElementById("vehicleNo").value.trim();
+        const transportCost = parseFloat(document.getElementById("transportCost").value) || 0;
         const rows = document.querySelectorAll(".item-row");
         let items = [];
         for(let row of rows){
             const name = row.querySelector(".itemName").value.trim();
             const qty = parseInt(row.querySelector(".itemQty").value);
-            if(name && qty > 0){
-                items.push({ itemName: name, orderedQty: qty, receivedQty: 0, damageQty: 0 });
+            const price = parseFloat(row.querySelector(".itemPrice").value);
+            if(name && qty > 0 && price >= 0){
+                items.push({ 
+                    itemName: name, 
+                    orderedQty: qty, 
+                    unitPrice: price,
+                    totalItemCost: qty * price,
+                    receivedQty: 0, 
+                    damageQty: 0 
+                });
             }
         }
-        if(items.length === 0) return alert("Add at least one product.");
+        if(items.length === 0) return alert("Add at least one product with valid quantity and price.");
         if(!senderName) return alert("Enter rep name.");
         
         await db.collection("shipments").add({
             senderName: senderName,
             destinationBranch: destBranch,
             vehicleNo: vehicleNo,
+            transportCost: transportCost,
             items: items,
             status: "Dispatched",
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -127,7 +150,8 @@
         });
         alert("✅ Shipment dispatched to " + destBranch);
         document.getElementById("dispatchForm").reset();
-        document.getElementById("itemsContainer").innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button></div>`;
+        document.getElementById("itemsContainer").innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><input type="number" placeholder="Price per unit (₦)" class="itemPrice"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button></div>`;
+        updateCostPreview();
     });
 
     // Real-time recent shipments
@@ -135,18 +159,21 @@
         let html = "";
         snap.forEach(doc => {
             const data = doc.data();
+            let goodsValue = 0;
+            if(data.items) data.items.forEach(i => goodsValue += (i.totalItemCost || 0));
             const itemsShort = data.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ") + (data.items?.length>2?"...":"");
-            html += `<tr><td>${doc.id.slice(0,6)}</td><td>${data.destinationBranch}</td><td>${itemsShort}</td><td>${data.status}</td><td>${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "recent"}</td></tr>`;
+            html += `<tr>
+                        <td>${doc.id.slice(0,6)}</td>
+                        <td>${data.destinationBranch}</td>
+                        <td>${itemsShort}</td>
+                        <td class="cost-cell">₦${goodsValue.toLocaleString()}</td>
+                        <td class="cost-cell">₦${(data.transportCost||0).toLocaleString()}</td>
+                        <td>${data.status}</td>
+                        <td>${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "recent"}</td>
+                     </tr>`;
         });
-        document.getElementById("recentShipments").querySelector("tbody").innerHTML = html || "<tr><td colspan='5'>No shipments yet</td></tr>";
+        document.getElementById("recentShipments").querySelector("tbody").innerHTML = html || "<tr><td colspan='7'>No shipments yet</td></tr>";
     });
-</script>
-    <script>
-  firebase.firestore().collection("shipments").onSnapshot((snap) => {
-    console.log("🔥 Firestore connected, shipments count:", snap.size);
-  }, (error) => {
-    console.error("❌ Firestore error:", error);
-  });
 </script>
 </body>
 </html>
