@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEVAMAK – Login</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: linear-gradient(135deg, #0a3d62, #3c6382); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; padding: 20px; }
+        .card { background: white; max-width: 450px; width: 100%; padding: 30px; border-radius: 32px; box-shadow: 0 20px 35px rgba(0,0,0,0.2); }
+        h1 { color: #0a3d62; margin-bottom: 5px; }
+        .sub { color: #555; margin-bottom: 25px; font-size: 0.9rem; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 40px; font-size: 1rem; }
+        button { width: 100%; padding: 12px; background: #0a3d62; color: white; border: none; border-radius: 40px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button:hover { background: #1e3799; }
+        .toggle { text-align: center; margin-top: 15px; color: #0a3d62; cursor: pointer; text-decoration: underline; }
+        .error { color: #e74c3c; margin-top: 10px; text-align: center; }
+        .info { color: #27ae60; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🚛 NEVAMAK Enterprises</h1>
+    <div class="sub">Supply Chain Portal</div>
+    <div id="authContainer">
+        <div id="loginForm">
+            <input type="email" id="loginEmail" placeholder="Email" autocomplete="email">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button id="loginBtn">Sign In</button>
+            <div class="toggle" onclick="showSignup()">Don't have an account? Sign up</div>
+        </div>
+        <div id="signupForm" style="display:none;">
+            <input type="email" id="signupEmail" placeholder="Email">
+            <input type="password" id="signupPassword" placeholder="Password">
+            <button id="signupBtn">Sign Up</button>
+            <div class="toggle" onclick="showLogin()">← Back to Sign In</div>
+        </div>
+        <div id="message" class="error"></div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    function showSignup() {
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('signupForm').style.display = 'block';
+    }
+    function showLogin() {
+        document.getElementById('loginForm').style.display = 'block';
+        document.getElementById('signupForm').style.display = 'none';
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        try {
+            const userCred = await auth.signInWithEmailAndPassword(email, password);
+            const user = userCred.user;
+            // Check user role in Firestore
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (!userDoc.exists) {
+                await auth.signOut();
+                throw new Error('User role not found. Contact admin.');
+            }
+            const role = userDoc.data().role;
+            // Redirect based on role
+            if (role === 'admin' || role === 'lagos_sender') {
+                window.location.href = 'index.html';
+            } else if (role === 'abuja_rep') {
+                window.location.href = 'receive_abuja.html';
+            } else if (role === 'ph_rep') {
+                window.location.href = 'receive_ph.html';
+            } else {
+                throw new Error('Invalid role');
+            }
+        } catch (err) {
+            document.getElementById('message').innerText = err.message;
+        }
+    });
+
+    document.getElementById('signupBtn').addEventListener('click', async () => {
+        const email = document.getElementById('signupEmail').value;
+        const password = document.getElementById('signupPassword').value;
+        try {
+            const userCred = await auth.createUserWithEmailAndPassword(email, password);
+            const user = userCred.user;
+            // Default role: ask user to contact admin? For demo, we'll set a default role "abuja_rep" but admin must change.
+            // Better: alert that admin must assign role. We'll create a placeholder user doc with role "pending".
+            await db.collection('users').doc(user.uid).set({
+                email: email,
+                role: 'pending',   // Admin must manually update to correct role in Firestore
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await auth.signOut();
+            document.getElementById('message').innerText = 'Account created! Wait for admin to assign role. Then sign in.';
+            showLogin();
+        } catch (err) {
+            document.getElementById('message').innerText = err.message;
+        }
+    });
+
+    // Auto-redirect if already logged in
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                const role = userDoc.data().role;
+                if (role === 'admin' || role === 'lagos_sender') window.location.href = 'index.html';
+                else if (role === 'abuja_rep') window.location.href = 'receive_abuja.html';
+                else if (role === 'ph_rep') window.location.href = 'receive_ph.html';
+                else await auth.signOut();
+            } else {
+                await auth.signOut();
+            }
+        }
+    });
+</script>
+</body>
+</html>
