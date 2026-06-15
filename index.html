@@ -207,5 +207,12 @@
     }
     updateStatsAndTable();
 </script>
+    <script>
+  firebase.firestore().collection("shipments").onSnapshot((snap) => {
+    console.log("🔥 Firestore connected, shipments count:", snap.size);
+  }, (error) => {
+    console.error("❌ Firestore error:", error);
+  });
+</script>
 </body>
 </html>
