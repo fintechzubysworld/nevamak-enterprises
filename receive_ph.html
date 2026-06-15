@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NEVAMAK – Port Harcourt Receiving with Costs</title>
+    <title>NEVAMAK – Port Harcourt Receiving</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
         *{ font-family: 'Segoe UI', sans-serif; }
@@ -12,12 +13,14 @@
         .shipment-card{ border-left: 6px solid #e67e22; margin: 20px 0; padding: 15px; background: #fef9e6; border-radius: 20px; }
         button{ background: #e67e22; border: none; padding: 8px 18px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; }
         input{ padding: 6px; border-radius: 10px; border: 1px solid #aaa; margin: 5px; width: 100px; }
-        .nav a{ background: #2c3e50; color: white; text-decoration: none; padding: 6px 16px; border-radius: 30px; margin-right: 12px; display: inline-block; }
+        .nav a, .logout-btn{ background: #2c3e50; color: white; text-decoration: none; padding: 6px 16px; border-radius: 30px; margin-right: 12px; display: inline-block; border: none; cursor: pointer; }
         .cost-info{ background: #fff0db; padding: 8px; border-radius: 12px; margin: 10px 0; }
     </style>
 </head>
 <body>
-<div class="nav"><a href="index.html">🏠 Dashboard</a><a href="lagos_dispatch.html">📤 Lagos</a><a href="receive_abuja.html">🏢 Abuja</a></div>
+<div class="nav">
+    <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+</div>
 <h2>🌊 NEXT Cash & Carry – PORT HARCOURT Branch</h2>
 <p>Supply Representative – Receive goods, record discrepancies & GRN</p>
 <div id="phShipments" class="card">Fetching incoming shipments...</div>
@@ -33,7 +36,21 @@
         measurementId: "G-MZ8NT6KK8N"
     };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.data()?.role !== 'ph_rep') {
+            await auth.signOut();
+            window.location.href = 'login.html';
+        } else {
+            loadPHShipments();
+        }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
     async function loadPHShipments() {
         const querySnap = await db.collection("shipments")
@@ -45,11 +62,7 @@
         
         let docs = [];
         querySnap.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
-        docs.sort((a,b) => {
-            let dateA = a.data.createdAt?.toDate() || new Date(0);
-            let dateB = b.data.createdAt?.toDate() || new Date(0);
-            return dateB - dateA;
-        });
+        docs.sort((a,b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0));
         
         let html = `<h3>📥 Pending deliveries (PH)</h3>`;
         for(const { id, data: ship } of docs){
@@ -99,21 +112,12 @@
         const officer = document.getElementById(`ph_rep_${shipId}`).value.trim();
         const grnVal = document.getElementById(`ph_grn_${shipId}`).value.trim();
         if(!officer) return alert("Enter receiving rep name.");
-        let allDelivered = true;
-        items.forEach(it => { if(it.receivedQty + it.damageQty < it.orderedQty) allDelivered = false; });
+        let allDelivered = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
         const finalStatus = allDelivered ? "Delivered" : "Partially Delivered";
-        await docRef.update({
-            items: items,
-            status: finalStatus,
-            receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
-            receivingRep: officer,
-            grnNumber: grnVal || `GRN-PH-${Date.now()}`,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        await docRef.update({ items, status: finalStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep: officer, grnNumber: grnVal || `GRN-PH-${Date.now()}`, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
         alert(`Port Harcourt: ${finalStatus} status recorded. GRN: ${grnVal}`);
         loadPHShipments();
     };
-    loadPHShipments();
 </script>
 </body>
 </html>
