@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NEVAMAK – Abuja Receiving with Costs</title>
+    <title>NEVAMAK – Abuja Receiving</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
         *{ font-family: system-ui; }
@@ -12,13 +13,15 @@
         .shipment-card{ border-left: 5px solid #2c3e50; margin-bottom: 20px; padding: 15px; background: #fefefe; border-radius: 16px; }
         button{ background: #2c3e50; color: white; padding: 6px 12px; border-radius: 30px; border: none; cursor: pointer; }
         input{ padding: 6px; width: 100px; border-radius: 8px; border: 1px solid #ccc; }
-        .nav a{ background: #0a3d62; color: white; text-decoration: none; padding: 6px 15px; border-radius: 30px; margin-right: 12px; display: inline-block; }
+        .nav a, .logout-btn{ background: #0a3d62; color: white; text-decoration: none; padding: 6px 15px; border-radius: 30px; margin-right: 12px; display: inline-block; border: none; cursor: pointer; }
         .item-row{ display: flex; gap: 15px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
-        .cost-info{ background: #f1f9f9; padding: 8px; border-radius: 12px; margin: 8px 0; font-size: 0.9rem; }
+        .cost-info{ background: #f1f9f9; padding: 8px; border-radius: 12px; margin: 8px 0; }
     </style>
 </head>
 <body>
-<div class="nav" style="margin-bottom:20px;"><a href="index.html">🏠 Dashboard</a><a href="lagos_dispatch.html">📦 Lagos</a><a href="receive_ph.html">🌊 PH Receiving</a></div>
+<div class="nav">
+    <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+</div>
 <h2>🏢 NEXT Cash & Carry – ABUJA Branch</h2>
 <p>Supply Representative (Receiving) – confirm incoming goods from Lagos</p>
 <div id="shipmentsList" class="card">Loading pending shipments...</div>
@@ -34,7 +37,21 @@
         measurementId: "G-MZ8NT6KK8N"
     };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.data()?.role !== 'abuja_rep') {
+            await auth.signOut();
+            window.location.href = 'login.html';
+        } else {
+            loadShipments();
+        }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
     async function loadShipments() {
         const snapshot = await db.collection("shipments")
@@ -42,16 +59,11 @@
             .where("status", "in", ["Dispatched", "Partially Delivered"])
             .get();
         const container = document.getElementById("shipmentsList");
-        if(snapshot.empty) { container.innerHTML = "<div class='card'>✅ No pending shipments for Abuja. All goods received.</div>"; return; }
+        if(snapshot.empty) { container.innerHTML = "<div class='card'>✅ No pending shipments for Abuja.</div>"; return; }
         
-        // Client-side sort by createdAt desc
         let docs = [];
         snapshot.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
-        docs.sort((a,b) => {
-            let dateA = a.data.createdAt?.toDate() || new Date(0);
-            let dateB = b.data.createdAt?.toDate() || new Date(0);
-            return dateB - dateA;
-        });
+        docs.sort((a,b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0));
         
         let html = `<div><strong>📦 Shipments awaiting receiving action</strong></div>`;
         for (const { id, data: ship } of docs) {
@@ -59,12 +71,12 @@
             const totalGoodsValue = items.reduce((sum, it) => sum + (it.totalItemCost || 0), 0);
             html += `<div class="shipment-card" id="ship-${id}">
                         <h3>Shipment #${id.slice(0,8)} | Vehicle: ${ship.vehicleNo || "N/A"} | Sender: ${ship.senderName}</h3>
-                        <div class="cost-info">📊 Transport Cost: ₦${(ship.transportCost || 0).toLocaleString()} | Total Goods Value: ₦${totalGoodsValue.toLocaleString()}</div>
+                        <div class="cost-info">🚛 Transport: ₦${(ship.transportCost || 0).toLocaleString()} | Goods: ₦${totalGoodsValue.toLocaleString()}</div>
                         <div id="items-area-${id}">`;
             for(let idx=0; idx<items.length; idx++){
                 const it = items[idx];
                 const remaining = it.orderedQty - (it.receivedQty + it.damageQty);
-                html += `<div class="item-row" data-itemidx="${idx}">
+                html += `<div class="item-row">
                             <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit) 
                             Ordered: ${it.orderedQty} | Already OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${remaining}
                             <br>➕ Additional received: <input type="number" id="recv_${id}_${idx}" value="0" min="0" max="${remaining}" style="width:80px">
@@ -93,37 +105,22 @@
                 anyUpdate = true;
                 items[i].receivedQty = (items[i].receivedQty || 0) + addRecv;
                 items[i].damageQty = (items[i].damageQty || 0) + addDam;
-                // Clamp
                 if(items[i].receivedQty + items[i].damageQty > items[i].orderedQty){
                     alert(`Over-receipt on ${items[i].itemName}. Adjusting.`);
-                    let total = items[i].receivedQty + items[i].damageQty;
-                    if(total > items[i].orderedQty) items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
+                    items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
                 }
             }
         }
-        if(!anyUpdate) return alert("No quantity entered for receiving.");
+        if(!anyUpdate) return alert("No quantity entered.");
         const receivingRep = document.getElementById(`repName_${shipId}`).value.trim();
         const grn = document.getElementById(`grn_${shipId}`).value.trim();
-        if(!receivingRep) return alert("Please enter receiving rep name.");
-        
-        let allCompleted = true;
-        for(let it of items){
-            if(it.receivedQty + it.damageQty < it.orderedQty) allCompleted = false;
-        }
+        if(!receivingRep) return alert("Enter receiving rep name.");
+        let allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
         const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
-        
-        await docRef.update({
-            items: items,
-            status: newStatus,
-            receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
-            receivingRep: receivingRep,
-            grnNumber: grn || `GRN-${Date.now()}`,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        alert(`✅ ${newStatus} - Goods receipt completed. GRN: ${grn}`);
-        loadShipments(); // refresh
+        await docRef.update({ items, status: newStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep, grnNumber: grn || `GRN-${Date.now()}`, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+        alert(`✅ ${newStatus} - GRN: ${grn}`);
+        loadShipments();
     };
-    loadShipments();
 </script>
 </body>
 </html>
