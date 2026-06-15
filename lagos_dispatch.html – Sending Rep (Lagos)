@@ -60,22 +60,27 @@
         <h2>📦 Recent Shipments from Lagos</h2>
         <div style="overflow-x: auto;">
             <table id="recentShipments">
-                <thead><tr><th>ID</th><th>Destination</th><th>Items</th><th>Status</th><th>Date</th></tr></thead>
-                <tbody><tr><td colspan="5">Loading...</td></tr></tbody>
-            </table>
+                <thead><tr><th>ID</th><th>Destination</th><th>Items</th><th>Status</th><th>Date</th>}</thead>
+                <tbody><tr><td colspan="5">Loading...</td></tr>
+            </tbody>
+        </table>
         </div>
     </div>
 </div>
 
 <script>
+    // ==================== NEVAMAK FIREBASE CONFIG ====================
     const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT.appspot.com",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
     };
+    // ==============================================================
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
