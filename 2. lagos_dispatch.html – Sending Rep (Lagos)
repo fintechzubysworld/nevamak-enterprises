@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEVAMAK – Lagos Dispatch</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        *{ box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body{ background: #f4f7fc; margin: 0; padding: 20px; }
+        .container{ max-width: 1200px; margin: auto; }
+        .card{ background: white; border-radius: 24px; padding: 24px; margin-bottom: 30px; box-shadow: 0 6px 14px rgba(0,0,0,0.05); }
+        h2{ margin-top: 0; color: #0a3d62; }
+        input, select, button{ padding: 10px; border-radius: 10px; border: 1px solid #ccc; font-size: 1rem; margin: 5px 0; }
+        button{ background: #0a3d62; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover{ background: #1e3799; }
+        .item-row{ display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .item-row input{ flex: 1; }
+        .add-btn{ background: #27ae60; margin-top: 5px; }
+        .shipment-list table{ width: 100%; border-collapse: collapse; }
+        th, td{ text-align: left; padding: 10px; border-bottom: 1px solid #ddd; }
+        .nav{ display: flex; gap: 15px; margin-bottom: 20px; }
+        .nav a{ text-decoration: none; background: #2c3e50; color: white; padding: 6px 15px; border-radius: 30px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a href="index.html">🏠 Dashboard</a>
+        <a href="receive_abuja.html">🏢 Abuja Receiving</a>
+        <a href="receive_ph.html">🌊 PH Receiving</a>
+    </div>
+    <div class="card">
+        <h2>📤 Create New Dispatch (Lagos Warehouse)</h2>
+        <form id="dispatchForm">
+            <label>Supply Representative Name (Lagos):</label><br>
+            <input type="text" id="senderName" placeholder="e.g., Ade Lagos Rep" required><br><br>
+            <label>Destination Branch:</label><br>
+            <select id="destBranch">
+                <option value="Abuja">NEXT Cash & Carry - Abuja</option>
+                <option value="Portharcourt">NEXT Cash & Carry - Port Harcourt</option>
+            </select><br><br>
+            <label>Vehicle / Waybill #:</label><br>
+            <input type="text" id="vehicleNo" placeholder="Optional"><br><br>
+            <label>Items (product & quantity):</label>
+            <div id="itemsContainer">
+                <div class="item-row">
+                    <input type="text" placeholder="Item name" class="itemName">
+                    <input type="number" placeholder="Quantity" class="itemQty">
+                    <button type="button" class="removeItem" style="background:#e74c3c;">✖</button>
+                </div>
+            </div>
+            <button type="button" id="addItemBtn" class="add-btn">+ Add another product</button><br><br>
+            <button type="submit">🚛 Dispatch Shipment</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>📦 Recent Shipments from Lagos</h2>
+        <div style="overflow-x: auto;">
+            <table id="recentShipments">
+                <thead><tr><th>ID</th><th>Destination</th><th>Items</th><th>Status</th><th>Date</th></tr></thead>
+                <tbody><tr><td colspan="5">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Dynamic items
+    const itemsContainer = document.getElementById("itemsContainer");
+    document.getElementById("addItemBtn").addEventListener("click", () => {
+        const newRow = document.createElement("div");
+        newRow.className = "item-row";
+        newRow.innerHTML = `<input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button>`;
+        itemsContainer.appendChild(newRow);
+        attachRemoveEvent(newRow);
+    });
+    function attachRemoveEvent(row) {
+        row.querySelector(".removeItem")?.addEventListener("click", () => row.remove());
+    }
+    document.querySelectorAll(".removeItem").forEach(btn => btn.addEventListener("click", function(){ this.closest(".item-row").remove(); }));
+
+    // Create shipment
+    document.getElementById("dispatchForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const senderName = document.getElementById("senderName").value.trim();
+        const destBranch = document.getElementById("destBranch").value;
+        const vehicleNo = document.getElementById("vehicleNo").value.trim();
+        const rows = document.querySelectorAll(".item-row");
+        let items = [];
+        for(let row of rows){
+            const name = row.querySelector(".itemName").value.trim();
+            const qty = parseInt(row.querySelector(".itemQty").value);
+            if(name && qty > 0){
+                items.push({ itemName: name, orderedQty: qty, receivedQty: 0, damageQty: 0 });
+            }
+        }
+        if(items.length === 0) return alert("Add at least one product.");
+        if(!senderName) return alert("Enter rep name.");
+        
+        await db.collection("shipments").add({
+            senderName: senderName,
+            destinationBranch: destBranch,
+            vehicleNo: vehicleNo,
+            items: items,
+            status: "Dispatched",
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert("✅ Shipment dispatched to " + destBranch);
+        document.getElementById("dispatchForm").reset();
+        document.getElementById("itemsContainer").innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Quantity" class="itemQty"><button type="button" class="removeItem" style="background:#e74c3c;">✖</button></div>`;
+    });
+
+    // Real-time recent shipments
+    db.collection("shipments").orderBy("createdAt", "desc").limit(20).onSnapshot((snap) => {
+        let html = "";
+        snap.forEach(doc => {
+            const data = doc.data();
+            const itemsShort = data.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ") + (data.items?.length>2?"...":"");
+            html += `<tr><td>${doc.id.slice(0,6)}</td><td>${data.destinationBranch}</td><td>${itemsShort}</td><td>${data.status}</td><td>${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "recent"}</td></tr>`;
+        });
+        document.getElementById("recentShipments").querySelector("tbody").innerHTML = html || "<tr><td colspan='5'>No shipments yet</td></tr>";
+    });
+</script>
+</body>
+</html>
