@@ -16,29 +16,26 @@
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 40px; font-size: 1rem; }
         button { width: 100%; padding: 12px; background: #0a3d62; color: white; border: none; border-radius: 40px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         button:hover { background: #1e3799; }
-        .toggle { text-align: center; margin-top: 15px; color: #0a3d62; cursor: pointer; text-decoration: underline; }
         .error { color: #e74c3c; margin-top: 10px; text-align: center; }
         .info { color: #27ae60; text-align: center; margin-top: 10px; }
+        .setup-btn { background: #e67e22; margin-top: 20px; }
+        .setup-btn:hover { background: #d35400; }
+        .admin-only { border-top: 1px solid #ddd; margin-top: 20px; padding-top: 20px; }
     </style>
 </head>
 <body>
 <div class="card">
     <h1>🚛 NEVAMAK Enterprises</h1>
     <div class="sub">Supply Chain Portal</div>
-    <div id="authContainer">
-        <div id="loginForm">
-            <input type="email" id="loginEmail" placeholder="Email" autocomplete="email">
-            <input type="password" id="loginPassword" placeholder="Password">
-            <button id="loginBtn">Sign In</button>
-            <div class="toggle" onclick="showSignup()">Don't have an account? Sign up</div>
-        </div>
-        <div id="signupForm" style="display:none;">
-            <input type="email" id="signupEmail" placeholder="Email">
-            <input type="password" id="signupPassword" placeholder="Password">
-            <button id="signupBtn">Sign Up</button>
-            <div class="toggle" onclick="showLogin()">← Back to Sign In</div>
-        </div>
+    <div id="loginArea">
+        <input type="email" id="email" placeholder="Email" autocomplete="email">
+        <input type="password" id="password" placeholder="Password">
+        <button id="loginBtn">Sign In</button>
         <div id="message" class="error"></div>
+        <div id="setupAdminContainer" style="display:none;">
+            <button id="setupAdminBtn" class="setup-btn">🔧 Create Default Admin (admin@nevamak.com / admin123)</button>
+            <div class="info">Click once to create the admin account.</div>
+        </div>
     </div>
 </div>
 
@@ -56,29 +53,62 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    function showSignup() {
-        document.getElementById('loginForm').style.display = 'none';
-        document.getElementById('signupForm').style.display = 'block';
+    // Check if admin already exists
+    async function checkAdminExists() {
+        try {
+            const snapshot = await db.collection('users').where('role', '==', 'admin').limit(1).get();
+            if (!snapshot.empty) {
+                document.getElementById('setupAdminContainer').style.display = 'none';
+            } else {
+                document.getElementById('setupAdminContainer').style.display = 'block';
+            }
+        } catch (err) {
+            console.warn("Could not check admin existence", err);
+            document.getElementById('setupAdminContainer').style.display = 'block';
+        }
     }
-    function showLogin() {
-        document.getElementById('loginForm').style.display = 'block';
-        document.getElementById('signupForm').style.display = 'none';
-    }
+    checkAdminExists();
 
+    // Create default admin account
+    document.getElementById('setupAdminBtn')?.addEventListener('click', async () => {
+        const adminEmail = 'admin@nevamak.com';
+        const adminPassword = 'admin123';
+        try {
+            // Create user in Firebase Auth
+            const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
+            const uid = userCred.user.uid;
+            // Create user document in Firestore
+            await db.collection('users').doc(uid).set({
+                email: adminEmail,
+                role: 'admin',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert('✅ Admin account created! You can now log in.\nEmail: admin@nevamak.com\nPassword: admin123');
+            document.getElementById('setupAdminContainer').style.display = 'none';
+            await auth.signOut();
+        } catch (err) {
+            if (err.code === 'auth/email-already-in-use') {
+                alert('Admin account already exists. Just log in.');
+                document.getElementById('setupAdminContainer').style.display = 'none';
+            } else {
+                alert('Error: ' + err.message);
+            }
+        }
+    });
+
+    // Login
     document.getElementById('loginBtn').addEventListener('click', async () => {
-        const email = document.getElementById('loginEmail').value;
-        const password = document.getElementById('loginPassword').value;
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
         try {
             const userCred = await auth.signInWithEmailAndPassword(email, password);
-            const user = userCred.user;
-            // Check user role in Firestore
-            const userDoc = await db.collection('users').doc(user.uid).get();
+            const uid = userCred.user.uid;
+            const userDoc = await db.collection('users').doc(uid).get();
             if (!userDoc.exists) {
                 await auth.signOut();
                 throw new Error('User role not found. Contact admin.');
             }
             const role = userDoc.data().role;
-            // Redirect based on role
             if (role === 'admin' || role === 'lagos_sender') {
                 window.location.href = 'index.html';
             } else if (role === 'abuja_rep') {
@@ -93,27 +123,6 @@
         }
     });
 
-    document.getElementById('signupBtn').addEventListener('click', async () => {
-        const email = document.getElementById('signupEmail').value;
-        const password = document.getElementById('signupPassword').value;
-        try {
-            const userCred = await auth.createUserWithEmailAndPassword(email, password);
-            const user = userCred.user;
-            // Default role: ask user to contact admin? For demo, we'll set a default role "abuja_rep" but admin must change.
-            // Better: alert that admin must assign role. We'll create a placeholder user doc with role "pending".
-            await db.collection('users').doc(user.uid).set({
-                email: email,
-                role: 'pending',   // Admin must manually update to correct role in Firestore
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            await auth.signOut();
-            document.getElementById('message').innerText = 'Account created! Wait for admin to assign role. Then sign in.';
-            showLogin();
-        } catch (err) {
-            document.getElementById('message').innerText = err.message;
-        }
-    });
-
     // Auto-redirect if already logged in
     auth.onAuthStateChanged(async (user) => {
         if (user) {
@@ -123,9 +132,6 @@
                 if (role === 'admin' || role === 'lagos_sender') window.location.href = 'index.html';
                 else if (role === 'abuja_rep') window.location.href = 'receive_abuja.html';
                 else if (role === 'ph_rep') window.location.href = 'receive_ph.html';
-                else await auth.signOut();
-            } else {
-                await auth.signOut();
             }
         }
     });
