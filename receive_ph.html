@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>NEVAMAK – Port Harcourt Receiving</title>
+    <title>NEVAMAK – Port Harcourt Receiving with Costs</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
@@ -13,6 +13,7 @@
         button{ background: #e67e22; border: none; padding: 8px 18px; border-radius: 40px; color: white; font-weight: bold; cursor: pointer; margin-top: 10px; }
         input{ padding: 6px; border-radius: 10px; border: 1px solid #aaa; margin: 5px; width: 100px; }
         .nav a{ background: #2c3e50; color: white; text-decoration: none; padding: 6px 16px; border-radius: 30px; margin-right: 12px; display: inline-block; }
+        .cost-info{ background: #fff0db; padding: 8px; border-radius: 12px; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -22,7 +23,6 @@
 <div id="phShipments" class="card">Fetching incoming shipments...</div>
 
 <script>
-    // ==================== NEVAMAK FIREBASE CONFIG ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -32,34 +32,45 @@
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
         measurementId: "G-MZ8NT6KK8N"
     };
-    // ==============================================================
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     async function loadPHShipments() {
-        const querySnap = await db.collection("shipments").where("destinationBranch", "==", "Portharcourt").where("status", "in", ["Dispatched", "Partially Delivered"]).orderBy("createdAt", "desc").get();
+        const querySnap = await db.collection("shipments")
+            .where("destinationBranch", "==", "Portharcourt")
+            .where("status", "in", ["Dispatched", "Partially Delivered"])
+            .get();
         const container = document.getElementById("phShipments");
         if(querySnap.empty){ container.innerHTML = "<div class='card'>No pending receipts for Port Harcourt.</div>"; return; }
+        
+        let docs = [];
+        querySnap.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
+        docs.sort((a,b) => {
+            let dateA = a.data.createdAt?.toDate() || new Date(0);
+            let dateB = b.data.createdAt?.toDate() || new Date(0);
+            return dateB - dateA;
+        });
+        
         let html = `<h3>📥 Pending deliveries (PH)</h3>`;
-        for(const docSnap of querySnap.docs){
-            const data = docSnap.data();
-            const items = data.items;
-            html += `<div class="shipment-card" id="ph-${docSnap.id}">
-                        <strong>🚚 Shipment ID: ${docSnap.id.slice(0,8)}</strong> | Sender: ${data.senderName}<br>
-                        <em>Items status:</em><div id="ph-items-${docSnap.id}">`;
+        for(const { id, data: ship } of docs){
+            const items = ship.items;
+            const totalGoodsValue = items.reduce((sum, it) => sum + (it.totalItemCost || 0), 0);
+            html += `<div class="shipment-card" id="ph-${id}">
+                        <strong>🚚 Shipment ID: ${id.slice(0,8)}</strong> | Sender: ${ship.senderName}<br>
+                        <div class="cost-info">🚛 Transport: ₦${(ship.transportCost || 0).toLocaleString()} | Goods: ₦${totalGoodsValue.toLocaleString()}</div>
+                        <em>Items:</em><div id="ph-items-${id}">`;
             for(let idx=0; idx<items.length; idx++){
                 const it = items[idx];
                 const pending = it.orderedQty - (it.receivedQty + it.damageQty);
                 html += `<div style="margin: 10px 0; border-bottom: 1px solid #ccc;">
-                            📦 ${it.itemName} | Ordered: ${it.orderedQty} | Already OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}<br>
-                            ➕ Receive good units: <input type="number" id="ph_recv_${docSnap.id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
-                            🛑 Additional damaged: <input type="number" id="ph_dam_${docSnap.id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
+                            📦 ${it.itemName} (₦${it.unitPrice?.toLocaleString()}/unit) | Ordered: ${it.orderedQty} | Already OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}<br>
+                            ➕ Receive good units: <input type="number" id="ph_recv_${id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
+                            🛑 Additional damaged: <input type="number" id="ph_dam_${id}_${idx}" value="0" min="0" max="${pending}" style="width:70px">
                           </div>`;
             }
-            html += `<div><label>Receiving Officer (PH):</label> <input type="text" id="ph_rep_${docSnap.id}" placeholder="Name"></div>
-                     <div><label>GRN Number:</label> <input type="text" id="ph_grn_${docSnap.id}" placeholder="GRN-PH-001"></div>
-                     <button onclick="receivePH('${docSnap.id}')">✅ Receive & Submit</button>
+            html += `<div><label>Receiving Officer (PH):</label> <input type="text" id="ph_rep_${id}" placeholder="Name"></div>
+                     <div><label>GRN Number:</label> <input type="text" id="ph_grn_${id}" placeholder="GRN-PH-001"></div>
+                     <button onclick="receivePH('${id}')">✅ Receive & Submit</button>
                      </div>`;
         }
         container.innerHTML = html;
@@ -103,13 +114,6 @@
         loadPHShipments();
     };
     loadPHShipments();
-</script>
-    <script>
-  firebase.firestore().collection("shipments").onSnapshot((snap) => {
-    console.log("🔥 Firestore connected, shipments count:", snap.size);
-  }, (error) => {
-    console.error("❌ Firestore error:", error);
-  });
 </script>
 </body>
 </html>
