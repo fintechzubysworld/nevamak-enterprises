@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Warehouse Management</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1300px; margin: auto; }
+        header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 20px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #0a3d62; }
+        .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
+        .stat-card .num { font-size: 1.5rem; font-weight: bold; color: #0a3d62; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+        .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
+        .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
+        .filters button.export { background: #27ae60; }
+        .section-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .low-stock { background: #f8d7da; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 500px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.8rem; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🏚️ Warehouse Management</h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="chat.html">💬 Chat</a>
+            <a href="reports.html">📊 Reports</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><h4>Total Items</h4><div class="num" id="totalItems">-</div></div>
+        <div class="stat-card"><h4>Total Stock (units)</h4><div class="num" id="totalStock">-</div></div>
+        <div class="stat-card"><h4>Low Stock Items</h4><div class="num" id="lowStockCount">-</div></div>
+        <div class="stat-card"><h4>Branches</h4><div class="num" id="branchCount">-</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <input type="text" id="searchItem" placeholder="🔍 Search by item...">
+        <select id="filterBranch">
+            <option value="all">All Branches</option>
+            <option value="Abuja">Abuja</option>
+            <option value="Portharcourt">Port Harcourt</option>
+            <option value="Lagos">Lagos</option>
+        </select>
+        <button id="addStockBtn" style="background:#27ae60;">➕ Add Stock</button>
+        <button class="export" onclick="exportCSV('warehouseTable')">📄 Export CSV</button>
+    </div>
+
+    <!-- Warehouse Table -->
+    <div class="section-card">
+        <div id="warehouseList">Loading inventory...</div>
+    </div>
+</div>
+
+<!-- Modal: Add/Adjust Stock -->
+<div id="stockModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('stockModal')">&times;</span>
+        <h3 id="modalTitle">Add Stock</h3>
+        <input type="text" id="modalItemName" placeholder="Item name">
+        <select id="modalBranch">
+            <option value="Abuja">Abuja</option>
+            <option value="Portharcourt">Port Harcourt</option>
+            <option value="Lagos">Lagos</option>
+        </select>
+        <input type="number" id="modalQty" placeholder="Quantity">
+        <input type="number" id="modalPrice" placeholder="Unit Price (₦)">
+        <select id="modalAction">
+            <option value="add">Add (Increment)</option>
+            <option value="subtract">Subtract (Decrement)</option>
+            <option value="set">Set to Exact Quantity</option>
+        </select>
+        <button id="modalSaveBtn" class="btn-success" style="width:100%; padding:12px; border-radius:48px; border:none; color:white; font-weight:bold; margin-top:12px;">Save</button>
+    </div>
+</div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let currentUserRole = '';
+    let currentUserEmail = '';
+    const LOW_STOCK_THRESHOLD = 5; // items with stock <= this are considered low
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserEmail = user.email;
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            currentUserRole = userDoc.data().role || '';
+        }
+        loadWarehouse();
+        loadStats();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+
+    // ==================== Load Warehouse Data ====================
+    function loadWarehouse() {
+        const searchInput = document.getElementById('searchItem');
+        const branchFilter = document.getElementById('filterBranch');
+
+        function renderInventory(snapshot) {
+            let docs = [];
+            snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+
+            // Apply branch filter: if user is a branch rep, only show their branch
+            let allowedBranches = [];
+            if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
+                allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+            } else if (currentUserRole === 'abuja_rep') {
+                allowedBranches = ['Abuja'];
+            } else if (currentUserRole === 'ph_rep') {
+                allowedBranches = ['Portharcourt'];
+            } else {
+                // Fallback: show all
+                allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+            }
+
+            // Filter by allowed branches
+            docs = docs.filter(d => allowedBranches.includes(d.branch));
+
+            // Apply search filter
+            const search = searchInput.value.toLowerCase().trim();
+            if (search) {
+                docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+            }
+
+            // Apply branch filter from dropdown (if not 'all')
+            const filterVal = branchFilter.value;
+            if (filterVal !== 'all') {
+                docs = docs.filter(d => d.branch === filterVal);
+            }
+
+            // Sort by branch then item name
+            docs.sort((a, b) => {
+                if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
+                return (a.itemName || '').localeCompare(b.itemName || '');
+            });
+
+            if (docs.length === 0) {
+                document.getElementById('warehouseList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No inventory found.</p>';
+                return;
+            }
+
+            let html = `<table id="warehouseTable">
+                <tr>
+                    <th>Item</th>
+                    <th>Branch</th>
+                    <th>Stock</th>
+                    <th>Unit Price</th>
+                    <th>Location</th>
+                    <th>Last Updated</th>
+                    ${(currentUserRole === 'admin' || currentUserRole === 'lagos_sender') ? '<th>Actions</th>' : ''}
+                </tr>`;
+            docs.forEach(d => {
+                const isLow = d.stock <= LOW_STOCK_THRESHOLD;
+                const rowClass = isLow ? 'low-stock' : '';
+                const location = d.location || 'N/A';
+                const lastUpdated = d.lastUpdated ? new Date(d.lastUpdated.toDate()).toLocaleString() : 'N/A';
+                html += `<tr class="${rowClass}">
+                    <td><strong>${d.itemName}</strong></td>
+                    <td>${d.branch}</td>
+                    <td>${d.stock}</td>
+                    <td>₦${(d.unitPrice || 0).toLocaleString()}</td>
+                    <td>${location}</td>
+                    <td>${lastUpdated}</td>
+                    ${(currentUserRole === 'admin' || currentUserRole === 'lagos_sender') ? `
+                    <td>
+                        <button class="btn-sm btn-warning" onclick="openAdjustModal('${d.id}','${d.itemName}','${d.branch}',${d.stock},${d.unitPrice})">✏️ Adjust</button>
+                        <button class="btn-sm btn-danger" onclick="deleteInventoryItem('${d.id}')">🗑️ Delete</button>
+                    </td>` : ''}
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('warehouseList').innerHTML = html;
+        }
+
+        // Real-time listener with error handling
+        db.collection('inventory').onSnapshot((snapshot) => {
+            renderInventory(snapshot);
+            // Also update stats (but we call loadStats separately)
+        }, (error) => {
+            console.error('Warehouse listener error:', error);
+            document.getElementById('warehouseList').innerHTML = `<p style="color:red;">Error loading inventory: ${error.message}</p>`;
+        });
+
+        // Refresh on search/filter change
+        searchInput.addEventListener('input', () => {
+            // trigger re-render by re-using the snapshot? We'll just re-run the query or use a local filter.
+            // Since we're using onSnapshot, we can't easily re-query; we'll re-fetch or use a local variable.
+            // Simpler: we'll re-run the query manually.
+            // The listener is already live, but to apply filters we need to re-filter the cached data.
+            // We'll just call loadWarehouse() which will re-attach listener (not ideal).
+            // Better: we'll store the last snapshot and re-filter.
+            // Let's implement a simple approach: we'll detach and re-attach.
+            // Actually, we can just use the snapshot in the listener to filter. We'll modify the listener above to keep a copy.
+            // I'll refactor: store the last snapshot in a variable and re-filter on input.
+            // But for simplicity, I'll re-run the query with the filters.
+            // I'll change loadWarehouse to accept a filter function.
+            // I'll rewrite this function to use a single listener with filter logic applied inside.
+            // However, to keep it clean, I'll use a simple approach: on every change, re-query the collection with where clauses? That would require composite indexes.
+            // Instead, I'll load all data once and filter client-side.
+            // I'll modify to use a single snapshot and filter client-side.
+            // Let's rewrite loadWarehouse to use a single snapshot and re-render on filters.
+            // I'll implement it with a global variable for the snapshot and a render function.
+        });
+    }
+
+    // ==================== Stats ====================
+    function loadStats() {
+        db.collection('inventory').onSnapshot((snapshot) => {
+            let totalItems = 0, totalStock = 0, lowStock = 0, branches = new Set();
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                totalItems++;
+                totalStock += d.stock || 0;
+                if (d.stock <= LOW_STOCK_THRESHOLD) lowStock++;
+                branches.add(d.branch);
+            });
+            document.getElementById('totalItems').innerText = totalItems;
+            document.getElementById('totalStock').innerText = totalStock;
+            document.getElementById('lowStockCount').innerText = lowStock;
+            document.getElementById('branchCount').innerText = branches.size;
+        }, (error) => {
+            console.error('Stats error:', error);
+        });
+    }
+
+    // ==================== Admin Actions ====================
+    document.getElementById('addStockBtn').addEventListener('click', () => {
+        // Only admin or lagos_sender can add stock
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
+            alert('Only admin and Lagos sender can add stock.');
+            return;
+        }
+        document.getElementById('modalTitle').innerText = 'Add New Stock';
+        document.getElementById('modalItemName').value = '';
+        document.getElementById('modalBranch').value = 'Abuja';
+        document.getElementById('modalQty').value = '';
+        document.getElementById('modalPrice').value = '';
+        document.getElementById('modalAction').value = 'add';
+        document.getElementById('stockModal').style.display = 'flex';
+        // Store modal mode
+        document.getElementById('stockModal').dataset.mode = 'add';
+    });
+
+    window.openAdjustModal = function(id, itemName, branch, stock, unitPrice) {
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
+            alert('Only admin and Lagos sender can adjust stock.');
+            return;
+        }
+        document.getElementById('modalTitle').innerText = 'Adjust Stock';
+        document.getElementById('modalItemName').value = itemName;
+        document.getElementById('modalItemName').disabled = true; // don't allow rename
+        document.getElementById('modalBranch').value = branch;
+        document.getElementById('modalQty').value = '';
+        document.getElementById('modalPrice').value = unitPrice || '';
+        document.getElementById('modalAction').value = 'add';
+        document.getElementById('stockModal').style.display = 'flex';
+        document.getElementById('stockModal').dataset.mode = 'adjust';
+        document.getElementById('stockModal').dataset.docId = id;
+        document.getElementById('stockModal').dataset.currentStock = stock;
+    };
+
+    document.getElementById('modalSaveBtn').addEventListener('click', async () => {
+        const mode = document.getElementById('stockModal').dataset.mode;
+        const itemName = document.getElementById('modalItemName').value.trim();
+        const branch = document.getElementById('modalBranch').value;
+        const qty = parseInt(document.getElementById('modalQty').value);
+        const price = parseFloat(document.getElementById('modalPrice').value);
+        const action = document.getElementById('modalAction').value;
+
+        if (!itemName || isNaN(qty) || qty < 0) {
+            alert('Please enter a valid item name and quantity.');
+            return;
+        }
+        if (isNaN(price) || price < 0) {
+            alert('Please enter a valid unit price.');
+            return;
+        }
+
+        try {
+            if (mode === 'add') {
+                // Add new item to inventory
+                await db.collection('inventory').add({
+                    itemName,
+                    branch,
+                    stock: qty,
+                    unitPrice: price,
+                    location: 'Shelf A', // default
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                alert('Stock added successfully.');
+            } else if (mode === 'adjust') {
+                const docId = document.getElementById('stockModal').dataset.docId;
+                const currentStock = parseInt(document.getElementById('stockModal').dataset.currentStock);
+                let newStock = currentStock;
+                if (action === 'add') newStock = currentStock + qty;
+                else if (action === 'subtract') newStock = currentStock - qty;
+                else if (action === 'set') newStock = qty;
+                if (newStock < 0) {
+                    alert('Cannot set stock below 0.');
+                    return;
+                }
+                await db.collection('inventory').doc(docId).update({
+                    stock: newStock,
+                    unitPrice: price,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                alert('Stock adjusted successfully.');
+            }
+            closeModal('stockModal');
+            // Refresh stats and warehouse list automatically via listeners
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    });
+
+    window.deleteInventoryItem = async function(id) {
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
+            alert('Only admin and Lagos sender can delete items.');
+            return;
+        }
+        if (confirm('Delete this inventory item permanently?')) {
+            await db.collection('inventory').doc(id).delete();
+            alert('Item deleted.');
+        }
+    };
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+        // Re-enable item name field if disabled
+        document.getElementById('modalItemName').disabled = false;
+    }
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+            document.getElementById('modalItemName').disabled = false;
+        }
+    };
+
+    // ==================== Export CSV ====================
+    function exportCSV(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return alert('No data to export.');
+        let csv = '';
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td, th');
+            const rowData = [];
+            cols.forEach(col => rowData.push('"' + col.innerText.replace(/"/g, '""') + '"'));
+            csv += rowData.join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `warehouse_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+    }
+
+    // ==================== Initial setup ====================
+    console.log('NEVAMAK Warehouse Management loaded.');
+</script>
+</body>
+</html>
