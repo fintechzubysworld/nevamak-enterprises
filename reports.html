@@ -139,6 +139,7 @@
 </div>
 
 <script>
+    // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -157,6 +158,7 @@
     auth.onAuthStateChanged(user => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
+        // Load all reports
         loadInvoices();
         loadReturns();
         loadDispatched();
@@ -166,7 +168,7 @@
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // Tab switching
+    // ==================== Tab Switching ====================
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -176,7 +178,7 @@
         });
     });
 
-    // Export CSV
+    // ==================== Utility: Export CSV ====================
     function exportCSV(tableId) {
         const table = document.getElementById(tableId);
         if (!table) return alert('No data to export.');
@@ -195,70 +197,82 @@
         link.click();
     }
 
-    // Invoices
+    // ==================== Invoices ====================
     async function loadInvoices() {
-        const start = document.getElementById('invDateStart').value;
-        const end = document.getElementById('invDateEnd').value;
-        const branch = document.getElementById('invBranch').value;
-        let query = db.collection('shipments').where('status', '==', 'Delivered').where('grnNumber', '!=', null);
-        if (start) query = query.where('receivedDate', '>=', new Date(start));
-        if (end) {
-            const endDate = new Date(end);
-            endDate.setHours(23,59,59);
-            query = query.where('receivedDate', '<=', endDate);
+        try {
+            const start = document.getElementById('invDateStart').value;
+            const end = document.getElementById('invDateEnd').value;
+            const branch = document.getElementById('invBranch').value;
+            let query = db.collection('shipments').where('status', '==', 'Delivered').where('grnNumber', '!=', null);
+            if (start) query = query.where('receivedDate', '>=', new Date(start));
+            if (end) {
+                const endDate = new Date(end);
+                endDate.setHours(23,59,59);
+                query = query.where('receivedDate', '<=', endDate);
+            }
+            if (branch) query = query.where('destinationBranch', '==', branch);
+            const snap = await query.get();
+            if (snap.empty) {
+                document.getElementById('invoiceList').innerHTML = '<p class="empty">No invoices found. Try adjusting filters.</p>';
+                return;
+            }
+            let html = '<table id="invTable"><tr><th>GRN</th><th>Date</th><th>Branch</th><th>Supplier</th><th>Total Goods</th><th>Transport</th><th>Action</th></tr>';
+            snap.forEach(doc => {
+                const d = doc.data();
+                const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
+                html += `<tr>
+                    <td>${d.grnNumber || 'N/A'}</td>
+                    <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
+                    <td>${d.destinationBranch}</td>
+                    <td>${d.senderName}</td>
+                    <td>₦${totalGoods.toLocaleString()}</td>
+                    <td>₦${(d.transportCost||0).toLocaleString()}</td>
+                    <td><button onclick="viewInvoice('${doc.id}')" style="background:#f39c12; border:none; color:white; padding:4px 16px; border-radius:40px; cursor:pointer;">Preview</button></td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('invoiceList').innerHTML = html;
+        } catch (error) {
+            console.error('Invoices load error:', error);
+            document.getElementById('invoiceList').innerHTML = `<p class="empty">⚠️ Error loading invoices: ${error.message}</p>`;
         }
-        if (branch) query = query.where('destinationBranch', '==', branch);
-        const snap = await query.get();
-        let html = '<table id="invTable"><tr><th>GRN</th><th>Date</th><th>Branch</th><th>Supplier</th><th>Total Goods</th><th>Transport</th><th>Action</th></tr>';
-        if (snap.empty) html += '<tr><td colspan="7" class="empty">No invoices found</td></tr>';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
-            html += `<tr>
-                <td>${d.grnNumber || 'N/A'}</td>
-                <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
-                <td>${d.destinationBranch}</td>
-                <td>${d.senderName}</td>
-                <td>₦${totalGoods.toLocaleString()}</td>
-                <td>₦${(d.transportCost||0).toLocaleString()}</td>
-                <td><button onclick="viewInvoice('${doc.id}')" style="background:#f39c12; border:none; color:white; padding:4px 16px; border-radius:40px; cursor:pointer;">Preview</button></td>
-            </tr>`;
-        });
-        html += '</table>';
-        document.getElementById('invoiceList').innerHTML = html;
     }
 
     window.viewInvoice = async (shipId) => {
-        const doc = await db.collection('shipments').doc(shipId).get();
-        if (!doc.exists) return;
-        const d = doc.data();
-        const items = d.items || [];
-        let itemsHtml = '';
-        items.forEach(it => {
-            itemsHtml += `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>`;
-        });
-        const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
-        const html = `
-            <div id="invoiceContentInner">
-                <h2>NEVAMAK Enterprises</h2>
-                <h3>Goods Received Note (GRN)</h3>
-                <p><strong>GRN:</strong> ${d.grnNumber || 'N/A'}</p>
-                <p><strong>Date:</strong> ${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleString() : 'N/A'}</p>
-                <p><strong>Supplier:</strong> ${d.senderName}</p>
-                <p><strong>Branch:</strong> ${d.destinationBranch}</p>
-                <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
-                <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
-                    <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
-                    ${itemsHtml}
-                    <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
-                    <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(d.transportCost||0).toLocaleString()}</strong></td></tr>
-                </table>
-                <p><em>Received by: ${d.receivingRep}</em></p>
-                <p>This is a system-generated invoice.</p>
-            </div>
-        `;
-        document.getElementById('invoiceContent').innerHTML = html;
-        document.getElementById('invoiceModal').style.display = 'flex';
+        try {
+            const doc = await db.collection('shipments').doc(shipId).get();
+            if (!doc.exists) return;
+            const d = doc.data();
+            const items = d.items || [];
+            let itemsHtml = '';
+            items.forEach(it => {
+                itemsHtml += `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>`;
+            });
+            const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
+            const html = `
+                <div id="invoiceContentInner">
+                    <h2>NEVAMAK Enterprises</h2>
+                    <h3>Goods Received Note (GRN)</h3>
+                    <p><strong>GRN:</strong> ${d.grnNumber || 'N/A'}</p>
+                    <p><strong>Date:</strong> ${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleString() : 'N/A'}</p>
+                    <p><strong>Supplier:</strong> ${d.senderName}</p>
+                    <p><strong>Branch:</strong> ${d.destinationBranch}</p>
+                    <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
+                    <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
+                        <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                        ${itemsHtml}
+                        <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(d.transportCost||0).toLocaleString()}</strong></td></tr>
+                    </table>
+                    <p><em>Received by: ${d.receivingRep}</em></p>
+                    <p>This is a system-generated invoice.</p>
+                </div>
+            `;
+            document.getElementById('invoiceContent').innerHTML = html;
+            document.getElementById('invoiceModal').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading invoice: ' + error.message);
+        }
     };
 
     function closeModal(id) {
@@ -273,178 +287,222 @@
     async function downloadInvoicePDF() {
         const element = document.getElementById('invoiceContentInner');
         if (!element) return alert('No invoice to download.');
-        const canvas = await html2canvas(element, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgWidth = 190;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
-        pdf.save(`Invoice_${new Date().toISOString().slice(0,10)}.pdf`);
+        try {
+            const canvas = await html2canvas(element, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`Invoice_${new Date().toISOString().slice(0,10)}.pdf`);
+        } catch (error) {
+            alert('Error generating PDF: ' + error.message);
+        }
     }
 
     document.getElementById('invFilterBtn').addEventListener('click', loadInvoices);
 
-    // Returns
+    // ==================== Returns ====================
     async function loadReturns() {
-        const start = document.getElementById('retDateStart').value;
-        const end = document.getElementById('retDateEnd').value;
-        const branch = document.getElementById('retBranch').value;
-        let query = db.collection('returns').orderBy('date', 'desc');
-        if (start) query = query.where('date', '>=', new Date(start));
-        if (end) {
-            const endDate = new Date(end);
-            endDate.setHours(23,59,59);
-            query = query.where('date', '<=', endDate);
+        try {
+            const start = document.getElementById('retDateStart').value;
+            const end = document.getElementById('retDateEnd').value;
+            const branch = document.getElementById('retBranch').value;
+            let query = db.collection('returns');
+            if (start) query = query.where('date', '>=', new Date(start));
+            if (end) {
+                const endDate = new Date(end);
+                endDate.setHours(23,59,59);
+                query = query.where('date', '<=', endDate);
+            }
+            if (branch) query = query.where('branch', '==', branch);
+            const snap = await query.get();
+            // Client-side sort by date desc
+            let docs = [];
+            snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+            docs.sort((a, b) => (b.date?.toDate() || 0) - (a.date?.toDate() || 0));
+            if (docs.length === 0) {
+                document.getElementById('returnsList').innerHTML = '<p class="empty">No returns found. Try adjusting filters.</p>';
+                return;
+            }
+            let html = '<table id="retTable"><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr>';
+            docs.forEach(r => {
+                html += `<tr>
+                    <td>${r.date ? new Date(r.date.toDate()).toLocaleDateString() : ''}</td>
+                    <td>${r.branch}</td>
+                    <td>${r.shipmentId?.slice(0,8) || ''}</td>
+                    <td>${r.itemName}</td>
+                    <td>${r.returnedQty}</td>
+                    <td>${r.reason || '-'}</td>
+                    <td>${r.createdBy || '-'}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('returnsList').innerHTML = html;
+        } catch (error) {
+            console.error('Returns load error:', error);
+            document.getElementById('returnsList').innerHTML = `<p class="empty">⚠️ Error loading returns: ${error.message}</p>`;
         }
-        if (branch) query = query.where('branch', '==', branch);
-        const snap = await query.get();
-        let html = '<table id="retTable"><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr>';
-        if (snap.empty) html += '<tr><td colspan="7" class="empty">No returns found</td></tr>';
-        snap.forEach(doc => {
-            const r = doc.data();
-            html += `<tr>
-                <td>${r.date ? new Date(r.date.toDate()).toLocaleDateString() : ''}</td>
-                <td>${r.branch}</td>
-                <td>${r.shipmentId.slice(0,8)}</td>
-                <td>${r.itemName}</td>
-                <td>${r.returnedQty}</td>
-                <td>${r.reason || '-'}</td>
-                <td>${r.createdBy || '-'}</td>
-            </tr>`;
-        });
-        html += '</table>';
-        document.getElementById('returnsList').innerHTML = html;
     }
     document.getElementById('retFilterBtn').addEventListener('click', loadReturns);
 
-    // Dispatched
+    // ==================== Dispatched ====================
     async function loadDispatched() {
-        const start = document.getElementById('dispDateStart').value;
-        const end = document.getElementById('dispDateEnd').value;
-        const status = document.getElementById('dispStatus').value;
-        let query = db.collection('shipments').orderBy('createdAt', 'desc');
-        if (start) query = query.where('createdAt', '>=', new Date(start));
-        if (end) {
-            const endDate = new Date(end);
-            endDate.setHours(23,59,59);
-            query = query.where('createdAt', '<=', endDate);
+        try {
+            const start = document.getElementById('dispDateStart').value;
+            const end = document.getElementById('dispDateEnd').value;
+            const status = document.getElementById('dispStatus').value;
+            let query = db.collection('shipments');
+            if (start) query = query.where('createdAt', '>=', new Date(start));
+            if (end) {
+                const endDate = new Date(end);
+                endDate.setHours(23,59,59);
+                query = query.where('createdAt', '<=', endDate);
+            }
+            if (status) query = query.where('status', '==', status);
+            const snap = await query.get();
+            // Client-side sort by createdAt desc
+            let docs = [];
+            snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+            docs.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+            if (docs.length === 0) {
+                document.getElementById('dispatchedList').innerHTML = '<p class="empty">No dispatched shipments found. Try adjusting filters.</p>';
+                return;
+            }
+            let html = '<table id="dispTable"><tr><th>ID</th><th>Date</th><th>Destination</th><th>Sender</th><th>Items</th><th>Goods Value</th><th>Status</th></tr>';
+            docs.forEach(d => {
+                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : '-';
+                const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
+                const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'') || 'dispatched'}`;
+                html += `<tr>
+                    <td>${d.id.slice(0,8)}</td>
+                    <td>${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ''}</td>
+                    <td>${d.destinationBranch}</td>
+                    <td>${d.senderName}</td>
+                    <td>${itemsShort}</td>
+                    <td>₦${totalGoods.toLocaleString()}</td>
+                    <td><span class="status-badge ${statusClass}">${d.status}</span></td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('dispatchedList').innerHTML = html;
+        } catch (error) {
+            console.error('Dispatched load error:', error);
+            document.getElementById('dispatchedList').innerHTML = `<p class="empty">⚠️ Error loading dispatched: ${error.message}</p>`;
         }
-        if (status) query = query.where('status', '==', status);
-        const snap = await query.get();
-        let html = '<table id="dispTable"><tr><th>ID</th><th>Date</th><th>Destination</th><th>Sender</th><th>Items</th><th>Goods Value</th><th>Status</th></tr>';
-        if (snap.empty) html += '<tr><td colspan="7" class="empty">No dispatched shipments found</td></tr>';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : '-';
-            const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
-            const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'') || 'dispatched'}`;
-            html += `<tr>
-                <td>${doc.id.slice(0,8)}</td>
-                <td>${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ''}</td>
-                <td>${d.destinationBranch}</td>
-                <td>${d.senderName}</td>
-                <td>${itemsShort}</td>
-                <td>₦${totalGoods.toLocaleString()}</td>
-                <td><span class="status-badge ${statusClass}">${d.status}</span></td>
-            </tr>`;
-        });
-        html += '</table>';
-        document.getElementById('dispatchedList').innerHTML = html;
     }
     document.getElementById('dispFilterBtn').addEventListener('click', loadDispatched);
 
-    // Received
+    // ==================== Received ====================
     async function loadReceived() {
-        const start = document.getElementById('recvDateStart').value;
-        const end = document.getElementById('recvDateEnd').value;
-        const branch = document.getElementById('recvBranch').value;
-        let query = db.collection('shipments').where('status', 'in', ['Delivered', 'Partially Delivered']).orderBy('receivedDate', 'desc');
-        if (start) query = query.where('receivedDate', '>=', new Date(start));
-        if (end) {
-            const endDate = new Date(end);
-            endDate.setHours(23,59,59);
-            query = query.where('receivedDate', '<=', endDate);
+        try {
+            const start = document.getElementById('recvDateStart').value;
+            const end = document.getElementById('recvDateEnd').value;
+            const branch = document.getElementById('recvBranch').value;
+            let query = db.collection('shipments').where('status', 'in', ['Delivered', 'Partially Delivered']);
+            if (start) query = query.where('receivedDate', '>=', new Date(start));
+            if (end) {
+                const endDate = new Date(end);
+                endDate.setHours(23,59,59);
+                query = query.where('receivedDate', '<=', endDate);
+            }
+            if (branch) query = query.where('destinationBranch', '==', branch);
+            const snap = await query.get();
+            // Client-side sort by receivedDate desc
+            let docs = [];
+            snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+            docs.sort((a, b) => (b.receivedDate?.toDate() || 0) - (a.receivedDate?.toDate() || 0));
+            if (docs.length === 0) {
+                document.getElementById('receivedList').innerHTML = '<p class="empty">No received shipments found. Try adjusting filters.</p>';
+                return;
+            }
+            let html = '<table id="recvTable"><tr><th>Date</th><th>Branch</th><th>GRN</th><th>Supplier</th><th>Items</th><th>Goods Value</th><th>Received By</th></tr>';
+            docs.forEach(d => {
+                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0})`).join(", ").substring(0,40) : '-';
+                const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
+                html += `<tr>
+                    <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
+                    <td>${d.destinationBranch}</td>
+                    <td>${d.grnNumber || 'N/A'}</td>
+                    <td>${d.senderName}</td>
+                    <td>${itemsShort}</td>
+                    <td>₦${totalGoods.toLocaleString()}</td>
+                    <td>${d.receivingRep || '-'}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('receivedList').innerHTML = html;
+        } catch (error) {
+            console.error('Received load error:', error);
+            document.getElementById('receivedList').innerHTML = `<p class="empty">⚠️ Error loading received: ${error.message}</p>`;
         }
-        if (branch) query = query.where('destinationBranch', '==', branch);
-        const snap = await query.get();
-        let html = '<table id="recvTable"><tr><th>Date</th><th>Branch</th><th>GRN</th><th>Supplier</th><th>Items</th><th>Goods Value</th><th>Received By</th></tr>';
-        if (snap.empty) html += '<tr><td colspan="7" class="empty">No received shipments found</td></tr>';
-        snap.forEach(doc => {
-            const d = doc.data();
-            const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0})`).join(", ").substring(0,40) : '-';
-            const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
-            html += `<tr>
-                <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
-                <td>${d.destinationBranch}</td>
-                <td>${d.grnNumber || 'N/A'}</td>
-                <td>${d.senderName}</td>
-                <td>${itemsShort}</td>
-                <td>₦${totalGoods.toLocaleString()}</td>
-                <td>${d.receivingRep || '-'}</td>
-            </tr>`;
-        });
-        html += '</table>';
-        document.getElementById('receivedList').innerHTML = html;
     }
     document.getElementById('recvFilterBtn').addEventListener('click', loadReceived);
 
-    // Chat History
+    // ==================== Chat History ====================
     async function loadChatHistory() {
-        const start = document.getElementById('chatDateStart').value;
-        const end = document.getElementById('chatDateEnd').value;
-        const search = document.getElementById('chatSearch').value.toLowerCase().trim();
-        let query = db.collection('messages')
-            .where('senderId', '==', currentUser.uid)
-            .orderBy('timestamp', 'desc');
-        if (start) query = query.where('timestamp', '>=', new Date(start));
-        if (end) {
-            const endDate = new Date(end);
-            endDate.setHours(23,59,59);
-            query = query.where('timestamp', '<=', endDate);
-        }
-        const snap = await query.get();
-        let html = '<table id="chatTable"><tr><th>Time</th><th>Chat</th><th>Text</th><th>File</th></tr>';
-        if (snap.empty) html += '<tr><td colspan="4" class="empty">No messages found</td></tr>';
-        snap.forEach(doc => {
-            const m = doc.data();
-            let chatDisplay = 'Global';
-            if (m.chatId !== 'global') {
-                const parts = m.chatId.split('_');
-                const other = parts.find(p => p !== currentUser.uid);
-                if (other) {
-                    const user = allUsers ? allUsers.find(u => u.uid === other) : null;
-                    chatDisplay = user ? user.email.split('@')[0] : other;
-                } else {
-                    chatDisplay = m.chatId;
-                }
+        try {
+            const start = document.getElementById('chatDateStart').value;
+            const end = document.getElementById('chatDateEnd').value;
+            const search = document.getElementById('chatSearch').value.toLowerCase().trim();
+            let query = db.collection('messages').where('senderId', '==', currentUser.uid);
+            if (start) query = query.where('timestamp', '>=', new Date(start));
+            if (end) {
+                const endDate = new Date(end);
+                endDate.setHours(23,59,59);
+                query = query.where('timestamp', '<=', endDate);
             }
-            const text = m.text || '';
-            if (search && !text.toLowerCase().includes(search)) return;
-            const file = m.fileName ? `📎 ${m.fileName}` : '';
-            html += `<tr>
-                <td>${m.timestamp ? new Date(m.timestamp.toDate()).toLocaleString() : ''}</td>
-                <td>${chatDisplay}</td>
-                <td>${text}</td>
-                <td>${file}</td>
-            </tr>`;
-        });
-        html += '</table>';
-        document.getElementById('chatList').innerHTML = html;
-    }
+            const snap = await query.get();
+            // Client-side sort by timestamp desc
+            let docs = [];
+            snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+            docs.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
 
-    let allUsers = [];
-    async function loadUsers() {
-        const snap = await db.collection('users').get();
-        allUsers = [];
-        snap.forEach(doc => {
-            allUsers.push({ uid: doc.id, email: doc.data().email });
-        });
+            // Apply search filter (if any)
+            if (search) {
+                docs = docs.filter(m => (m.text || '').toLowerCase().includes(search));
+            }
+
+            if (docs.length === 0) {
+                document.getElementById('chatList').innerHTML = '<p class="empty">No messages found. Try adjusting filters.</p>';
+                return;
+            }
+
+            let html = '<table id="chatTable"><tr><th>Time</th><th>Chat</th><th>Text</th><th>File</th></tr>';
+            docs.forEach(m => {
+                let chatDisplay = 'Global';
+                if (m.chatId !== 'global') {
+                    const parts = m.chatId.split('_');
+                    const other = parts.find(p => p !== currentUser.uid);
+                    if (other) {
+                        // We don't have users list here, but we can just show the chatId
+                        chatDisplay = other.slice(0,6);
+                    } else {
+                        chatDisplay = m.chatId;
+                    }
+                }
+                const text = m.text || '';
+                const file = m.fileName ? `📎 ${m.fileName}` : '';
+                html += `<tr>
+                    <td>${m.timestamp ? new Date(m.timestamp.toDate()).toLocaleString() : ''}</td>
+                    <td>${chatDisplay}</td>
+                    <td>${text}</td>
+                    <td>${file}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('chatList').innerHTML = html;
+        } catch (error) {
+            console.error('Chat history load error:', error);
+            document.getElementById('chatList').innerHTML = `<p class="empty">⚠️ Error loading chat history: ${error.message}</p>`;
+        }
     }
-    loadUsers();
 
     document.getElementById('chatFilterBtn').addEventListener('click', loadChatHistory);
     document.getElementById('chatSearch').addEventListener('input', loadChatHistory);
+
+    console.log('NEVAMAK Reports loaded successfully.');
 </script>
 </body>
 </html>
