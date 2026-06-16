@@ -2,25 +2,39 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Abuja Receiving</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
-        *{ font-family: system-ui, -apple-system; }
-        body{ background: #eef2f5; margin: 0; padding: 12px; }
-        .card, .shipment-card{ background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .shipment-card{ border-left: 5px solid #2c3e50; }
-        button{ background: #2c3e50; color: white; padding: 12px 20px; border-radius: 48px; border: none; font-size: 1rem; width: 100%; margin-top: 8px; cursor: pointer; }
-        input{ padding: 10px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin: 4px 0; }
-        .nav{ display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-        .nav a, .logout-btn{ background: #0a3d62; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
-        .item-row{ background: #f9f9f9; padding: 12px; border-radius: 20px; margin-bottom: 12px; }
-        .cost-info{ background: #f1f9f9; padding: 8px; border-radius: 16px; margin: 8px 0; font-size: 0.9rem; }
-        .input-group{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .input-group input{ flex: 1; min-width: 80px; }
-        h2{ font-size: 1.3rem; }
+        * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; box-sizing: border-box; }
+        body { background: #eef2f5; margin: 0; padding: 12px; }
+        .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .shipment-card { border-left: 5px solid #2c3e50; }
+        button { background: #2c3e50; color: white; padding: 12px 20px; border-radius: 48px; border: none; font-size: 1rem; width: 100%; margin-top: 8px; cursor: pointer; }
+        input, select, textarea { padding: 10px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin: 4px 0; }
+        .nav { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .nav a, .logout-btn { background: #0a3d62; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        .item-row { background: #f9f9f9; padding: 12px; border-radius: 20px; margin-bottom: 12px; }
+        .cost-info { background: #f1f9f9; padding: 8px; border-radius: 16px; margin: 8px 0; font-size: 0.9rem; }
+        .input-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .input-group input, .input-group select { flex: 1; min-width: 80px; }
+        h2 { font-size: 1.3rem; color: #0a3d62; }
+        .quality-check { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .quality-check label { font-size: 0.9rem; font-weight: 600; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .tab-btn { background: #ccc; color: #333; width: auto; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .tab-btn.active { background: #2c3e50; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 20px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #0a3d62; }
+        .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
+        .stat-card .num { font-size: 1.5rem; font-weight: bold; color: #0a3d62; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.5rem; }
         @media (max-width: 500px) { .input-group { flex-direction: column; } .input-group input { width: 100%; } }
     </style>
 </head>
@@ -31,37 +45,183 @@
     <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
 </div>
 <h2>🏢 Abuja Receiving</h2>
-<div id="shipmentsList" class="card">Loading...</div>
+
+<!-- Stats -->
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card"><h4>Received</h4><div class="num" id="receivedCount">-</div></div>
+    <div class="stat-card"><h4>Pending</h4><div class="num" id="pendingCount">-</div></div>
+    <div class="stat-card"><h4>Returned</h4><div class="num" id="returnedCount">-</div></div>
+    <div class="stat-card"><h4>Total Goods (₦)</h4><div class="num" id="totalGoods">-</div></div>
+    <div class="stat-card"><h4>Stock Value</h4><div class="num" id="stockValue">-</div></div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+    <button class="tab-btn active" data-tab="receive">📦 Receive Goods</button>
+    <button class="tab-btn" data-tab="returns">🔄 Returns</button>
+    <button class="tab-btn" data-tab="inventory">📊 Inventory</button>
+    <button class="tab-btn" data-tab="history">📜 Activity</button>
+</div>
+
+<!-- Tab: Receive Goods -->
+<div id="tab-receive" class="tab-content active">
+    <div id="shipmentsList" class="card">Loading...</div>
+</div>
+
+<!-- Tab: Returns -->
+<div id="tab-returns" class="tab-content">
+    <div class="card">
+        <h3>Record Return</h3>
+        <select id="returnShipmentSelect"><option value="">-- Select Shipment --</option></select>
+        <select id="returnItemSelect"><option value="">-- Select Item --</option></select>
+        <input type="number" id="returnQty" placeholder="Quantity to return">
+        <textarea id="returnReason" placeholder="Reason"></textarea>
+        <button id="recordReturnBtn">📤 Record Return</button>
+        <div id="returnMessage"></div>
+    </div>
+    <div class="card">
+        <h3>Past Returns</h3>
+        <div id="pastReturnsList">Loading...</div>
+    </div>
+</div>
+
+<!-- Tab: Inventory -->
+<div id="tab-inventory" class="tab-content">
+    <div class="card">
+        <h3>Current Stock</h3>
+        <input type="text" id="invSearch" placeholder="🔍 Search by item...">
+        <div id="inventoryList">Loading...</div>
+    </div>
+</div>
+
+<!-- Tab: Activity -->
+<div id="tab-history" class="tab-content">
+    <div class="card">
+        <h3>Activity Log</h3>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input type="date" id="historyStart">
+            <input type="date" id="historyEnd">
+            <button id="filterHistoryBtn" style="width:auto; padding:10px 20px;">Filter</button>
+        </div>
+        <div id="activityList">Loading...</div>
+    </div>
+</div>
+
+<!-- Modal: Invoice/GRN Preview -->
+<div id="invoiceModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('invoiceModal')">&times;</span>
+        <div id="invoiceContent"></div>
+        <button id="printInvoiceBtn" onclick="window.print()">🖨️ Print</button>
+    </div>
+</div>
 
 <script>
-    const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    let currentUserEmail = "";
+    const BRANCH = "Abuja";
+
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
-        // Check role – if not abuja_rep, still show but only Abuja shipments
         const userDoc = await db.collection('users').doc(user.uid).get();
-        const role = userDoc.data()?.role;
-        // If role is abuja_rep, we already filter by destination Abuja. Otherwise we show all? We'll keep filter for all.
+        if (userDoc.data()?.role !== 'abuja_rep') {
+            await auth.signOut();
+            window.location.href = 'login.html';
+            return;
+        }
+        currentUserEmail = user.email;
         loadShipments();
+        loadReturnShipmentsDropdown();
+        loadPastReturns();
+        loadActivityHistory();
+        loadInventory();
+        loadStats();
     });
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+        });
+    });
+
+    // ---- Stats ----
+    function loadStats() {
+        db.collection("shipments").where("destinationBranch", "==", BRANCH).onSnapshot(snap => {
+            let received = 0, pending = 0, totalGoods = 0;
+            snap.forEach(doc => {
+                const d = doc.data();
+                if (d.status === 'Delivered' || d.status === 'Partially Delivered') received++;
+                if (d.status === 'Dispatched' || d.status === 'Partially Delivered') pending++;
+                if (d.items) d.items.forEach(i => totalGoods += i.totalItemCost || 0);
+            });
+            document.getElementById('receivedCount').innerText = received;
+            document.getElementById('pendingCount').innerText = pending;
+            document.getElementById('totalGoods').innerText = '₦' + totalGoods.toLocaleString();
+        });
+        // Returns count
+        db.collection("returns").where("branch", "==", BRANCH).onSnapshot(snap => {
+            document.getElementById('returnedCount').innerText = snap.size;
+        });
+        // Stock value (sum of stock * unitPrice)
+        db.collection("inventory").where("branch", "==", BRANCH).onSnapshot(snap => {
+            let val = 0;
+            snap.forEach(doc => {
+                const d = doc.data();
+                val += (d.stock || 0) * (d.unitPrice || 0);
+            });
+            document.getElementById('stockValue').innerText = '₦' + val.toLocaleString();
+        });
+    }
+
+    // ---- Receive Goods ----
     async function loadShipments() {
-        const snap = await db.collection("shipments").where("destinationBranch","==","Abuja").where("status","in",["Dispatched","Partially Delivered"]).get();
-        if(snap.empty) { document.getElementById("shipmentsList").innerHTML = "<div class='card'>✅ No pending shipments</div>"; return; }
-        let docs = []; snap.forEach(d => docs.push({id:d.id, data:d.data()}));
-        docs.sort((a,b)=>(b.data.createdAt?.toDate()||0)-(a.data.createdAt?.toDate()||0));
+        const snap = await db.collection("shipments")
+            .where("destinationBranch", "==", BRANCH)
+            .where("status", "in", ["Dispatched", "Partially Delivered"])
+            .get();
+        const container = document.getElementById("shipmentsList");
+        if (snap.empty) {
+            container.innerHTML = "<div class='card'>✅ No pending shipments</div>";
+            return;
+        }
+        let docs = [];
+        snap.forEach(d => docs.push({ id: d.id, data: d.data() }));
+        docs.sort((a, b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0));
+
         let html = "";
-        for(const {id, data: ship} of docs){
+        for (const { id, data: ship } of docs) {
             const items = ship.items;
-            const totalGoods = items.reduce((s,i)=>s+(i.totalItemCost||0),0);
+            const totalGoods = items.reduce((s, i) => s + (i.totalItemCost || 0), 0);
             html += `<div class="shipment-card" id="ship-${id}">
-                        <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName}</h3>
-                        <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div>`;
-            for(let idx=0; idx<items.length; idx++){
+                        <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName} | Expected: ${ship.expectedDate||'N/A'}</h3>
+                        <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div>
+                        <div class="quality-check">
+                            <label>Quality Check:</label>
+                            <select id="quality_${id}">
+                                <option value="Pass">Pass</option>
+                                <option value="Fail">Fail</option>
+                                <option value="Partial">Partial</option>
+                            </select>
+                            <button class="btn-sm btn-danger" onclick="rejectShipment('${id}')" style="width:auto;">❌ Reject Shipment</button>
+                        </div>`;
+            for (let idx = 0; idx < items.length; idx++) {
                 const it = items[idx];
                 const pending = it.orderedQty - (it.receivedQty + it.damageQty);
                 html += `<div class="item-row">
@@ -70,47 +230,337 @@
                             <div class="input-group">
                                 <input type="number" id="recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}">
                                 <input type="number" id="dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}">
+                                <select id="location_${id}_${idx}">
+                                    <option value="Shelf A">Shelf A</option>
+                                    <option value="Shelf B">Shelf B</option>
+                                    <option value="Cold Room">Cold Room</option>
+                                    <option value="Warehouse">Warehouse</option>
+                                </select>
                             </div>
                           </div>`;
             }
             html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div>
                      <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div>
                      <button onclick="receiveShipment('${id}')">✅ Confirm Receipt</button>
+                     <button onclick="viewInvoice('${id}')" style="background:#f39c12;">🧾 Preview Invoice</button>
                      </div>`;
         }
-        document.getElementById("shipmentsList").innerHTML = html;
+        container.innerHTML = html;
     }
 
+    // ---- Receive shipment function (as before, plus invoice) ----
     window.receiveShipment = async (shipId) => {
         const docRef = db.collection("shipments").doc(shipId);
         const doc = await docRef.get();
-        if(!doc.exists) return;
+        if (!doc.exists) return;
         const data = doc.data();
         let items = [...data.items];
         let updated = false;
-        for(let i=0; i<items.length; i++){
+        const quality = document.getElementById(`quality_${shipId}`).value;
+
+        for (let i = 0; i < items.length; i++) {
             const addRecv = parseInt(document.getElementById(`recv_${shipId}_${i}`)?.value || 0);
             const addDam = parseInt(document.getElementById(`dam_${shipId}_${i}`)?.value || 0);
-            if(addRecv>0 || addDam>0){
+            const location = document.getElementById(`location_${shipId}_${i}`)?.value || 'Shelf A';
+            if (addRecv > 0 || addDam > 0) {
                 updated = true;
-                items[i].receivedQty = (items[i].receivedQty||0) + addRecv;
-                items[i].damageQty = (items[i].damageQty||0) + addDam;
-                if(items[i].receivedQty+items[i].damageQty > items[i].orderedQty){
+                items[i].receivedQty = (items[i].receivedQty || 0) + addRecv;
+                items[i].damageQty = (items[i].damageQty || 0) + addDam;
+                items[i].location = location;
+                if (items[i].receivedQty + items[i].damageQty > items[i].orderedQty) {
                     alert(`Over-receipt on ${items[i].itemName}`);
                     items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
                 }
             }
         }
-        if(!updated) return alert("Enter quantities");
+        if (!updated) return alert("Enter quantities");
         const rep = document.getElementById(`repName_${shipId}`).value.trim();
         const grn = document.getElementById(`grn_${shipId}`).value.trim();
-        if(!rep) return alert("Enter rep name");
-        const allCompleted = items.every(it => (it.receivedQty+it.damageQty) >= it.orderedQty);
+        if (!rep) return alert("Enter rep name");
+
+        const allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
         const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
-        await docRef.update({ items, status:newStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep:rep, grnNumber:grn||`GRN-${Date.now()}` });
+
+        await docRef.update({
+            items,
+            status: newStatus,
+            receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+            receivingRep: rep,
+            grnNumber: grn || `GRN-${Date.now()}`,
+            qualityCheck: quality,
+            receivedBy: rep
+        });
+
+        // Update inventory
+        for (const item of items) {
+            if (item.receivedQty > 0) {
+                const invRef = db.collection('inventory')
+                    .where('itemName', '==', item.itemName)
+                    .where('branch', '==', BRANCH);
+                const snap = await invRef.get();
+                if (snap.empty) {
+                    await db.collection('inventory').add({
+                        itemName: item.itemName,
+                        branch: BRANCH,
+                        stock: item.receivedQty,
+                        unitPrice: item.unitPrice,
+                        location: item.location || 'Shelf A',
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    snap.forEach(d => {
+                        d.ref.update({
+                            stock: firebase.firestore.FieldValue.increment(item.receivedQty),
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                }
+            }
+        }
+
+        // Log activity
+        await db.collection('activityLog').add({
+            actionType: 'receive',
+            shipmentId: shipId,
+            branch: BRANCH,
+            details: `Received by ${rep}, GRN: ${grn}, Quality: ${quality}`,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            user: rep
+        });
+
+        // Notification
+        await db.collection('notifications').add({
+            userId: 'admin',
+            message: `Shipment ${shipId.slice(0,6)} received at ${BRANCH} by ${rep}`,
+            read: false,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
         alert(`${newStatus} - GRN: ${grn}`);
         loadShipments();
+        loadActivityHistory();
+        loadStats();
+        loadInventory();
     };
+
+    // ---- Reject Shipment ----
+    window.rejectShipment = async (shipId) => {
+        if (!confirm('Reject this entire shipment?')) return;
+        const reason = prompt('Reason for rejection:');
+        if (reason === null) return;
+        await db.collection("shipments").doc(shipId).update({
+            status: 'Rejected',
+            rejectionReason: reason,
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        await db.collection('activityLog').add({
+            actionType: 'reject',
+            shipmentId: shipId,
+            branch: BRANCH,
+            details: `Rejected: ${reason}`,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            user: currentUserEmail
+        });
+        alert('Shipment rejected');
+        loadShipments();
+        loadActivityHistory();
+        loadStats();
+    };
+
+    // ---- View Invoice ----
+    window.viewInvoice = async (shipId) => {
+        const doc = await db.collection("shipments").doc(shipId).get();
+        if (!doc.exists) return;
+        const data = doc.data();
+        const items = data.items || [];
+        let itemsHtml = '';
+        items.forEach(it => {
+            itemsHtml += `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>`;
+        });
+        const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
+        const html = `
+            <h2>NEVAMAK Enterprises</h2>
+            <h3>Goods Received Note (GRN)</h3>
+            <p><strong>GRN:</strong> ${data.grnNumber || 'N/A'}</p>
+            <p><strong>Date:</strong> ${data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleString() : 'N/A'}</p>
+            <p><strong>Supplier:</strong> ${data.senderName}</p>
+            <p><strong>Branch:</strong> ${BRANCH}</p>
+            <p><strong>Vehicle:</strong> ${data.vehicleNo || 'N/A'}</p>
+            <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
+                <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                ${itemsHtml}
+                <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
+                <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(data.transportCost||0).toLocaleString()}</strong></td></tr>
+            </table>
+            <p><em>Received by: ${data.receivingRep}</em></p>
+        `;
+        document.getElementById('invoiceContent').innerHTML = html;
+        document.getElementById('invoiceModal').style.display = 'flex';
+    };
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+
+    // ---- Returns (same as PH) ----
+    async function loadReturnShipmentsDropdown() {
+        const snap = await db.collection("shipments")
+            .where("destinationBranch", "==", BRANCH)
+            .where("status", "in", ["Delivered", "Partially Delivered"])
+            .get();
+        const sel = document.getElementById("returnShipmentSelect");
+        sel.innerHTML = '<option value="">-- Select Shipment --</option>';
+        snap.forEach(doc => {
+            const opt = document.createElement("option");
+            opt.value = doc.id;
+            opt.textContent = `${doc.id.slice(0,8)} - ${doc.data().senderName}`;
+            sel.appendChild(opt);
+        });
+        sel.onchange = () => loadReturnItems(sel.value);
+    }
+
+    async function loadReturnItems(shipmentId) {
+        const itemSelect = document.getElementById("returnItemSelect");
+        if (!shipmentId) { itemSelect.innerHTML = '<option value="">-- Select Item --</option>'; return; }
+        const doc = await db.collection("shipments").doc(shipmentId).get();
+        const items = doc.data().items;
+        itemSelect.innerHTML = '<option value="">-- Select Item --</option>';
+        items.forEach((it, idx) => {
+            const opt = document.createElement("option");
+            opt.value = idx;
+            opt.textContent = `${it.itemName} (OK: ${it.receivedQty}, Damaged: ${it.damageQty})`;
+            itemSelect.appendChild(opt);
+        });
+    }
+
+    document.getElementById("recordReturnBtn").addEventListener("click", async () => {
+        const shipmentId = document.getElementById("returnShipmentSelect").value;
+        const itemIdx = document.getElementById("returnItemSelect").value;
+        const qty = parseInt(document.getElementById("returnQty").value);
+        const reason = document.getElementById("returnReason").value.trim();
+        if (!shipmentId || itemIdx === "" || !qty || qty <= 0) return alert("Select shipment, item, and valid quantity");
+
+        const shipmentDoc = await db.collection("shipments").doc(shipmentId).get();
+        const items = shipmentDoc.data().items;
+        const item = items[parseInt(itemIdx)];
+        if (qty > (item.receivedQty - item.damageQty)) return alert("Cannot return more than received good units");
+
+        items[parseInt(itemIdx)].receivedQty -= qty;
+        await db.collection("shipments").doc(shipmentId).update({ items });
+
+        await db.collection("returns").add({
+            shipmentId,
+            branch: BRANCH,
+            itemName: item.itemName,
+            returnedQty: qty,
+            reason,
+            date: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUserEmail
+        });
+
+        await db.collection("activityLog").add({
+            actionType: "return",
+            shipmentId,
+            branch: BRANCH,
+            details: `Returned ${qty} x ${item.itemName}. Reason: ${reason}`,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            user: currentUserEmail
+        });
+
+        // Reduce inventory
+        const invRef = db.collection('inventory')
+            .where('itemName', '==', item.itemName)
+            .where('branch', '==', BRANCH);
+        const snap = await invRef.get();
+        if (!snap.empty) {
+            snap.forEach(d => {
+                d.ref.update({
+                    stock: firebase.firestore.FieldValue.increment(-qty)
+                });
+            });
+        }
+
+        alert("Return recorded");
+        document.getElementById("returnQty").value = "";
+        document.getElementById("returnReason").value = "";
+        loadPastReturns();
+        loadActivityHistory();
+        loadReturnShipmentsDropdown();
+        loadStats();
+        loadInventory();
+    });
+
+    async function loadPastReturns() {
+        const snap = await db.collection("returns").where("branch", "==", BRANCH).orderBy("date", "desc").get();
+        let html = "<ul>";
+        snap.forEach(doc => {
+            const r = doc.data();
+            html += `<li>${new Date(r.date?.toDate()).toLocaleString()}: ${r.itemName} x${r.returnedQty} (${r.reason})</li>`;
+        });
+        html += "</ul>";
+        document.getElementById("pastReturnsList").innerHTML = html || "No returns";
+    }
+
+    // ---- Inventory ----
+    async function loadInventory() {
+        const snap = await db.collection("inventory").where("branch", "==", BRANCH).get();
+        let html = '<table><tr><th>Item</th><th>Stock</th><th>Location</th><th>Unit Price</th></tr>';
+        snap.forEach(doc => {
+            const d = doc.data();
+            html += `<tr><td>${d.itemName}</td><td>${d.stock}</td><td>${d.location||'N/A'}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>`;
+        });
+        html += '</table>';
+        document.getElementById("inventoryList").innerHTML = html || 'No inventory';
+    }
+
+    // Search inventory
+    document.getElementById('invSearch').addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#inventoryList table tr');
+        rows.forEach((row, idx) => {
+            if (idx === 0) return;
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
+    });
+
+    // ---- Activity History with date filter ----
+    async function loadActivityHistory(startDate, endDate) {
+        let query = db.collection("activityLog").where("branch", "==", BRANCH).orderBy("timestamp", "desc").limit(100);
+        if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23,59,59);
+            query = query.where("timestamp", ">=", start).where("timestamp", "<=", end);
+        }
+        const snap = await query.get();
+        let html = '<table style="width:100%; border-collapse:collapse;"><tr><th>Time</th><th>Action</th><th>Details</th><th>User</th></tr>';
+        snap.forEach(doc => {
+            const a = doc.data();
+            html += `<tr>
+                <td>${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ""}</td>
+                <td>${a.actionType}</td>
+                <td>${a.details}</td>
+                <td>${a.user || ''}</td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById("activityList").innerHTML = html || "No activity";
+    }
+
+    document.getElementById('filterHistoryBtn').addEventListener('click', () => {
+        const start = document.getElementById('historyStart').value;
+        const end = document.getElementById('historyEnd').value;
+        loadActivityHistory(start, end);
+    });
+    // Initial load without filter
+    loadActivityHistory();
+
 </script>
 </body>
 </html>
