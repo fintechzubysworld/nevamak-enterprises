@@ -139,7 +139,6 @@
 </div>
 
 <script>
-    // ========== Firebase Config ==========
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -155,11 +154,9 @@
 
     let currentUser = null;
 
-    // ========== Auth ==========
     auth.onAuthStateChanged(user => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
-        // Load all reports
         loadInvoices();
         loadReturns();
         loadDispatched();
@@ -169,7 +166,7 @@
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // ========== Tab Switching ==========
+    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -179,7 +176,7 @@
         });
     });
 
-    // ========== Utility: Export CSV ==========
+    // Export CSV
     function exportCSV(tableId) {
         const table = document.getElementById(tableId);
         if (!table) return alert('No data to export.');
@@ -198,7 +195,7 @@
         link.click();
     }
 
-    // ========== Invoices ==========
+    // Invoices
     async function loadInvoices() {
         const start = document.getElementById('invDateStart').value;
         const end = document.getElementById('invDateEnd').value;
@@ -286,10 +283,9 @@
         pdf.save(`Invoice_${new Date().toISOString().slice(0,10)}.pdf`);
     }
 
-    // Filter listeners
     document.getElementById('invFilterBtn').addEventListener('click', loadInvoices);
 
-    // ========== Returns ==========
+    // Returns
     async function loadReturns() {
         const start = document.getElementById('retDateStart').value;
         const end = document.getElementById('retDateEnd').value;
@@ -322,7 +318,7 @@
     }
     document.getElementById('retFilterBtn').addEventListener('click', loadReturns);
 
-    // ========== Dispatched ==========
+    // Dispatched
     async function loadDispatched() {
         const start = document.getElementById('dispDateStart').value;
         const end = document.getElementById('dispDateEnd').value;
@@ -358,7 +354,7 @@
     }
     document.getElementById('dispFilterBtn').addEventListener('click', loadDispatched);
 
-    // ========== Received ==========
+    // Received
     async function loadReceived() {
         const start = document.getElementById('recvDateStart').value;
         const end = document.getElementById('recvDateEnd').value;
@@ -393,7 +389,7 @@
     }
     document.getElementById('recvFilterBtn').addEventListener('click', loadReceived);
 
-    // ========== Chat History ==========
+    // Chat History
     async function loadChatHistory() {
         const start = document.getElementById('chatDateStart').value;
         const end = document.getElementById('chatDateEnd').value;
@@ -414,7 +410,6 @@
             const m = doc.data();
             let chatDisplay = 'Global';
             if (m.chatId !== 'global') {
-                // Try to extract other user
                 const parts = m.chatId.split('_');
                 const other = parts.find(p => p !== currentUser.uid);
                 if (other) {
@@ -438,7 +433,6 @@
         document.getElementById('chatList').innerHTML = html;
     }
 
-    // Load users for chat display
     let allUsers = [];
     async function loadUsers() {
         const snap = await db.collection('users').get();
@@ -451,9 +445,6 @@
 
     document.getElementById('chatFilterBtn').addEventListener('click', loadChatHistory);
     document.getElementById('chatSearch').addEventListener('input', loadChatHistory);
-
-    // ========== Initial Load ==========
-    // All data loads on auth state change.
 </script>
 </body>
 </html>
