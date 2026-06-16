@@ -170,27 +170,32 @@
         });
         if (!items.length || !senderName) return alert("Fill all fields and add at least one item.");
 
-        await db.collection('invoiceRequests').add({
-            senderName,
-            branch,
-            items,
-            notes,
-            status: 'pending',
-            requestedBy: currentUser.email,
-            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        try {
+            await db.collection('invoiceRequests').add({
+                senderName,
+                branch,
+                items,
+                notes,
+                status: 'pending',
+                requestedBy: currentUser.email,
+                requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-        alert('Request submitted successfully!');
-        document.getElementById("requestForm").reset();
-        reqContainer.innerHTML = `<div class="item-row">
-            <input type="text" placeholder="Item name" class="reqItemName">
-            <input type="number" placeholder="Quantity" class="reqItemQty">
-            <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
-            <button type="button" class="removeItem">✖</button>
-        </div>`;
-        updateReqPreview();
-        loadRequests();
+            alert('Request submitted successfully!');
+            document.getElementById("requestForm").reset();
+            reqContainer.innerHTML = `<div class="item-row">
+                <input type="text" placeholder="Item name" class="reqItemName">
+                <input type="number" placeholder="Quantity" class="reqItemQty">
+                <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
+                <button type="button" class="removeItem">✖</button>
+            </div>`;
+            updateReqPreview();
+            loadRequests();
+        } catch (error) {
+            console.error('Submit error:', error);
+            alert('Error submitting request: ' + error.message);
+        }
     });
 
     // ==================== Load Your Requests ====================
@@ -218,23 +223,35 @@
                     </tr>`;
                 });
                 document.querySelector("#requestsTable tbody").innerHTML = html || "<tr><td colspan='6'>No requests</td></tr>";
+            }, (error) => {
+                console.error('Load requests error:', error);
+                document.querySelector("#requestsTable tbody").innerHTML = `<tr><td colspan='6'>Error loading requests: ${error.message}</td></tr>`;
             });
     }
 
     window.cancelRequest = async function(id) {
         if (!confirm('Cancel this request?')) return;
-        await db.collection('invoiceRequests').doc(id).delete();
-        alert('Request cancelled.');
+        try {
+            await db.collection('invoiceRequests').doc(id).delete();
+            alert('Request cancelled.');
+            loadRequests();
+        } catch (error) {
+            alert('Error cancelling: ' + error.message);
+        }
     };
 
     window.viewApproved = async function(id) {
-        const doc = await db.collection('invoiceRequests').doc(id).get();
-        if (!doc.exists) return;
-        const d = doc.data();
-        if (d.shipmentId) {
-            alert('View shipment: ' + d.shipmentId + ' (navigate to receiving page)');
-        } else {
-            alert('No shipment linked yet.');
+        try {
+            const doc = await db.collection('invoiceRequests').doc(id).get();
+            if (!doc.exists) return;
+            const d = doc.data();
+            if (d.shipmentId) {
+                alert('Dispatch created: ' + d.shipmentId + '. Please go to your receiving page to receive it.');
+            } else {
+                alert('No dispatch linked yet.');
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
         }
     };
 </script>
