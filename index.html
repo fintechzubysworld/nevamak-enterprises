@@ -30,14 +30,9 @@
         .status-delivered { background: #d4edda; color: #155724; }
         .status-partial { background: #fff3cd; color: #856404; }
         .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
-        .cost-cell { font-family: monospace; font-weight: bold; white-space: nowrap; }
+        .cost-cell { font-family: monospace; font-weight: bold; }
         footer { text-align: center; margin-top: 24px; font-size: 0.75rem; color: #7f8c8d; }
-        @media (max-width: 640px) {
-            .stats { grid-template-columns: 1fr 1fr; }
-            .stat-card .number { font-size: 1.3rem; }
-            header { flex-direction: column; text-align: center; }
-        }
-        .return-row { background: #fff3e0; }
+        @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } .stat-card .number { font-size: 1.3rem; } header { flex-direction: column; text-align: center; } }
     </style>
 </head>
 <body>
@@ -46,12 +41,14 @@
         <div class="logo"><h1>🚛 NEVAMAK</h1><p id="roleBadge"></p></div>
         <div class="nav-links">
             <a href="lagos_dispatch.html">📦 Dispatch</a>
+            <a href="receive_abuja.html">🏢 Abuja</a>
+            <a href="receive_ph.html">🌊 PH</a>
+            <a href="chat.html">💬 Chat</a>
             <a href="admin_create_user.html" id="adminPanelLink" style="display:none;">👑 Admin</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
 
-    <!-- Stats -->
     <div class="stats">
         <div class="stat-card"><h3>Total Shipments</h3><p class="number" id="totalShipments">-</p></div>
         <div class="stat-card"><h3>To Abuja</h3><p class="number" id="toAbuja">-</p></div>
@@ -62,88 +59,58 @@
         <div class="stat-card"><h3>Returned Items</h3><p class="number" id="returnedCount">-</p></div>
     </div>
 
-    <!-- Shipments Table -->
     <div class="section-card">
         <h2 class="section-title">📋 Live Shipments</h2>
-        <div style="overflow-x: auto;">
-            <table>
-                <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th></tr></thead>
-                <tbody id="shipmentsBody"><tr><td colspan="8">Loading...</td></tr></tbody>
-            </table>
-        </div>
+        <table>
+            <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody id="shipmentsBody"><tr><td colspan="8">Loading...</td></tr></tbody>
+        </table>
     </div>
 
-    <!-- Returned Goods Table -->
     <div class="section-card">
         <h2 class="section-title">🔄 Returned Goods</h2>
-        <div style="overflow-x: auto;">
-            <table>
-                <thead><tr><th>Date</th><th>Branch</th><th>Shipment ID</th><th>Item</th><th>Qty Returned</th><th>Reason</th><th>Recorded By</th></tr></thead>
-                <tbody id="returnsBody"><tr><td colspan="7">Loading...</td></tr></tbody>
-            </table>
-        </div>
+        <table>
+            <thead><tr><th>Date</th><th>Branch</th><th>Shipment ID</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr></thead>
+            <tbody id="returnsBody"><tr><td colspan="7">Loading...</td></tr></tbody>
+        </table>
     </div>
-
     <footer>NEVAMAK Connect – Real-time Sync</footer>
 </div>
 
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
-        authDomain: "nevamak-enterprises.firebaseapp.com",
-        projectId: "nevamak-enterprises",
-        storageBucket: "nevamak-enterprises.firebasestorage.app",
-        messagingSenderId: "144324172534",
-        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-        measurementId: "G-MZ8NT6KK8N"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+    let currentRole = '';
 
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         const userDoc = await db.collection('users').doc(user.uid).get();
-        const role = userDoc.data()?.role;
-        if (!role || (role !== 'admin' && role !== 'lagos_sender')) {
-            await auth.signOut();
-            window.location.href = 'login.html';
-            return;
-        }
-        document.getElementById('roleBadge').innerText = `Role: ${role}`;
-        if (role === 'admin') document.getElementById('adminPanelLink').style.display = 'inline-block';
+        currentRole = userDoc.data()?.role || '';
+        document.getElementById('roleBadge').innerText = `Role: ${currentRole}`;
+        if (currentRole === 'admin') document.getElementById('adminPanelLink').style.display = 'inline-block';
+        // Listen to shipments and returns
         startListeners();
     });
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
     function startListeners() {
-        // Shipments listener
-        db.collection("shipments").onSnapshot((snapshot) => {
-            let total = 0, abuja = 0, ph = 0, delivered = 0, totalGoods = 0, totalTrans = 0;
-            const rows = [];
-            snapshot.forEach(doc => {
-                const data = doc.data();
+        // Shipments
+        db.collection("shipments").onSnapshot(snap => {
+            let total=0, abuja=0, ph=0, delivered=0, totalGoods=0, totalTrans=0, rows=[];
+            snap.forEach(doc => {
+                const d = doc.data();
                 total++;
-                if (data.destinationBranch === "Abuja") abuja++;
-                if (data.destinationBranch === "Portharcourt") ph++;
-                if (data.status === "Delivered") delivered++;
-                let goods = 0;
-                if (data.items) data.items.forEach(i => goods += (i.totalItemCost || 0));
-                totalGoods += goods;
-                totalTrans += (data.transportCost || 0);
-                const statusClass = `status status-${data.status?.toLowerCase().replace(/\s/g, '') || 'dispatched'}`;
-                const itemsShort = data.items ? data.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0, 40) : "-";
-                const lastUpdate = data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleDateString() : (data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : "N/A");
-                rows.push(`<tr>
-                    <td><strong>${doc.id.slice(0,6)}</strong></td>
-                    <td>${data.senderName || "—"}</td>
-                    <td><span class="badge">${data.destinationBranch}</span></td>
-                    <td>${itemsShort}</td>
-                    <td class="cost-cell">₦${goods.toLocaleString()}</td>
-                    <td class="cost-cell">₦${(data.transportCost||0).toLocaleString()}</td>
-                    <td><span class="${statusClass}">${data.status}</span></td>
-                    <td>${lastUpdate}</td>
-                </tr>`);
+                if (d.destinationBranch==="Abuja") abuja++;
+                if (d.destinationBranch==="Portharcourt") ph++;
+                if (d.status==="Delivered") delivered++;
+                let goods=0; if(d.items) d.items.forEach(i=>goods+=i.totalItemCost||0);
+                totalGoods+=goods; totalTrans+=(d.transportCost||0);
+                const statusClass = `status status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+                const itemsShort = d.items ? d.items.map(i=>`${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : "-";
+                const lastUpdate = d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : (d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : "N/A");
+                rows.push(`<tr><td><strong>${doc.id.slice(0,6)}</strong></td><td>${d.senderName||"—"}</td><td><span class="badge">${d.destinationBranch}</span></td><td>${itemsShort}</td><td class="cost-cell">₦${goods.toLocaleString()}</td><td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td><td><span class="${statusClass}">${d.status}</span></td><td>${lastUpdate}</td></tr>`);
             });
             document.getElementById("totalShipments").innerText = total;
             document.getElementById("toAbuja").innerText = abuja;
@@ -151,28 +118,19 @@
             document.getElementById("deliveredCount").innerText = delivered;
             document.getElementById("totalValue").innerText = `₦${totalGoods.toLocaleString()}`;
             document.getElementById("totalTransport").innerText = `₦${totalTrans.toLocaleString()}`;
-            document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='8'>No shipments yet</td></tr>";
-        }, err => console.error(err));
+            document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='8'>No shipments</td></tr>";
+        }, err=>console.error(err));
 
-        // Returns listener
-        db.collection("returns").orderBy("date", "desc").onSnapshot(snap => {
-            let returnRows = "";
-            let totalReturnedQty = 0;
+        // Returns
+        db.collection("returns").orderBy("date","desc").onSnapshot(snap => {
+            let returnRows="", totalReturned=0;
             snap.forEach(doc => {
                 const r = doc.data();
-                totalReturnedQty += r.returnedQty;
-                returnRows += `<tr>
-                    <td>${new Date(r.date?.toDate()).toLocaleDateString()}</td>
-                    <td>${r.branch}</td>
-                    <td>${r.shipmentId.slice(0,6)}</td>
-                    <td>${r.itemName}</td>
-                    <td>${r.returnedQty}</td>
-                    <td>${r.reason || "-"}</td>
-                    <td>${r.createdBy || "-"}</td>
-                </tr>`;
+                totalReturned += r.returnedQty;
+                returnRows += `<tr><td>${new Date(r.date?.toDate()).toLocaleDateString()}</td><td>${r.branch}</td><td>${r.shipmentId.slice(0,6)}</td><td>${r.itemName}</td><td>${r.returnedQty}</td><td>${r.reason||"-"}</td><td>${r.createdBy||"-"}</td></tr>`;
             });
-            document.getElementById("returnedCount").innerText = totalReturnedQty;
-            document.getElementById("returnsBody").innerHTML = returnRows || "<tr><td colspan='7'>No returns recorded</td></tr>";
+            document.getElementById("returnedCount").innerText = totalReturned;
+            document.getElementById("returnsBody").innerHTML = returnRows || "<tr><td colspan='7'>No returns</td></tr>";
         });
     }
 </script>
