@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEVAMAK – Lagos Dispatch</title>
+    <title>NEVAMAK – Create Shipment</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -32,12 +32,13 @@
 <div class="container">
     <div class="nav">
         <a href="index.html">🏠 Dashboard</a>
+        <a href="chat.html">💬 Chat</a>
         <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
     <div class="card">
-        <h2>📤 New Dispatch (Lagos)</h2>
+        <h2>📤 Create Shipment</h2>
         <form id="dispatchForm">
-            <input type="text" id="senderName" placeholder="Lagos Rep Name" required>
+            <input type="text" id="senderName" placeholder="Your Name / Branch" required>
             <select id="destBranch">
                 <option value="Abuja">Abuja</option>
                 <option value="Portharcourt">Port Harcourt</option>
@@ -70,27 +71,14 @@
 </div>
 
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
-        authDomain: "nevamak-enterprises.firebaseapp.com",
-        projectId: "nevamak-enterprises",
-        storageBucket: "nevamak-enterprises.firebasestorage.app",
-        messagingSenderId: "144324172534",
-        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-        measurementId: "G-MZ8NT6KK8N"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    auth.onAuthStateChanged(async (user) => {
+    auth.onAuthStateChanged(user => {
         if (!user) { window.location.href = 'login.html'; return; }
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        const role = userDoc.data()?.role;
-        if (role !== 'admin' && role !== 'lagos_sender') {
-            await auth.signOut();
-            window.location.href = 'login.html';
-        } else loadRecent();
+        loadRecent();
     });
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
