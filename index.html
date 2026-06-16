@@ -59,6 +59,7 @@
         </div>
     </header>
 
+    <!-- Stats -->
     <div class="stats" id="statsContainer">
         <div class="stat-card"><h3>Total Shipments</h3><p class="number" id="totalShipments">-</p></div>
         <div class="stat-card"><h3>To Abuja</h3><p class="number" id="toAbuja">-</p></div>
@@ -70,6 +71,7 @@
         <div class="stat-card"><h3>In Stock</h3><p class="number" id="inStockCount">-</p></div>
     </div>
 
+    <!-- Charts -->
     <div class="section-card">
         <div class="section-title">📊 Analytics <span id="chartPeriod" style="font-size:0.8rem; font-weight:normal;">Last 30 days</span></div>
         <div class="charts-grid">
@@ -78,12 +80,14 @@
         </div>
     </div>
 
+    <!-- Notifications -->
     <div class="section-card" style="position:relative;">
         <div class="section-title">🔔 Notifications <span class="notification-bell" id="notifBell">🔔 <span class="notification-badge" id="notifCount">0</span></span></div>
         <div class="notification-panel" id="notifPanel"></div>
         <div id="notificationList" style="max-height:200px; overflow-y:auto;"></div>
     </div>
 
+    <!-- Shipments Table -->
     <div class="section-card">
         <div class="section-title">📋 Live Shipments <span><input type="text" id="shipmentSearch" placeholder="🔍 Search..." style="padding:6px; border-radius:40px; border:1px solid #ccc; font-size:0.8rem;"></span></div>
         <div style="overflow-x:auto;">
@@ -94,11 +98,13 @@
         </div>
     </div>
 
+    <!-- Inventory Summary -->
     <div class="section-card">
         <div class="section-title">📦 Inventory Summary</div>
         <div id="inventorySummary">Loading...</div>
     </div>
 
+    <!-- Returns Log -->
     <div class="section-card">
         <div class="section-title">🔄 Returns Log</div>
         <table>
@@ -107,6 +113,7 @@
         </table>
     </div>
 
+    <!-- Activity Audit -->
     <div class="section-card">
         <div class="section-title">📜 Activity Audit</div>
         <div style="max-height:300px; overflow-y:auto;" id="auditLog">Loading...</div>
@@ -116,6 +123,7 @@
 </div>
 
 <script>
+    // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -130,6 +138,7 @@
     const db = firebase.firestore();
     let currentUser, currentRole;
 
+    // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
@@ -143,16 +152,28 @@
         loadNotifications();
         initCharts();
     });
-    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // ---- Charts ----
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    // ==================== Charts ====================
     let shipmentChart, costChart;
     function initCharts() {
         const ctx1 = document.getElementById('shipmentChart').getContext('2d');
         const ctx2 = document.getElementById('costChart').getContext('2d');
-        shipmentChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [{ label: 'Shipments', data: [], borderColor: '#0a3d62', fill: false }] }, options: { responsive: true } });
-        costChart = new Chart(ctx2, { type: 'bar', data: { labels: [], datasets: [{ label: 'Goods Value (₦)', data: [], backgroundColor: '#3c6382' }] }, options: { responsive: true } });
+        shipmentChart = new Chart(ctx1, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Shipments', data: [], borderColor: '#0a3d62', fill: false }] },
+            options: { responsive: true }
+        });
+        costChart = new Chart(ctx2, {
+            type: 'bar',
+            data: { labels: [], datasets: [{ label: 'Goods Value (₦)', data: [], backgroundColor: '#3c6382' }] },
+            options: { responsive: true }
+        });
     }
+
     function updateCharts(data) {
         const labels = data.map(d => d.date);
         shipmentChart.data.labels = labels;
@@ -163,33 +184,36 @@
         costChart.update();
     }
 
-    // ---- Listeners ----
+    // ==================== Firestore Listeners ====================
     function startListeners() {
-        db.collection("shipments").onSnapshot(snap => {
-            let total=0, abuja=0, ph=0, delivered=0, totalGoods=0, totalTrans=0, rows=[];
+        // Shipments
+        db.collection("shipments").onSnapshot((snapshot) => {
+            let total = 0, abuja = 0, ph = 0, delivered = 0, totalGoods = 0, totalTrans = 0, rows = [];
             let chartData = {};
-            snap.forEach(doc => {
+            snapshot.forEach(doc => {
                 const d = doc.data();
                 total++;
-                if (d.destinationBranch==="Abuja") abuja++;
-                if (d.destinationBranch==="Portharcourt") ph++;
-                if (d.status==="Delivered") delivered++;
-                let goods=0; if(d.items) d.items.forEach(i=>goods+=i.totalItemCost||0);
-                totalGoods+=goods; totalTrans+=(d.transportCost||0);
+                if (d.destinationBranch === "Abuja") abuja++;
+                if (d.destinationBranch === "Portharcourt") ph++;
+                if (d.status === "Delivered") delivered++;
+                let goods = 0;
+                if (d.items) d.items.forEach(i => goods += (i.totalItemCost || 0));
+                totalGoods += goods;
+                totalTrans += (d.transportCost || 0);
                 const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : 'unknown';
-                if (!chartData[date]) chartData[date] = { count:0, value:0 };
+                if (!chartData[date]) chartData[date] = { count: 0, value: 0 };
                 chartData[date].count++;
                 chartData[date].value += goods;
-                const statusClass = `status status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
-                const itemsShort = d.items ? d.items.map(i=>`${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : "-";
+                const statusClass = `status status-${d.status?.toLowerCase().replace(/\s/g, '') || 'dispatched'}`;
+                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0, 40) : "-";
                 const lastUpdate = d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : (d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : "N/A");
                 rows.push(`<tr>
                     <td><strong>${doc.id.slice(0,6)}</strong></td>
-                    <td>${d.senderName||"—"}</td>
+                    <td>${d.senderName || "—"}</td>
                     <td><span class="badge">${d.destinationBranch}</span></td>
                     <td>${itemsShort}</td>
                     <td class="cost-cell">₦${goods.toLocaleString()}</td>
-                    <td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td>
+                    <td class="cost-cell">₦${(d.transportCost || 0).toLocaleString()}</td>
                     <td><span class="${statusClass}">${d.status}</span></td>
                     <td>${lastUpdate}</td>
                     <td><button onclick="viewShipment('${doc.id}')" style="background:#3c6382; border:none; border-radius:40px; padding:4px 12px; color:white; cursor:pointer;">View</button></td>
@@ -202,66 +226,102 @@
             document.getElementById("totalValue").innerText = `₦${totalGoods.toLocaleString()}`;
             document.getElementById("totalTransport").innerText = `₦${totalTrans.toLocaleString()}`;
             document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='9'>No shipments</td></tr>";
+            // Update charts
             const sorted = Object.keys(chartData).sort().slice(-30);
             const dataForChart = sorted.map(k => ({ date: k, count: chartData[k].count, value: chartData[k].value }));
             updateCharts(dataForChart);
+        }, (error) => {
+            console.error("Shipments listener error:", error);
         });
 
-        db.collection("returns").orderBy("date","desc").onSnapshot(snap => {
-            let returnRows="", totalReturned=0;
-            snap.forEach(doc => {
+        // Returns
+        db.collection("returns").orderBy("date", "desc").onSnapshot((snapshot) => {
+            let returnRows = "", totalReturned = 0;
+            snapshot.forEach(doc => {
                 const r = doc.data();
                 totalReturned += r.returnedQty;
-                returnRows += `<tr><td>${new Date(r.date?.toDate()).toLocaleDateString()}</td><td>${r.branch}</td><td>${r.shipmentId.slice(0,6)}</td><td>${r.itemName}</td><td>${r.returnedQty}</td><td>${r.reason||"-"}</td><td>${r.createdBy||"-"}</td></tr>`;
+                returnRows += `<tr>
+                    <td>${new Date(r.date?.toDate()).toLocaleDateString()}</td>
+                    <td>${r.branch}</td>
+                    <td>${r.shipmentId.slice(0,6)}</td>
+                    <td>${r.itemName}</td>
+                    <td>${r.returnedQty}</td>
+                    <td>${r.reason || "-"}</td>
+                    <td>${r.createdBy || "-"}</td>
+                </tr>`;
             });
             document.getElementById("returnedCount").innerText = totalReturned;
             document.getElementById("returnsBody").innerHTML = returnRows || "<tr><td colspan='7'>No returns</td></tr>";
+        }, (error) => {
+            console.error("Returns listener error:", error);
         });
     }
 
-    // ---- Inventory ----
+    // ==================== Inventory ====================
     async function loadInventory() {
-        const snap = await db.collection('inventory').get();
-        let totalStock = 0;
-        let html = '<table><tr><th>Item</th><th>Branch</th><th>Stock</th><th>Unit Price</th></tr>';
-        snap.forEach(doc => {
-            const d = doc.data();
-            totalStock += d.stock || 0;
-            html += `<tr><td>${d.itemName}</td><td>${d.branch}</td><td>${d.stock}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>`;
-        });
-        html += '</table>';
-        document.getElementById('inventorySummary').innerHTML = html || '<p>No inventory data</p>';
-        document.getElementById('inStockCount').innerText = totalStock;
+        try {
+            const snap = await db.collection('inventory').get();
+            if (snap.empty) {
+                document.getElementById('inventorySummary').innerHTML = '<p>No inventory data available. Please create inventory via receiving goods.</p>';
+                document.getElementById('inStockCount').innerText = '0';
+                return;
+            }
+            let totalStock = 0;
+            let html = '<table><tr><th>Item</th><th>Branch</th><th>Stock</th><th>Unit Price</th></tr>';
+            snap.forEach(doc => {
+                const d = doc.data();
+                totalStock += d.stock || 0;
+                html += `<tr><td>${d.itemName}</td><td>${d.branch}</td><td>${d.stock}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>`;
+            });
+            html += '</table>';
+            document.getElementById('inventorySummary').innerHTML = html;
+            document.getElementById('inStockCount').innerText = totalStock;
+        } catch (error) {
+            console.error('Error loading inventory:', error);
+            document.getElementById('inventorySummary').innerHTML = `<p>⚠️ Error loading inventory: ${error.message}. Check Firestore permissions.</p>`;
+            document.getElementById('inStockCount').innerText = '0';
+        }
     }
 
-    // ---- Audit Log ----
+    // ==================== Audit Log ====================
     async function loadAudit() {
-        const snap = await db.collection('activityLog').orderBy('timestamp','desc').limit(50).get();
-        let html = '';
-        snap.forEach(doc => {
-            const a = doc.data();
-            html += `<div style="border-bottom:1px solid #eee; padding:4px 0;">${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ''} - <strong>${a.user}</strong> ${a.actionType}: ${a.details}</div>`;
-        });
-        document.getElementById('auditLog').innerHTML = html || 'No activity';
-    }
-
-    // ---- Notifications ----
-    function loadNotifications() {
-        db.collection('notifications').where('userId','==',currentUser?.uid).orderBy('timestamp','desc').limit(20).onSnapshot(snap => {
-            let count = 0;
+        try {
+            const snap = await db.collection('activityLog').orderBy('timestamp', 'desc').limit(50).get();
             let html = '';
             snap.forEach(doc => {
-                const n = doc.data();
-                if (!n.read) count++;
-                html += `<div style="border-bottom:1px solid #eee; padding:4px 0; ${n.read ? 'opacity:0.7;' : ''}">${n.message} - ${new Date(n.timestamp?.toDate()).toLocaleString()}</div>`;
-                if (!n.read) doc.ref.update({ read: true });
+                const a = doc.data();
+                html += `<div style="border-bottom:1px solid #eee; padding:4px 0;">${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ''} - <strong>${a.user}</strong> ${a.actionType}: ${a.details}</div>`;
             });
-            document.getElementById('notifCount').innerText = count;
-            document.getElementById('notificationList').innerHTML = html || 'No notifications';
-        });
+            document.getElementById('auditLog').innerHTML = html || 'No activity';
+        } catch (error) {
+            console.error('Error loading audit log:', error);
+            document.getElementById('auditLog').innerHTML = '<p>Error loading audit log.</p>';
+        }
     }
 
-    // ---- Search ----
+    // ==================== Notifications ====================
+    function loadNotifications() {
+        db.collection('notifications')
+            .where('userId', '==', currentUser?.uid)
+            .orderBy('timestamp', 'desc')
+            .limit(20)
+            .onSnapshot((snapshot) => {
+                let count = 0;
+                let html = '';
+                snapshot.forEach(doc => {
+                    const n = doc.data();
+                    if (!n.read) count++;
+                    html += `<div style="border-bottom:1px solid #eee; padding:4px 0; ${n.read ? 'opacity:0.7;' : ''}">${n.message} - ${new Date(n.timestamp?.toDate()).toLocaleString()}</div>`;
+                    if (!n.read) doc.ref.update({ read: true });
+                });
+                document.getElementById('notifCount').innerText = count;
+                document.getElementById('notificationList').innerHTML = html || 'No notifications';
+            }, (error) => {
+                console.error('Notifications error:', error);
+            });
+    }
+
+    // ==================== Search ====================
     document.getElementById('shipmentSearch').addEventListener('input', function() {
         const q = this.value.toLowerCase();
         const rows = document.querySelectorAll('#shipmentsBody tr');
@@ -271,15 +331,18 @@
         });
     });
 
-    // ---- View Shipment ----
+    // ==================== View Shipment (placeholder) ====================
     window.viewShipment = function(id) {
         alert('View details for shipment ' + id + ' (implement full view modal)');
     };
 
-    // ---- Notification bell ----
+    // ==================== Notification Bell ====================
     document.getElementById('notifBell').addEventListener('click', () => {
         document.getElementById('notifPanel').classList.toggle('show');
     });
+
+    // ==================== Optional: Language toggle placeholder ====================
+    // Not implemented, but structure is here if you want to add.
 </script>
 </body>
 </html>
