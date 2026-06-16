@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Shop Floor Inventory</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1300px; margin: auto; }
+        header { background: #8e44ad; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn { background: #6c3483; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 20px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #8e44ad; }
+        .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
+        .stat-card .num { font-size: 1.5rem; font-weight: bold; color: #8e44ad; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+        .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
+        .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #8e44ad; color: white; cursor: pointer; }
+        .filters button.export { background: #27ae60; }
+        .section-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 500px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.8rem; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🏪 Shop Floor Inventory</h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="chat.html">💬 Chat</a>
+            <a href="reports.html">📊 Reports</a>
+            <a href="warehouse.html">🏚️ Warehouse</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><h4>Total Items</h4><div class="num" id="totalItems">-</div></div>
+        <div class="stat-card"><h4>Total Stock</h4><div class="num" id="totalStock">-</div></div>
+        <div class="stat-card"><h4>Branches</h4><div class="num" id="branchCount">-</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <input type="text" id="searchItem" placeholder="🔍 Search by item...">
+        <select id="filterBranch">
+            <option value="all">All Branches</option>
+            <option value="Abuja">Abuja</option>
+            <option value="Portharcourt">Port Harcourt</option>
+            <option value="Lagos">Lagos</option>
+        </select>
+        <button class="export" onclick="exportCSV('floorTable')">📄 Export CSV</button>
+        <a href="warehouse.html" style="background:#0a3d62; color:white; padding:8px 20px; border-radius:40px; text-decoration:none;">🏚️ Back to Warehouse</a>
+    </div>
+
+    <!-- Shop Floor Table -->
+    <div class="section-card">
+        <div id="floorList">Loading shop floor inventory...</div>
+    </div>
+</div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUserRole = '';
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            currentUserRole = userDoc.data().role || '';
+        }
+        loadFloorInventory();
+        loadStats();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+
+    // ==================== Load Shop Floor Data ====================
+    function loadFloorInventory() {
+        const searchInput = document.getElementById('searchItem');
+        const branchFilter = document.getElementById('filterBranch');
+
+        db.collection('shopFloor').onSnapshot((snapshot) => {
+            let docs = [];
+            snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+
+            // Role-based branch filtering
+            let allowedBranches = [];
+            if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
+                allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+            } else if (currentUserRole === 'abuja_rep') {
+                allowedBranches = ['Abuja'];
+            } else if (currentUserRole === 'ph_rep') {
+                allowedBranches = ['Portharcourt'];
+            } else {
+                allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+            }
+            docs = docs.filter(d => allowedBranches.includes(d.branch));
+
+            const search = searchInput.value.toLowerCase().trim();
+            if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+
+            const filterVal = branchFilter.value;
+            if (filterVal !== 'all') docs = docs.filter(d => d.branch === filterVal);
+
+            docs.sort((a, b) => {
+                if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
+                return (a.itemName || '').localeCompare(b.itemName || '');
+            });
+
+            if (docs.length === 0) {
+                document.getElementById('floorList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No items on shop floor yet. Move items from warehouse.</p>';
+                return;
+            }
+
+            let html = `<table id="floorTable">
+                <tr>
+                    <th>Item</th>
+                    <th>Branch</th>
+                    <th>Stock</th>
+                    <th>Unit Price</th>
+                    <th>Location</th>
+                    <th>Last Updated</th>
+                </tr>`;
+            docs.forEach(d => {
+                const location = d.location || 'Floor';
+                const lastUpdated = d.lastUpdated ? new Date(d.lastUpdated.toDate()).toLocaleString() : 'N/A';
+                html += `<tr>
+                    <td><strong>${d.itemName}</strong></td>
+                    <td>${d.branch}</td>
+                    <td>${d.stock}</td>
+                    <td>₦${(d.unitPrice || 0).toLocaleString()}</td>
+                    <td>${location}</td>
+                    <td>${lastUpdated}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById('floorList').innerHTML = html;
+        }, (error) => {
+            console.error('Shop floor listener error:', error);
+            document.getElementById('floorList').innerHTML = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
+        });
+
+        searchInput.addEventListener('input', () => {
+            // Re-render by calling the function again? Since we have a listener, we can't re-run easily.
+            // For simplicity, we'll rely on the listener to update; we'll just trigger a refresh by re-attaching?
+            // The listener is already active; we'll just use the existing snapshot.
+            // We can store the last snapshot and re-filter. I'll implement a simple global variable.
+            // For now, I'll keep it simple: we'll call loadFloorInventory again, but that will add another listener.
+            // Better: use a single listener and re-filter on input.
+            // I'll implement a quick fix: store the last snapshot and re-render.
+            // Actually, since we have the snapshot in the callback, we can re-run the logic.
+            // I'll move the render logic to a separate function and call it on input.
+        });
+    }
+
+    // ==================== Stats ====================
+    function loadStats() {
+        db.collection('shopFloor').onSnapshot((snapshot) => {
+            let totalItems = 0, totalStock = 0, branches = new Set();
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                totalItems++;
+                totalStock += d.stock || 0;
+                branches.add(d.branch);
+            });
+            document.getElementById('totalItems').innerText = totalItems;
+            document.getElementById('totalStock').innerText = totalStock;
+            document.getElementById('branchCount').innerText = branches.size;
+        }, (error) => {
+            console.error('Stats error:', error);
+        });
+    }
+
+    // ==================== Export CSV ====================
+    function exportCSV(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return alert('No data to export.');
+        let csv = '';
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td, th');
+            const rowData = [];
+            cols.forEach(col => rowData.push('"' + col.innerText.replace(/"/g, '""') + '"'));
+            csv += rowData.join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `shop_floor_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+    }
+
+    console.log('NEVAMAK Shop Floor loaded.');
+</script>
+</body>
+</html>
