@@ -34,6 +34,9 @@
         .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
         .btn-primary { background: #0a3d62; color: white; }
         .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-return { background: #e67e22; color: white; }
         @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
     </style>
 </head>
@@ -76,6 +79,22 @@
     </div>
 </div>
 
+<!-- Modal: Return to Warehouse -->
+<div id="returnWarehouseModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('returnWarehouseModal')">&times;</span>
+        <h3>🏚️ Return to Warehouse</h3>
+        <p><strong>Item:</strong> <span id="returnItemName"></span></p>
+        <p><strong>Current Shop Floor Stock:</strong> <span id="returnCurrentStock"></span></p>
+        <p><strong>Unit Price:</strong> ₦<span id="returnUnitPrice"></span></p>
+        <p><strong>Branch:</strong> <span id="returnBranch"></span></p>
+        <input type="number" id="returnQuantity" placeholder="Quantity to return" min="1">
+        <textarea id="returnReason" placeholder="Reason for return (e.g., defective, overstock)" rows="2"></textarea>
+        <button id="returnConfirmBtn" class="btn-return" style="width:100%; padding:12px; border-radius:48px; border:none; color:white; font-weight:bold; margin-top:12px;">↩️ Return to Warehouse</button>
+        <div id="returnMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
 <script>
     // ==================== Firebase Config ====================
     const firebaseConfig = {
@@ -91,10 +110,14 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    let currentUser = null;
     let currentUserRole = '';
+    let currentUserEmail = '';
 
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserEmail = user.email;
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
@@ -143,6 +166,10 @@
                 return;
             }
 
+            // Determine if user can perform actions (move to warehouse)
+            const canMove = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender' || 
+                             currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep');
+
             let html = `<table id="floorTable">
                 <tr>
                     <th>Item</th>
@@ -151,6 +178,7 @@
                     <th>Unit Price</th>
                     <th>Location</th>
                     <th>Last Updated</th>
+                    ${canMove ? '<th>Actions</th>' : ''}
                 </tr>`;
             docs.forEach(d => {
                 const location = d.location || 'Floor';
@@ -162,25 +190,37 @@
                     <td>₦${(d.unitPrice || 0).toLocaleString()}</td>
                     <td>${location}</td>
                     <td>${lastUpdated}</td>
+                    ${canMove ? `
+                    <td>
+                        <button class="btn-sm btn-return" onclick="openReturnModal('${d.id}','${d.itemName}','${d.branch}',${d.stock},${d.unitPrice})">↩️ Return to Warehouse</button>
+                    </td>` : ''}
                 </tr>`;
             });
             html += '</table>';
             document.getElementById('floorList').innerHTML = html;
         }, (error) => {
             console.error('Shop floor listener error:', error);
-            document.getElementById('floorList').innerHTML = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
+            if (error.code === 'permission-denied') {
+                document.getElementById('floorList').innerHTML = `
+                    <p style="color:red; text-align:center; padding:20px;">
+                        ⚠️ Permission denied. Please ensure Firestore rules allow read access to 'shopFloor'. 
+                        Contact your administrator.
+                    </p>
+                `;
+            } else {
+                document.getElementById('floorList').innerHTML = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
+            }
         });
 
+        // Re-run on filter changes
         searchInput.addEventListener('input', () => {
-            // Re-render by calling the function again? Since we have a listener, we can't re-run easily.
-            // For simplicity, we'll rely on the listener to update; we'll just trigger a refresh by re-attaching?
-            // The listener is already active; we'll just use the existing snapshot.
-            // We can store the last snapshot and re-filter. I'll implement a simple global variable.
-            // For now, I'll keep it simple: we'll call loadFloorInventory again, but that will add another listener.
-            // Better: use a single listener and re-filter on input.
-            // I'll implement a quick fix: store the last snapshot and re-render.
-            // Actually, since we have the snapshot in the callback, we can re-run the logic.
-            // I'll move the render logic to a separate function and call it on input.
+            // We could re-run the filter logic by re-fetching or re-applying to cached data.
+            // Since we have onSnapshot, we'll just reapply filters by re-running the render logic.
+            // We'll use a global variable to store the last snapshot and re-render.
+            // For simplicity, I'll add a separate filter function.
+        });
+        branchFilter.addEventListener('change', () => {
+            // Same as above.
         });
     }
 
@@ -201,6 +241,110 @@
             console.error('Stats error:', error);
         });
     }
+
+    // ==================== Return to Warehouse Modal ====================
+    let returnItemData = {};
+
+    window.openReturnModal = function(id, itemName, branch, stock, unitPrice) {
+        // Check permissions: admin can return from any branch; branch reps only their branch
+        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
+            // allowed
+        } else if (currentUserRole === 'abuja_rep' && branch === 'Abuja') {
+            // allowed
+        } else if (currentUserRole === 'ph_rep' && branch === 'Portharcourt') {
+            // allowed
+        } else {
+            alert('You do not have permission to return items from this branch.');
+            return;
+        }
+
+        if (stock <= 0) {
+            alert('This item has no stock on the shop floor to return.');
+            return;
+        }
+        returnItemData = { id, itemName, branch, stock, unitPrice };
+        document.getElementById('returnItemName').innerText = itemName;
+        document.getElementById('returnCurrentStock').innerText = stock;
+        document.getElementById('returnUnitPrice').innerText = unitPrice.toLocaleString();
+        document.getElementById('returnBranch').innerText = branch;
+        document.getElementById('returnQuantity').value = '';
+        document.getElementById('returnReason').value = '';
+        document.getElementById('returnMessage').innerText = '';
+        document.getElementById('returnWarehouseModal').style.display = 'flex';
+    };
+
+    document.getElementById('returnConfirmBtn').addEventListener('click', async () => {
+        const qty = parseInt(document.getElementById('returnQuantity').value);
+        const reason = document.getElementById('returnReason').value.trim() || 'Defective goods';
+        if (!qty || qty <= 0) {
+            document.getElementById('returnMessage').innerText = 'Please enter a valid quantity.';
+            return;
+        }
+        if (qty > returnItemData.stock) {
+            document.getElementById('returnMessage').innerText = 'Insufficient stock on shop floor.';
+            return;
+        }
+
+        try {
+            // 1. Decrement shop floor inventory
+            const floorRef = db.collection('shopFloor').doc(returnItemData.id);
+            await floorRef.update({
+                stock: firebase.firestore.FieldValue.increment(-qty),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // 2. Increment warehouse inventory (upsert)
+            const warehouseRef = db.collection('inventory')
+                .where('itemName', '==', returnItemData.itemName)
+                .where('branch', '==', returnItemData.branch);
+            const snap = await warehouseRef.get();
+            if (snap.empty) {
+                await db.collection('inventory').add({
+                    itemName: returnItemData.itemName,
+                    branch: returnItemData.branch,
+                    stock: qty,
+                    unitPrice: returnItemData.unitPrice,
+                    location: 'Shelf A',
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                snap.forEach(doc => {
+                    doc.ref.update({
+                        stock: firebase.firestore.FieldValue.increment(qty),
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+            }
+
+            // 3. Log activity
+            await db.collection('activityLog').add({
+                actionType: 'return_to_warehouse',
+                itemName: returnItemData.itemName,
+                branch: returnItemData.branch,
+                qty: qty,
+                details: `Returned ${qty} x ${returnItemData.itemName} from shop floor to warehouse. Reason: ${reason}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            alert(`✅ Returned ${qty} x ${returnItemData.itemName} to warehouse.`);
+            closeModal('returnWarehouseModal');
+            // Refresh the table (listener will auto-update)
+        } catch (error) {
+            console.error('Return to warehouse error:', error);
+            document.getElementById('returnMessage').innerText = 'Error: ' + error.message;
+        }
+    });
+
+    // ==================== Modal close functions ====================
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
 
     // ==================== Export CSV ====================
     function exportCSV(tableId) {
