@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Request Invoice</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 900px; margin: auto; }
+        .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
+        input, select, textarea { width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
+        button { padding: 12px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 6px 0; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
+        .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .item-row input { flex: 1; margin: 0; }
+        .removeItem { background: #e74c3c; color: white; width: auto; padding: 10px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; }
+        .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .flex-row > * { flex: 1; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
+        th { background: #f8f9fa; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; }
+        .status-pending { background: #ffeaa7; color: #b85c00; }
+        .status-approved { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
+        .cost-cell { font-family: monospace; font-weight: bold; }
+        .scroll { overflow-x: auto; }
+        @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <a href="index.html">🏠 Dashboard</a>
+        <a href="chat.html">💬 Chat</a>
+        <a href="reports.html">📊 Reports</a>
+        <a href="warehouse.html">🏚️ Warehouse</a>
+        <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+    </div>
+
+    <div class="card">
+        <h2>📄 Request Invoice from Sender</h2>
+        <p>Fill in the items you need. The sender will review and send you a dispatch with final prices.</p>
+        <form id="requestForm">
+            <div class="flex-row">
+                <input type="text" id="requestSenderName" placeholder="Your Name" required>
+                <select id="requestBranch" required>
+                    <option value="Abuja">Abuja</option>
+                    <option value="Portharcourt">Port Harcourt</option>
+                </select>
+            </div>
+            <input type="text" id="requestNotes" placeholder="Additional notes or special instructions">
+            <label>Items:</label>
+            <div id="requestItemsContainer">
+                <div class="item-row">
+                    <input type="text" placeholder="Item name" class="reqItemName">
+                    <input type="number" placeholder="Quantity" class="reqItemQty">
+                    <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
+                    <button type="button" class="removeItem">✖</button>
+                </div>
+            </div>
+            <button type="button" id="addReqItemBtn" class="btn-success">+ Add product</button>
+            <div class="cost-summary" id="reqCostPreview">Estimated total: ₦0</div>
+            <button type="submit" class="btn-primary">📤 Submit Request</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>📋 Your Requests</h2>
+        <div class="scroll">
+            <table id="requestsTable">
+                <thead><tr><th>Date</th><th>Branch</th><th>Items</th><th>Est. Total</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody><tr><td colspan="6">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let currentUserRole = '';
+
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            currentUserRole = userDoc.data().role || '';
+        }
+        // Only branch reps can request
+        if (!['abuja_rep', 'ph_rep'].includes(currentUserRole)) {
+            alert('Only branch representatives can request invoices.');
+            window.location.href = 'index.html';
+            return;
+        }
+        document.getElementById('requestSenderName').value = currentUser.email.split('@')[0] + ' (' + currentUserRole + ')';
+        loadRequests();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+
+    // ==================== Request Items Management ====================
+    const reqContainer = document.getElementById("requestItemsContainer");
+    document.getElementById("addReqItemBtn").addEventListener("click", () => {
+        const div = document.createElement("div");
+        div.className = "item-row";
+        div.innerHTML = `
+            <input type="text" placeholder="Item name" class="reqItemName">
+            <input type="number" placeholder="Quantity" class="reqItemQty">
+            <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
+            <button type="button" class="removeItem">✖</button>
+        `;
+        reqContainer.appendChild(div);
+        div.querySelector(".removeItem").onclick = () => div.remove();
+        updateReqPreview();
+    });
+
+    function updateReqPreview() {
+        let total = 0;
+        document.querySelectorAll("#requestItemsContainer .item-row").forEach(r => {
+            const qty = parseInt(r.querySelector(".reqItemQty")?.value || 0);
+            const price = parseFloat(r.querySelector(".reqItemPrice")?.value || 0);
+            total += qty * price;
+        });
+        document.getElementById("reqCostPreview").innerHTML = `Estimated total: ₦${total.toLocaleString()}`;
+    }
+    reqContainer.addEventListener("input", updateReqPreview);
+
+    // ==================== Submit Request ====================
+    document.getElementById("requestForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const senderName = document.getElementById("requestSenderName").value.trim();
+        const branch = document.getElementById("requestBranch").value;
+        const notes = document.getElementById("requestNotes").value.trim();
+        const items = [];
+        document.querySelectorAll("#requestItemsContainer .item-row").forEach(row => {
+            const name = row.querySelector(".reqItemName").value.trim();
+            const qty = parseInt(row.querySelector(".reqItemQty").value);
+            const price = parseFloat(row.querySelector(".reqItemPrice").value) || 0;
+            if (name && qty > 0) {
+                items.push({ itemName: name, quantity: qty, estimatedPrice: price });
+            }
+        });
+        if (!items.length || !senderName) return alert("Fill all fields and add at least one item.");
+
+        await db.collection('invoiceRequests').add({
+            senderName,
+            branch,
+            items,
+            notes,
+            status: 'pending',
+            requestedBy: currentUser.email,
+            requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        alert('Request submitted successfully!');
+        document.getElementById("requestForm").reset();
+        reqContainer.innerHTML = `<div class="item-row">
+            <input type="text" placeholder="Item name" class="reqItemName">
+            <input type="number" placeholder="Quantity" class="reqItemQty">
+            <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
+            <button type="button" class="removeItem">✖</button>
+        </div>`;
+        updateReqPreview();
+        loadRequests();
+    });
+
+    // ==================== Load Your Requests ====================
+    function loadRequests() {
+        db.collection('invoiceRequests')
+            .where('requestedBy', '==', currentUser.email)
+            .orderBy('requestedAt', 'desc')
+            .onSnapshot((snap) => {
+                let html = '';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const total = d.items.reduce((sum, it) => sum + (it.quantity * (it.estimatedPrice || 0)), 0);
+                    const itemsShort = d.items.map(it => `${it.itemName}(${it.quantity})`).join(", ").substring(0,40);
+                    const statusClass = `status-${d.status}`;
+                    html += `<tr>
+                        <td>${d.requestedAt ? new Date(d.requestedAt.toDate()).toLocaleDateString() : ''}</td>
+                        <td>${d.branch}</td>
+                        <td>${itemsShort}</td>
+                        <td class="cost-cell">₦${total.toLocaleString()}</td>
+                        <td><span class="status-badge ${statusClass}">${d.status}</span></td>
+                        <td>
+                            ${d.status === 'pending' ? `<button class="btn-sm btn-danger" onclick="cancelRequest('${doc.id}')">Cancel</button>` : ''}
+                            ${d.status === 'approved' ? `<button class="btn-sm btn-success" onclick="viewApproved('${doc.id}')">View Dispatch</button>` : ''}
+                        </td>
+                    </tr>`;
+                });
+                document.querySelector("#requestsTable tbody").innerHTML = html || "<tr><td colspan='6'>No requests</td></tr>";
+            });
+    }
+
+    window.cancelRequest = async function(id) {
+        if (!confirm('Cancel this request?')) return;
+        await db.collection('invoiceRequests').doc(id).delete();
+        alert('Request cancelled.');
+    };
+
+    window.viewApproved = async function(id) {
+        const doc = await db.collection('invoiceRequests').doc(id).get();
+        if (!doc.exists) return;
+        const d = doc.data();
+        if (d.shipmentId) {
+            alert('View shipment: ' + d.shipmentId + ' (navigate to receiving page)');
+        } else {
+            alert('No shipment linked yet.');
+        }
+    };
+</script>
+</body>
+</html>
