@@ -44,6 +44,7 @@
         .status-draft { background: #dfe6e9; color: #2d3436; }
         .status-delivered { background: #d4edda; color: #155724; }
         .status-partial { background: #fff3cd; color: #856404; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
         .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
         .cost-cell { font-family: monospace; font-weight: bold; }
         .scroll { overflow-x: auto; }
@@ -54,14 +55,13 @@
 </head>
 <body>
 <div class="container">
-    <!-- Navigation -->
     <div class="nav">
         <a href="index.html">🏠 Dashboard</a>
         <a href="chat.html">💬 Chat</a>
+        <a href="reports.html">📊 Reports</a>
         <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
 
-    <!-- Stats -->
     <div class="stats-grid" id="statsGrid">
         <div class="stat-card"><h4>Total Shipments</h4><div class="num" id="totalShipments">-</div></div>
         <div class="stat-card"><h4>Dispatched</h4><div class="num" id="dispatchedCount">-</div></div>
@@ -70,7 +70,6 @@
         <div class="stat-card"><h4>Total Goods (₦)</h4><div class="num" id="totalGoods">-</div></div>
     </div>
 
-    <!-- Dispatch Form -->
     <div class="card">
         <h2>📦 Create Shipment</h2>
         <form id="dispatchForm">
@@ -120,7 +119,6 @@
         </form>
     </div>
 
-    <!-- Recent Shipments -->
     <div class="card">
         <h2>📋 Shipments</h2>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
@@ -130,6 +128,7 @@
                 <option value="Dispatched">Dispatched</option>
                 <option value="Delivered">Delivered</option>
                 <option value="Partially Delivered">Partial</option>
+                <option value="Rejected">Rejected</option>
                 <option value="Draft">Draft</option>
             </select>
         </div>
@@ -165,7 +164,6 @@
 </div>
 
 <script>
-    // Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -184,13 +182,11 @@
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
-        // Auto-fill sender name from user email or name
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             const role = userDoc.data().role;
             document.getElementById('senderName').value = user.email.split('@')[0] + ' (' + role + ')';
         }
-        // Generate tracking number
         document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
         loadSuppliers();
         loadShipments();
@@ -213,7 +209,6 @@
         });
     }
 
-    // Add supplier modal
     document.getElementById('addSupplierBtn').addEventListener('click', () => {
         document.getElementById('supplierModal').style.display = 'flex';
     });
@@ -248,7 +243,6 @@
             if (!itemName) return alert('Enter item name first');
             document.getElementById('invItemName').innerText = itemName;
             document.getElementById('inventoryModal').style.display = 'flex';
-            // Query inventory
             db.collection('inventory').where('itemName', '==', itemName).get().then(snap => {
                 let html = '<table><tr><th>Branch</th><th>Stock</th><th>Location</th></tr>';
                 snap.forEach(doc => {
@@ -289,21 +283,19 @@
     }
     itemsContainer.addEventListener("input", updatePreview);
 
-    // ---- Barcode scan ----
+    // ---- Barcode ----
     document.getElementById('barcodeInput').addEventListener('change', function() {
         const code = this.value.trim();
         if (code) {
-            // Try to find item in inventory by barcode (mock)
             alert('Barcode scanned: ' + code + '. In production, fetch product details.');
             const firstRow = document.querySelector('.item-row');
             if (firstRow) {
                 firstRow.querySelector('.itemName').value = 'Product-' + code;
-                // Could also set price if known
             }
         }
     });
 
-    // ---- Create Shipment (Dispatch or Draft) ----
+    // ---- Save Shipment ----
     async function saveShipment(status) {
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
@@ -314,6 +306,7 @@
         const driver = document.getElementById("driverName").value.trim();
         const trackingNo = document.getElementById("trackingNo").value.trim();
         const notes = document.getElementById("dispatchNotes").value.trim();
+        const transportCost = 0; // could add a field
         const items = [];
         document.querySelectorAll(".item-row").forEach(row => {
             const name = row.querySelector(".itemName").value.trim();
@@ -341,14 +334,13 @@
             driver,
             trackingNo,
             notes,
-            transportCost: 0, // add later
+            transportCost,
             items,
             status: status,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        // Log activity
         await db.collection('activityLog').add({
             actionType: status === 'Draft' ? 'draft' : 'dispatch',
             shipmentId: 'new',
@@ -375,7 +367,7 @@
         saveShipment('Draft');
     });
 
-    // ---- Load Shipments with search & filter ----
+    // ---- Load Shipments ----
     function loadShipments() {
         const searchInput = document.getElementById('searchShipment');
         const filterSelect = document.getElementById('filterStatus');
@@ -406,14 +398,12 @@
             document.querySelector("#shipmentsTable tbody").innerHTML = html || "<tr><td colspan='8'>No shipments</td></tr>";
         }
 
-        // Real-time listener with filter
         let q = db.collection("shipments").orderBy("createdAt", "desc");
         const statusFilter = filterSelect.value;
         if (statusFilter !== 'all') {
             q = q.where("status", "==", statusFilter);
         }
         q.onSnapshot(snap => {
-            // Apply search filter client-side
             const search = searchInput.value.toLowerCase();
             let filtered = [];
             snap.forEach(doc => {
@@ -421,7 +411,6 @@
                 const text = (d.senderName + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
                 if (text.includes(search)) filtered.push({ id: doc.id, data: d });
             });
-            // Rebuild table from filtered array (simpler: just use snapshot but filter)
             let html = '';
             filtered.forEach(({id, data: d}) => {
                 let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
@@ -446,17 +435,15 @@
             document.querySelector("#shipmentsTable tbody").innerHTML = html || "<tr><td colspan='8'>No shipments</td></tr>";
         });
 
-        // Re-run on search/filter change
         searchInput.addEventListener('input', () => loadShipments());
         filterSelect.addEventListener('change', () => loadShipments());
     }
 
     window.viewShipment = function(id) {
-        alert('View details for shipment ' + id + ' (implement full view modal)');
+        alert('View details for shipment ' + id);
     };
-
     window.editDraft = function(id) {
-        alert('Edit draft ' + id + ' (load data into form)');
+        alert('Edit draft ' + id);
     };
 
     // ---- Stats ----
