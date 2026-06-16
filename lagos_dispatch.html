@@ -2,95 +2,282 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEVAMAK – Create Shipment</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Lagos Dispatch</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
-        *{ box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        body{ background: #f4f7fc; margin: 0; padding: 12px; }
-        .container{ max-width: 700px; margin: auto; }
-        .card{ background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        h2{ margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
-        input, select, button{ width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
-        button{ background: #0a3d62; color: white; font-weight: bold; border: none; cursor: pointer; }
-        .item-row{ display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-        .item-row input{ flex: 1; margin: 0; }
-        .add-btn{ background: #27ae60; }
-        .removeItem{ background: #e74c3c; padding: 12px; width: auto; min-width: 60px; }
-        .cost-summary{ background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; }
-        .nav{ display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-        .nav a, .logout-btn{ background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
-        table{ width: 100%; border-collapse: collapse; min-width: 500px; }
-        th, td{ padding: 10px; text-align: left; font-size: 0.85rem; border-bottom: 1px solid #ddd; }
-        .cost-cell{ font-family: monospace; }
-        .scroll{ overflow-x: auto; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f4f7fc; margin: 0; padding: 12px; }
+        .container { max-width: 900px; margin: auto; }
+        .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
+        h3 { font-size: 1.1rem; color: #2c3e50; margin: 12px 0 8px; }
+        input, select, textarea { width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
+        button { padding: 12px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 6px 0; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
+        .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .item-row input { flex: 1; margin: 0; }
+        .removeItem { background: #e74c3c; color: white; width: auto; padding: 10px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; }
+        .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .flex-row > * { flex: 1; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 20px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #0a3d62; }
+        .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
+        .stat-card .num { font-size: 1.5rem; font-weight: bold; color: #0a3d62; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
+        th { background: #f8f9fa; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; }
+        .status-dispatched { background: #ffeaa7; color: #b85c00; }
+        .status-draft { background: #dfe6e9; color: #2d3436; }
+        .status-delivered { background: #d4edda; color: #155724; }
+        .status-partial { background: #fff3cd; color: #856404; }
+        .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
+        .cost-cell { font-family: monospace; font-weight: bold; }
+        .scroll { overflow-x: auto; }
+        .inline-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .inline-add input { flex: 1; }
+        @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
     </style>
 </head>
 <body>
 <div class="container">
+    <!-- Navigation -->
     <div class="nav">
         <a href="index.html">🏠 Dashboard</a>
         <a href="chat.html">💬 Chat</a>
         <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><h4>Total Shipments</h4><div class="num" id="totalShipments">-</div></div>
+        <div class="stat-card"><h4>Dispatched</h4><div class="num" id="dispatchedCount">-</div></div>
+        <div class="stat-card"><h4>Delivered</h4><div class="num" id="deliveredCount">-</div></div>
+        <div class="stat-card"><h4>Drafts</h4><div class="num" id="draftCount">-</div></div>
+        <div class="stat-card"><h4>Total Goods (₦)</h4><div class="num" id="totalGoods">-</div></div>
+    </div>
+
+    <!-- Dispatch Form -->
     <div class="card">
-        <h2>📤 Create Shipment</h2>
+        <h2>📦 Create Shipment</h2>
         <form id="dispatchForm">
-            <input type="text" id="senderName" placeholder="Your Name / Branch" required>
-            <select id="destBranch">
-                <option value="Abuja">Abuja</option>
-                <option value="Portharcourt">Port Harcourt</option>
-            </select>
-            <input type="text" id="vehicleNo" placeholder="Vehicle / Waybill #">
-            <input type="number" id="transportCost" placeholder="Transport Cost (₦)" value="0">
-            <label>Items (name, qty, price):</label>
+            <div class="flex-row">
+                <input type="text" id="senderName" placeholder="Sender Name / Branch" required>
+                <div style="flex:1; position:relative;">
+                    <select id="supplierSelect" style="width:100%;"><option value="">-- Select Supplier --</option></select>
+                    <button type="button" id="addSupplierBtn" class="btn-sm btn-success" style="position:absolute; right:8px; top:6px; width:auto; padding:4px 12px;">+ New</button>
+                </div>
+            </div>
+            <div class="flex-row">
+                <select id="destBranch">
+                    <option value="Abuja">Abuja</option>
+                    <option value="Portharcourt">Port Harcourt</option>
+                </select>
+                <input type="text" id="vehicleNo" placeholder="Vehicle / Waybill">
+            </div>
+            <div class="flex-row">
+                <input type="date" id="expectedDate">
+                <select id="routeSelect">
+                    <option value="Lagos-Abuja">Lagos → Abuja</option>
+                    <option value="Lagos-PH">Lagos → Port Harcourt</option>
+                </select>
+            </div>
+            <div class="flex-row">
+                <input type="text" id="driverName" placeholder="Driver Name">
+                <input type="text" id="trackingNo" placeholder="Tracking # (auto)" readonly>
+            </div>
+            <input type="text" id="barcodeInput" placeholder="📷 Scan Barcode / QR (or enter code)" class="barcode-input">
+            <label>Items:</label>
             <div id="itemsContainer">
                 <div class="item-row">
                     <input type="text" placeholder="Item name" class="itemName">
                     <input type="number" placeholder="Qty" class="itemQty">
                     <input type="number" placeholder="Price/unit" class="itemPrice">
                     <button type="button" class="removeItem">✖</button>
+                    <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
                 </div>
             </div>
-            <button type="button" id="addItemBtn" class="add-btn">+ Add product</button>
-            <div class="cost-summary" id="costPreview">Goods value: ₦0</div>
-            <button type="submit">🚛 Dispatch</button>
+            <button type="button" id="addItemBtn" class="btn-success">+ Add product</button>
+            <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
+            <textarea id="dispatchNotes" placeholder="Additional notes"></textarea>
+            <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                <button type="submit" class="btn-primary" style="flex:2;">🚛 Dispatch</button>
+                <button type="button" id="saveDraftBtn" class="btn-warning" style="flex:1;">💾 Save Draft</button>
+            </div>
         </form>
     </div>
+
+    <!-- Recent Shipments -->
     <div class="card">
-        <h2>📦 Recent Shipments</h2>
+        <h2>📋 Shipments</h2>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+            <input type="text" id="searchShipment" placeholder="🔍 Search..." style="flex:1;">
+            <select id="filterStatus" style="width:auto; flex:0;">
+                <option value="all">All Status</option>
+                <option value="Dispatched">Dispatched</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Partially Delivered">Partial</option>
+                <option value="Draft">Draft</option>
+            </select>
+        </div>
         <div class="scroll">
-            <table id="recentShipments">
-                <thead><tr><th>ID</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th></tr></thead>
-                <tbody><tr><td colspan="7">Loading...</td></tr></tbody>
+            <table id="shipmentsTable">
+                <thead><tr><th>ID</th><th>Dest</th><th>Supplier</th><th>Items</th><th>Goods</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+                <tbody><tr><td colspan="8">Loading...</td></tr></tbody>
             </table>
         </div>
     </div>
+
+    <!-- Supplier Modal -->
+    <div id="supplierModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('supplierModal')">&times;</span>
+            <h3>Add Supplier</h3>
+            <input type="text" id="newSupplierName" placeholder="Supplier Name">
+            <input type="text" id="newSupplierContact" placeholder="Contact Info">
+            <input type="text" id="newSupplierAddress" placeholder="Address">
+            <button id="saveSupplierBtn" class="btn-success">Save Supplier</button>
+        </div>
+    </div>
+
+    <!-- Inventory Modal -->
+    <div id="inventoryModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('inventoryModal')">&times;</span>
+            <h3>📊 Stock for <span id="invItemName"></span></h3>
+            <div id="invResult">Loading...</div>
+        </div>
+    </div>
+
 </div>
 
 <script>
-    const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
+    // Firebase Config
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    auth.onAuthStateChanged(user => {
+    let currentUser;
+
+    auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
-        loadRecent();
+        currentUser = user;
+        // Auto-fill sender name from user email or name
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            const role = userDoc.data().role;
+            document.getElementById('senderName').value = user.email.split('@')[0] + ' (' + role + ')';
+        }
+        // Generate tracking number
+        document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
+        loadSuppliers();
+        loadShipments();
+        loadStats();
     });
+
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
+    // ---- Suppliers ----
+    async function loadSuppliers() {
+        const snap = await db.collection('suppliers').get();
+        const sel = document.getElementById('supplierSelect');
+        sel.innerHTML = '<option value="">-- Select Supplier --</option>';
+        snap.forEach(doc => {
+            const s = doc.data();
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = s.name;
+            sel.appendChild(opt);
+        });
+    }
+
+    // Add supplier modal
+    document.getElementById('addSupplierBtn').addEventListener('click', () => {
+        document.getElementById('supplierModal').style.display = 'flex';
+    });
+    document.getElementById('saveSupplierBtn').addEventListener('click', async () => {
+        const name = document.getElementById('newSupplierName').value.trim();
+        const contact = document.getElementById('newSupplierContact').value.trim();
+        const address = document.getElementById('newSupplierAddress').value.trim();
+        if (!name) return alert('Supplier name required');
+        await db.collection('suppliers').add({ name, contact, address, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        alert('Supplier added');
+        closeModal('supplierModal');
+        loadSuppliers();
+        document.getElementById('newSupplierName').value = '';
+        document.getElementById('newSupplierContact').value = '';
+        document.getElementById('newSupplierAddress').value = '';
+    });
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+
+    // ---- Inventory Check ----
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('checkStockBtn')) {
+            const row = e.target.closest('.item-row');
+            const itemName = row.querySelector('.itemName').value.trim();
+            if (!itemName) return alert('Enter item name first');
+            document.getElementById('invItemName').innerText = itemName;
+            document.getElementById('inventoryModal').style.display = 'flex';
+            // Query inventory
+            db.collection('inventory').where('itemName', '==', itemName).get().then(snap => {
+                let html = '<table><tr><th>Branch</th><th>Stock</th><th>Location</th></tr>';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    html += `<tr><td>${d.branch}</td><td>${d.stock}</td><td>${d.location||'N/A'}</td></tr>`;
+                });
+                html += '</table>';
+                document.getElementById('invResult').innerHTML = html || 'No stock found';
+            });
+        }
+    });
+
+    // ---- Items Management ----
     const itemsContainer = document.getElementById("itemsContainer");
     document.getElementById("addItemBtn").addEventListener("click", () => {
         const div = document.createElement("div");
         div.className = "item-row";
-        div.innerHTML = `<input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Qty" class="itemQty"><input type="number" placeholder="Price/unit" class="itemPrice"><button type="button" class="removeItem">✖</button>`;
+        div.innerHTML = `
+            <input type="text" placeholder="Item name" class="itemName">
+            <input type="number" placeholder="Qty" class="itemQty">
+            <input type="number" placeholder="Price/unit" class="itemPrice">
+            <button type="button" class="removeItem">✖</button>
+            <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
+        `;
         itemsContainer.appendChild(div);
         div.querySelector(".removeItem").onclick = () => div.remove();
         updatePreview();
     });
+
     function updatePreview() {
         let total = 0;
         document.querySelectorAll(".item-row").forEach(r => {
@@ -101,36 +288,194 @@
         document.getElementById("costPreview").innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
     }
     itemsContainer.addEventListener("input", updatePreview);
-    document.getElementById("dispatchForm").addEventListener("submit", async (e) => {
-        e.preventDefault();
+
+    // ---- Barcode scan ----
+    document.getElementById('barcodeInput').addEventListener('change', function() {
+        const code = this.value.trim();
+        if (code) {
+            // Try to find item in inventory by barcode (mock)
+            alert('Barcode scanned: ' + code + '. In production, fetch product details.');
+            const firstRow = document.querySelector('.item-row');
+            if (firstRow) {
+                firstRow.querySelector('.itemName').value = 'Product-' + code;
+                // Could also set price if known
+            }
+        }
+    });
+
+    // ---- Create Shipment (Dispatch or Draft) ----
+    async function saveShipment(status) {
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
+        const supplierId = document.getElementById("supplierSelect").value;
         const vehicleNo = document.getElementById("vehicleNo").value.trim();
-        const transportCost = parseFloat(document.getElementById("transportCost").value) || 0;
+        const expectedDate = document.getElementById("expectedDate").value;
+        const route = document.getElementById("routeSelect").value;
+        const driver = document.getElementById("driverName").value.trim();
+        const trackingNo = document.getElementById("trackingNo").value.trim();
+        const notes = document.getElementById("dispatchNotes").value.trim();
         const items = [];
         document.querySelectorAll(".item-row").forEach(row => {
             const name = row.querySelector(".itemName").value.trim();
             const qty = parseInt(row.querySelector(".itemQty").value);
             const price = parseFloat(row.querySelector(".itemPrice").value);
-            if(name && qty>0 && price>=0) items.push({ itemName: name, orderedQty: qty, unitPrice: price, totalItemCost: qty*price, receivedQty:0, damageQty:0 });
+            if(name && qty>0 && price>=0) items.push({
+                itemName: name,
+                orderedQty: qty,
+                unitPrice: price,
+                totalItemCost: qty*price,
+                receivedQty: 0,
+                damageQty: 0
+            });
         });
-        if(!items.length || !senderName) return alert("Fill all fields");
-        await db.collection("shipments").add({ senderName, destinationBranch: destBranch, vehicleNo, transportCost, items, status: "Dispatched", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        alert("Dispatched to " + destBranch);
+        if (!items.length || !senderName) return alert("Fill all fields");
+        if (status === 'Draft' && !confirm('Save as draft?')) return;
+
+        await db.collection("shipments").add({
+            senderName,
+            destinationBranch: destBranch,
+            supplierId,
+            vehicleNo,
+            expectedDate,
+            route,
+            driver,
+            trackingNo,
+            notes,
+            transportCost: 0, // add later
+            items,
+            status: status,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Log activity
+        await db.collection('activityLog').add({
+            actionType: status === 'Draft' ? 'draft' : 'dispatch',
+            shipmentId: 'new',
+            branch: 'Lagos',
+            details: `${status} shipment to ${destBranch} by ${senderName}`,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            user: currentUser.email
+        });
+
+        alert(`${status} created`);
         document.getElementById("dispatchForm").reset();
-        itemsContainer.innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Qty" class="itemQty"><input type="number" placeholder="Price/unit" class="itemPrice"><button type="button" class="removeItem">✖</button></div>`;
+        itemsContainer.innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Qty" class="itemQty"><input type="number" placeholder="Price/unit" class="itemPrice"><button type="button" class="removeItem">✖</button><button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button></div>`;
         updatePreview();
+        loadShipments();
+        loadStats();
+        document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
+    }
+
+    document.getElementById("dispatchForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        saveShipment('Dispatched');
     });
-    function loadRecent() {
-        db.collection("shipments").orderBy("createdAt","desc").limit(20).onSnapshot(snap => {
-            let html = "";
+    document.getElementById("saveDraftBtn").addEventListener("click", () => {
+        saveShipment('Draft');
+    });
+
+    // ---- Load Shipments with search & filter ----
+    function loadShipments() {
+        const searchInput = document.getElementById('searchShipment');
+        const filterSelect = document.getElementById('filterStatus');
+
+        function renderSnap(snap) {
+            let html = '';
             snap.forEach(doc => {
                 const d = doc.data();
                 let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
                 const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
-                html += `<tr><td>${doc.id.slice(0,5)}</td><td>${d.destinationBranch}</td><td>${itemsShort}</td><td class="cost-cell">₦${goods.toLocaleString()}</td><td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td><td>${d.status}</td><td>${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ""}</td></tr>`;
+                const supplierName = d.supplierId ? 'Supplier' : '-';
+                const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+                const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
+                html += `<tr>
+                    <td><strong>${doc.id.slice(0,6)}</strong></td>
+                    <td><span class="badge">${d.destinationBranch}</span></td>
+                    <td>${supplierName}</td>
+                    <td>${itemsShort}</td>
+                    <td class="cost-cell">₦${goods.toLocaleString()}</td>
+                    <td><span class="status-badge ${statusClass}">${d.status}</span></td>
+                    <td>${date}</td>
+                    <td>
+                        <button class="btn-sm btn-primary" onclick="viewShipment('${doc.id}')">👁️</button>
+                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${doc.id}')">✏️</button>` : ''}
+                    </td>
+                </tr>`;
             });
-            document.querySelector("#recentShipments tbody").innerHTML = html || "<tr><td colspan='7'>No shipments</td></tr>";
+            document.querySelector("#shipmentsTable tbody").innerHTML = html || "<tr><td colspan='8'>No shipments</td></tr>";
+        }
+
+        // Real-time listener with filter
+        let q = db.collection("shipments").orderBy("createdAt", "desc");
+        const statusFilter = filterSelect.value;
+        if (statusFilter !== 'all') {
+            q = q.where("status", "==", statusFilter);
+        }
+        q.onSnapshot(snap => {
+            // Apply search filter client-side
+            const search = searchInput.value.toLowerCase();
+            let filtered = [];
+            snap.forEach(doc => {
+                const d = doc.data();
+                const text = (d.senderName + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
+                if (text.includes(search)) filtered.push({ id: doc.id, data: d });
+            });
+            // Rebuild table from filtered array (simpler: just use snapshot but filter)
+            let html = '';
+            filtered.forEach(({id, data: d}) => {
+                let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
+                const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
+                const supplierName = d.supplierId ? 'Supplier' : '-';
+                const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+                const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
+                html += `<tr>
+                    <td><strong>${id.slice(0,6)}</strong></td>
+                    <td><span class="badge">${d.destinationBranch}</span></td>
+                    <td>${supplierName}</td>
+                    <td>${itemsShort}</td>
+                    <td class="cost-cell">₦${goods.toLocaleString()}</td>
+                    <td><span class="status-badge ${statusClass}">${d.status}</span></td>
+                    <td>${date}</td>
+                    <td>
+                        <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️</button>
+                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️</button>` : ''}
+                    </td>
+                </tr>`;
+            });
+            document.querySelector("#shipmentsTable tbody").innerHTML = html || "<tr><td colspan='8'>No shipments</td></tr>";
+        });
+
+        // Re-run on search/filter change
+        searchInput.addEventListener('input', () => loadShipments());
+        filterSelect.addEventListener('change', () => loadShipments());
+    }
+
+    window.viewShipment = function(id) {
+        alert('View details for shipment ' + id + ' (implement full view modal)');
+    };
+
+    window.editDraft = function(id) {
+        alert('Edit draft ' + id + ' (load data into form)');
+    };
+
+    // ---- Stats ----
+    function loadStats() {
+        db.collection("shipments").onSnapshot(snap => {
+            let total = 0, dispatched = 0, delivered = 0, drafts = 0, goods = 0;
+            snap.forEach(doc => {
+                const d = doc.data();
+                total++;
+                if (d.status === 'Dispatched') dispatched++;
+                else if (d.status === 'Delivered') delivered++;
+                else if (d.status === 'Draft') drafts++;
+                if (d.items) d.items.forEach(i => goods += i.totalItemCost || 0);
+            });
+            document.getElementById('totalShipments').innerText = total;
+            document.getElementById('dispatchedCount').innerText = dispatched;
+            document.getElementById('deliveredCount').innerText = delivered;
+            document.getElementById('draftCount').innerText = drafts;
+            document.getElementById('totalGoods').innerText = '₦' + goods.toLocaleString();
         });
     }
 </script>
