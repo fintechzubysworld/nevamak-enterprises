@@ -7,10 +7,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
-        .container { max-width: 1200px; margin: auto; }
+        .container { max-width: 1400px; margin: auto; }
         header { background: #0a3d62; color: white; padding: 16px; border-radius: 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .logo h1 { margin: 0; font-size: 1.5rem; }
         .logo p { margin: 4px 0 0; font-size: 0.75rem; opacity: 0.8; }
@@ -21,7 +24,9 @@
         .stat-card h3 { margin: 0 0 6px; font-size: 0.85rem; color: #555; }
         .stat-card .number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #0a3d62; }
         .section-card { background: white; border-radius: 20px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
-        .section-title { font-size: 1.2rem; margin-top: 0; margin-bottom: 12px; color: #0a3d62; }
+        .section-title { font-size: 1.2rem; margin-top: 0; margin-bottom: 12px; color: #0a3d62; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
         table { width: 100%; border-collapse: collapse; min-width: 600px; }
         th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
         th { background: #f8f9fa; }
@@ -31,8 +36,12 @@
         .status-partial { background: #fff3cd; color: #856404; }
         .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
         .cost-cell { font-family: monospace; font-weight: bold; }
+        .notification-bell { position: relative; cursor: pointer; }
+        .notification-badge { position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; }
+        .notification-panel { background: white; border-radius: 20px; padding: 16px; max-height: 300px; overflow-y: auto; display: none; position: absolute; right: 0; width: 300px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); z-index: 1000; }
+        .notification-panel.show { display: block; }
+        .lang-toggle { background: #3c6382; color: white; border: none; padding: 6px 12px; border-radius: 40px; cursor: pointer; }
         footer { text-align: center; margin-top: 24px; font-size: 0.75rem; color: #7f8c8d; }
-        @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } .stat-card .number { font-size: 1.3rem; } header { flex-direction: column; text-align: center; } }
     </style>
 </head>
 <body>
@@ -45,60 +54,140 @@
             <a href="receive_ph.html">🌊 PH</a>
             <a href="chat.html">💬 Chat</a>
             <a href="admin_create_user.html" id="adminPanelLink" style="display:none;">👑 Admin</a>
+            <button id="langToggle" class="lang-toggle">🌐 EN</button>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
 
-    <div class="stats">
-        <div class="stat-card"><h3>Total Shipments</h3><p class="number" id="totalShipments">-</p></div>
-        <div class="stat-card"><h3>To Abuja</h3><p class="number" id="toAbuja">-</p></div>
-        <div class="stat-card"><h3>To PH</h3><p class="number" id="toPH">-</p></div>
-        <div class="stat-card"><h3>Delivered ✅</h3><p class="number" id="deliveredCount">-</p></div>
-        <div class="stat-card"><h3>Goods Value (₦)</h3><p class="number" id="totalValue">-</p></div>
-        <div class="stat-card"><h3>Transport (₦)</h3><p class="number" id="totalTransport">-</p></div>
-        <div class="stat-card"><h3>Returned Items</h3><p class="number" id="returnedCount">-</p></div>
+    <!-- Stats -->
+    <div class="stats" id="statsContainer">
+        <div class="stat-card"><h3 data-i18n="totalShipments">Total Shipments</h3><p class="number" id="totalShipments">-</p></div>
+        <div class="stat-card"><h3 data-i18n="toAbuja">To Abuja</h3><p class="number" id="toAbuja">-</p></div>
+        <div class="stat-card"><h3 data-i18n="toPH">To PH</h3><p class="number" id="toPH">-</p></div>
+        <div class="stat-card"><h3 data-i18n="delivered">Delivered ✅</h3><p class="number" id="deliveredCount">-</p></div>
+        <div class="stat-card"><h3 data-i18n="goodsValue">Goods Value (₦)</h3><p class="number" id="totalValue">-</p></div>
+        <div class="stat-card"><h3 data-i18n="transportCost">Transport (₦)</h3><p class="number" id="totalTransport">-</p></div>
+        <div class="stat-card"><h3 data-i18n="returnedItems">Returned Items</h3><p class="number" id="returnedCount">-</p></div>
+        <div class="stat-card"><h3 data-i18n="inStock">In Stock (units)</h3><p class="number" id="inStockCount">-</p></div>
     </div>
 
+    <!-- Charts -->
     <div class="section-card">
-        <h2 class="section-title">📋 Live Shipments</h2>
-        <table>
-            <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th></tr></thead>
-            <tbody id="shipmentsBody"><tr><td colspan="8">Loading...</td></tr></tbody>
-        </table>
+        <div class="section-title">📊 Analytics <span id="chartPeriod" style="font-size:0.8rem; font-weight:normal;">Last 30 days</span></div>
+        <div class="charts-grid">
+            <div><canvas id="shipmentChart"></canvas></div>
+            <div><canvas id="costChart"></canvas></div>
+        </div>
     </div>
 
+    <!-- Notifications -->
+    <div class="section-card" style="position:relative;">
+        <div class="section-title">🔔 Notifications <span class="notification-bell" id="notifBell">🔔 <span class="notification-badge" id="notifCount">0</span></span></div>
+        <div class="notification-panel" id="notifPanel"></div>
+        <div id="notificationList" style="max-height:200px; overflow-y:auto;"></div>
+    </div>
+
+    <!-- Shipments Table -->
     <div class="section-card">
-        <h2 class="section-title">🔄 Returned Goods</h2>
+        <div class="section-title">📋 Live Shipments <span><input type="text" id="shipmentSearch" placeholder="🔍 Search..." style="padding:6px; border-radius:40px; border:1px solid #ccc; font-size:0.8rem;"></span></div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+                <tbody id="shipmentsBody"><tr><td colspan="9">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Inventory Summary -->
+    <div class="section-card">
+        <div class="section-title">📦 Inventory Summary</div>
+        <div id="inventorySummary">Loading...</div>
+    </div>
+
+    <!-- Returns -->
+    <div class="section-card">
+        <div class="section-title">🔄 Returns Log</div>
         <table>
-            <thead><tr><th>Date</th><th>Branch</th><th>Shipment ID</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr></thead>
+            <thead><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr></thead>
             <tbody id="returnsBody"><tr><td colspan="7">Loading...</td></tr></tbody>
         </table>
     </div>
-    <footer>NEVAMAK Connect – Real-time Sync</footer>
+
+    <!-- Activity Audit -->
+    <div class="section-card">
+        <div class="section-title">📜 Activity Audit</div>
+        <div style="max-height:300px; overflow-y:auto;" id="auditLog">Loading...</div>
+    </div>
+
+    <footer>NEVAMAK Connect – Advanced Suite</footer>
 </div>
 
 <script>
+    // Firebase config
     const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    let currentRole = '';
+    let currentUser, currentRole, lang = 'en';
+    const i18n = {
+        en: { totalShipments: 'Total Shipments', toAbuja: 'To Abuja', toPH: 'To PH', delivered: 'Delivered ✅', goodsValue: 'Goods Value (₦)', transportCost: 'Transport (₦)', returnedItems: 'Returned Items', inStock: 'In Stock (units)' },
+        fr: { totalShipments: 'Total des expéditions', toAbuja: 'Vers Abuja', toPH: 'Vers PH', delivered: 'Livré ✅', goodsValue: 'Valeur des biens (₦)', transportCost: 'Coût transport (₦)', returnedItems: 'Articles retournés', inStock: 'En stock (unités)' }
+    };
+    function t(key) { return i18n[lang]?.[key] || key; }
 
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
         const userDoc = await db.collection('users').doc(user.uid).get();
         currentRole = userDoc.data()?.role || '';
         document.getElementById('roleBadge').innerText = `Role: ${currentRole}`;
         if (currentRole === 'admin') document.getElementById('adminPanelLink').style.display = 'inline-block';
-        // Listen to shipments and returns
         startListeners();
+        loadInventory();
+        loadAudit();
+        loadNotifications();
+        updateUI();
     });
-    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+    document.getElementById('langToggle').addEventListener('click', () => {
+        lang = lang === 'en' ? 'fr' : 'en';
+        document.getElementById('langToggle').innerText = lang.toUpperCase();
+        updateUI();
+    });
+
+    function updateUI() {
+        document.querySelectorAll('[data-i18n]').forEach(el => el.innerText = t(el.dataset.i18n));
+        // Update stats headers manually
+    }
+
+    // ---- Charts ----
+    let shipmentChart, costChart;
+    function initCharts() {
+        const ctx1 = document.getElementById('shipmentChart').getContext('2d');
+        const ctx2 = document.getElementById('costChart').getContext('2d');
+        shipmentChart = new Chart(ctx1, { type: 'line', data: { labels: [], datasets: [{ label: 'Shipments', data: [], borderColor: '#0a3d62', fill: false }] }, options: { responsive: true } });
+        costChart = new Chart(ctx2, { type: 'bar', data: { labels: [], datasets: [{ label: 'Goods Value (₦)', data: [], backgroundColor: '#3c6382' }] }, options: { responsive: true } });
+    }
+    initCharts();
+
+    function updateCharts(data) {
+        // data = array of {date, count, value}
+        const labels = data.map(d => d.date);
+        shipmentChart.data.labels = labels;
+        shipmentChart.data.datasets[0].data = data.map(d => d.count);
+        shipmentChart.update();
+        costChart.data.labels = labels;
+        costChart.data.datasets[0].data = data.map(d => d.value);
+        costChart.update();
+    }
+
+    // ---- Listeners ----
     function startListeners() {
         // Shipments
         db.collection("shipments").onSnapshot(snap => {
             let total=0, abuja=0, ph=0, delivered=0, totalGoods=0, totalTrans=0, rows=[];
+            let chartData = {};
             snap.forEach(doc => {
                 const d = doc.data();
                 total++;
@@ -107,10 +196,24 @@
                 if (d.status==="Delivered") delivered++;
                 let goods=0; if(d.items) d.items.forEach(i=>goods+=i.totalItemCost||0);
                 totalGoods+=goods; totalTrans+=(d.transportCost||0);
+                const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : 'unknown';
+                if (!chartData[date]) chartData[date] = { count:0, value:0 };
+                chartData[date].count++;
+                chartData[date].value += goods;
                 const statusClass = `status status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
                 const itemsShort = d.items ? d.items.map(i=>`${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : "-";
                 const lastUpdate = d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : (d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : "N/A");
-                rows.push(`<tr><td><strong>${doc.id.slice(0,6)}</strong></td><td>${d.senderName||"—"}</td><td><span class="badge">${d.destinationBranch}</span></td><td>${itemsShort}</td><td class="cost-cell">₦${goods.toLocaleString()}</td><td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td><td><span class="${statusClass}">${d.status}</span></td><td>${lastUpdate}</td></tr>`);
+                rows.push(`<tr>
+                    <td><strong>${doc.id.slice(0,6)}</strong></td>
+                    <td>${d.senderName||"—"}</td>
+                    <td><span class="badge">${d.destinationBranch}</span></td>
+                    <td>${itemsShort}</td>
+                    <td class="cost-cell">₦${goods.toLocaleString()}</td>
+                    <td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td>
+                    <td><span class="${statusClass}">${d.status}</span></td>
+                    <td>${lastUpdate}</td>
+                    <td><button onclick="viewShipment('${doc.id}')" style="background:#3c6382; border:none; border-radius:40px; padding:4px 12px; color:white; cursor:pointer;">View</button></td>
+                </tr>`);
             });
             document.getElementById("totalShipments").innerText = total;
             document.getElementById("toAbuja").innerText = abuja;
@@ -118,8 +221,12 @@
             document.getElementById("deliveredCount").innerText = delivered;
             document.getElementById("totalValue").innerText = `₦${totalGoods.toLocaleString()}`;
             document.getElementById("totalTransport").innerText = `₦${totalTrans.toLocaleString()}`;
-            document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='8'>No shipments</td></tr>";
-        }, err=>console.error(err));
+            document.getElementById("shipmentsBody").innerHTML = rows.length ? rows.join("") : "<tr><td colspan='9'>No shipments</td></tr>";
+            // Update charts
+            const sorted = Object.keys(chartData).sort().slice(-30);
+            const dataForChart = sorted.map(k => ({ date: k, count: chartData[k].count, value: chartData[k].value }));
+            updateCharts(dataForChart);
+        });
 
         // Returns
         db.collection("returns").orderBy("date","desc").onSnapshot(snap => {
@@ -133,6 +240,75 @@
             document.getElementById("returnsBody").innerHTML = returnRows || "<tr><td colspan='7'>No returns</td></tr>";
         });
     }
+
+    // ---- Inventory ----
+    async function loadInventory() {
+        const snap = await db.collection('inventory').get();
+        let totalStock = 0;
+        let html = '<table><tr><th>Item</th><th>Branch</th><th>Stock</th><th>Unit Price</th></tr>';
+        snap.forEach(doc => {
+            const d = doc.data();
+            totalStock += d.stock || 0;
+            html += `<tr><td>${d.itemName}</td><td>${d.branch}</td><td>${d.stock}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>`;
+        });
+        html += '</table>';
+        document.getElementById('inventorySummary').innerHTML = html || '<p>No inventory data</p>';
+        document.getElementById('inStockCount').innerText = totalStock;
+    }
+
+    // ---- Audit Log ----
+    async function loadAudit() {
+        const snap = await db.collection('activityLog').orderBy('timestamp','desc').limit(50).get();
+        let html = '';
+        snap.forEach(doc => {
+            const a = doc.data();
+            html += `<div style="border-bottom:1px solid #eee; padding:4px 0;">${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ''} - <strong>${a.user}</strong> ${a.actionType}: ${a.details}</div>`;
+        });
+        document.getElementById('auditLog').innerHTML = html || 'No activity';
+    }
+
+    // ---- Notifications ----
+    function loadNotifications() {
+        db.collection('notifications').where('userId','==',currentUser?.uid).orderBy('timestamp','desc').limit(20).onSnapshot(snap => {
+            let count = 0;
+            let html = '';
+            snap.forEach(doc => {
+                const n = doc.data();
+                if (!n.read) count++;
+                html += `<div style="border-bottom:1px solid #eee; padding:4px 0; ${n.read ? 'opacity:0.7;' : ''}">${n.message} - ${new Date(n.timestamp?.toDate()).toLocaleString()}</div>`;
+                // mark as read if viewed
+                if (!n.read) doc.ref.update({ read: true });
+            });
+            document.getElementById('notifCount').innerText = count;
+            document.getElementById('notificationList').innerHTML = html || 'No notifications';
+        });
+    }
+
+    // ---- Search ----
+    document.getElementById('shipmentSearch').addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        const rows = document.querySelectorAll('#shipmentsBody tr');
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
+    });
+
+    // ---- View Shipment ----
+    window.viewShipment = function(id) {
+        alert('View details for shipment ' + id + ' (can be expanded in production)');
+    };
+
+    // ---- Notification bell toggle ----
+    document.getElementById('notifBell').addEventListener('click', () => {
+        document.getElementById('notifPanel').classList.toggle('show');
+    });
+
+    // ---- Export PDF Report ----
+    window.exportPDF = function() {
+        // Placeholder
+        alert('PDF export would be implemented here');
+    };
 </script>
 </body>
 </html>
