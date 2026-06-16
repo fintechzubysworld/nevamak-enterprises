@@ -119,6 +119,7 @@
 </div>
 
 <script>
+    // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -135,6 +136,7 @@
     let currentUserEmail = "";
     const BRANCH = "Abuja";
 
+    // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         const userDoc = await db.collection('users').doc(user.uid).get();
@@ -151,9 +153,10 @@
         loadInventory();
         loadStats();
     });
+
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // Tab switching
+    // ==================== Tab Switching ====================
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -163,9 +166,9 @@
         });
     });
 
-    // ---- Stats ----
+    // ==================== Stats ====================
     function loadStats() {
-        db.collection("shipments").where("destinationBranch", "==", BRANCH).onSnapshot(snap => {
+        db.collection("shipments").where("destinationBranch", "==", BRANCH).onSnapshot((snap) => {
             let received = 0, pending = 0, totalGoods = 0;
             snap.forEach(doc => {
                 const d = doc.data();
@@ -176,223 +179,254 @@
             document.getElementById('receivedCount').innerText = received;
             document.getElementById('pendingCount').innerText = pending;
             document.getElementById('totalGoods').innerText = '₦' + totalGoods.toLocaleString();
-        });
-        db.collection("returns").where("branch", "==", BRANCH).onSnapshot(snap => {
+        }, (err) => console.error('Stats error:', err));
+
+        db.collection("returns").where("branch", "==", BRANCH).onSnapshot((snap) => {
             document.getElementById('returnedCount').innerText = snap.size;
-        });
-        db.collection("inventory").where("branch", "==", BRANCH).onSnapshot(snap => {
+        }, (err) => console.error('Returns stats error:', err));
+
+        db.collection("inventory").where("branch", "==", BRANCH).onSnapshot((snap) => {
             let val = 0;
             snap.forEach(doc => {
                 const d = doc.data();
                 val += (d.stock || 0) * (d.unitPrice || 0);
             });
             document.getElementById('stockValue').innerText = '₦' + val.toLocaleString();
-        });
+        }, (err) => console.error('Inventory stats error:', err));
     }
 
-    // ---- Receive Shipments ----
+    // ==================== Receive Shipments ====================
     async function loadShipments() {
-        const snap = await db.collection("shipments")
-            .where("destinationBranch", "==", BRANCH)
-            .where("status", "in", ["Dispatched", "Partially Delivered"])
-            .get();
-        const container = document.getElementById("shipmentsList");
-        if (snap.empty) {
-            container.innerHTML = "<div class='card'>✅ No pending shipments</div>";
-            return;
-        }
-        let docs = [];
-        snap.forEach(d => docs.push({ id: d.id, data: d.data() }));
-        docs.sort((a, b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0));
-
-        let html = "";
-        for (const { id, data: ship } of docs) {
-            const items = ship.items;
-            const totalGoods = items.reduce((s, i) => s + (i.totalItemCost || 0), 0);
-            html += `<div class="shipment-card" id="ship-${id}">
-                        <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName} | Expected: ${ship.expectedDate||'N/A'}</h3>
-                        <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div>
-                        <div class="quality-check">
-                            <label>Quality Check:</label>
-                            <select id="quality_${id}">
-                                <option value="Pass">Pass</option>
-                                <option value="Fail">Fail</option>
-                                <option value="Partial">Partial</option>
-                            </select>
-                            <button class="btn-sm btn-danger" onclick="rejectShipment('${id}')" style="width:auto; background:#e74c3c; padding:6px 16px;">❌ Reject Shipment</button>
-                        </div>`;
-            for (let idx = 0; idx < items.length; idx++) {
-                const it = items[idx];
-                const pending = it.orderedQty - (it.receivedQty + it.damageQty);
-                html += `<div class="item-row">
-                            <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit)<br>
-                            Ordered: ${it.orderedQty} | OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}
-                            <div class="input-group">
-                                <input type="number" id="recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}">
-                                <input type="number" id="dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}">
-                                <select id="location_${id}_${idx}">
-                                    <option value="Shelf A">Shelf A</option>
-                                    <option value="Shelf B">Shelf B</option>
-                                    <option value="Cold Room">Cold Room</option>
-                                    <option value="Warehouse">Warehouse</option>
-                                </select>
-                            </div>
-                          </div>`;
+        try {
+            const snap = await db.collection("shipments")
+                .where("destinationBranch", "==", BRANCH)
+                .where("status", "in", ["Dispatched", "Partially Delivered"])
+                .get();
+            const container = document.getElementById("shipmentsList");
+            if (snap.empty) {
+                container.innerHTML = "<div class='card'>✅ No pending shipments</div>";
+                return;
             }
-            html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div>
-                     <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div>
-                     <button onclick="receiveShipment('${id}')">✅ Confirm Receipt</button>
-                     <button onclick="viewInvoice('${id}')" style="background:#f39c12;">🧾 Preview Invoice</button>
-                     </div>`;
+            let docs = [];
+            snap.forEach(d => docs.push({ id: d.id, data: d.data() }));
+            docs.sort((a, b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0));
+
+            let html = "";
+            for (const { id, data: ship } of docs) {
+                const items = ship.items;
+                const totalGoods = items.reduce((s, i) => s + (i.totalItemCost || 0), 0);
+                html += `<div class="shipment-card" id="ship-${id}">
+                            <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName} | Expected: ${ship.expectedDate||'N/A'}</h3>
+                            <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div>
+                            <div class="quality-check">
+                                <label>Quality Check:</label>
+                                <select id="quality_${id}">
+                                    <option value="Pass">Pass</option>
+                                    <option value="Fail">Fail</option>
+                                    <option value="Partial">Partial</option>
+                                </select>
+                                <button class="btn-sm btn-danger" onclick="rejectShipment('${id}')" style="width:auto; background:#e74c3c; padding:6px 16px; border-radius:40px; border:none; color:white; cursor:pointer;">❌ Reject</button>
+                            </div>`;
+                for (let idx = 0; idx < items.length; idx++) {
+                    const it = items[idx];
+                    const pending = it.orderedQty - (it.receivedQty + it.damageQty);
+                    html += `<div class="item-row">
+                                <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit)<br>
+                                Ordered: ${it.orderedQty} | OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}
+                                <div class="input-group">
+                                    <input type="number" id="recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}">
+                                    <input type="number" id="dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}">
+                                    <select id="location_${id}_${idx}">
+                                        <option value="Shelf A">Shelf A</option>
+                                        <option value="Shelf B">Shelf B</option>
+                                        <option value="Cold Room">Cold Room</option>
+                                        <option value="Warehouse">Warehouse</option>
+                                    </select>
+                                </div>
+                              </div>`;
+                }
+                html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div>
+                         <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div>
+                         <button onclick="receiveShipment('${id}')">✅ Confirm Receipt</button>
+                         <button onclick="viewInvoice('${id}')" style="background:#f39c12;">🧾 Preview Invoice</button>
+                         </div>`;
+            }
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Load shipments error:', error);
+            document.getElementById('shipmentsList').innerHTML = `<div class='card'>⚠️ Error loading shipments: ${error.message}</div>`;
         }
-        container.innerHTML = html;
     }
 
     window.receiveShipment = async (shipId) => {
-        const docRef = db.collection("shipments").doc(shipId);
-        const doc = await docRef.get();
-        if (!doc.exists) return;
-        const data = doc.data();
-        let items = [...data.items];
-        let updated = false;
-        const quality = document.getElementById(`quality_${shipId}`).value;
+        try {
+            const docRef = db.collection("shipments").doc(shipId);
+            const doc = await docRef.get();
+            if (!doc.exists) return;
+            const data = doc.data();
+            let items = [...data.items];
+            let updated = false;
+            const quality = document.getElementById(`quality_${shipId}`).value;
 
-        for (let i = 0; i < items.length; i++) {
-            const addRecv = parseInt(document.getElementById(`recv_${shipId}_${i}`)?.value || 0);
-            const addDam = parseInt(document.getElementById(`dam_${shipId}_${i}`)?.value || 0);
-            const location = document.getElementById(`location_${shipId}_${i}`)?.value || 'Shelf A';
-            if (addRecv > 0 || addDam > 0) {
-                updated = true;
-                items[i].receivedQty = (items[i].receivedQty || 0) + addRecv;
-                items[i].damageQty = (items[i].damageQty || 0) + addDam;
-                items[i].location = location;
-                if (items[i].receivedQty + items[i].damageQty > items[i].orderedQty) {
-                    alert(`Over-receipt on ${items[i].itemName}`);
-                    items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
+            for (let i = 0; i < items.length; i++) {
+                const addRecv = parseInt(document.getElementById(`recv_${shipId}_${i}`)?.value || 0);
+                const addDam = parseInt(document.getElementById(`dam_${shipId}_${i}`)?.value || 0);
+                const location = document.getElementById(`location_${shipId}_${i}`)?.value || 'Shelf A';
+                if (addRecv > 0 || addDam > 0) {
+                    updated = true;
+                    items[i].receivedQty = (items[i].receivedQty || 0) + addRecv;
+                    items[i].damageQty = (items[i].damageQty || 0) + addDam;
+                    items[i].location = location;
+                    if (items[i].receivedQty + items[i].damageQty > items[i].orderedQty) {
+                        alert(`Over-receipt on ${items[i].itemName}`);
+                        items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
+                    }
                 }
             }
-        }
-        if (!updated) return alert("Enter quantities");
-        const rep = document.getElementById(`repName_${shipId}`).value.trim();
-        const grn = document.getElementById(`grn_${shipId}`).value.trim();
-        if (!rep) return alert("Enter rep name");
+            if (!updated) return alert("Enter quantities");
+            const rep = document.getElementById(`repName_${shipId}`).value.trim();
+            const grn = document.getElementById(`grn_${shipId}`).value.trim();
+            if (!rep) return alert("Enter rep name");
 
-        const allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
-        const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
+            const allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
+            const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
 
-        await docRef.update({
-            items,
-            status: newStatus,
-            receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
-            receivingRep: rep,
-            grnNumber: grn || `GRN-${Date.now()}`,
-            qualityCheck: quality,
-            receivedBy: rep
-        });
+            // Update shipment
+            await docRef.update({
+                items,
+                status: newStatus,
+                receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+                receivingRep: rep,
+                grnNumber: grn || `GRN-${Date.now()}`,
+                qualityCheck: quality,
+                receivedBy: rep
+            });
 
-        // Update inventory
-        for (const item of items) {
-            if (item.receivedQty > 0) {
-                const invRef = db.collection('inventory')
-                    .where('itemName', '==', item.itemName)
-                    .where('branch', '==', BRANCH);
-                const snap = await invRef.get();
-                if (snap.empty) {
-                    await db.collection('inventory').add({
-                        itemName: item.itemName,
-                        branch: BRANCH,
-                        stock: item.receivedQty,
-                        unitPrice: item.unitPrice,
-                        location: item.location || 'Shelf A',
-                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                } else {
-                    snap.forEach(d => {
-                        d.ref.update({
-                            stock: firebase.firestore.FieldValue.increment(item.receivedQty),
+            // Update inventory
+            for (const item of items) {
+                if (item.receivedQty > 0) {
+                    const invRef = db.collection('inventory')
+                        .where('itemName', '==', item.itemName)
+                        .where('branch', '==', BRANCH);
+                    const snap = await invRef.get();
+                    if (snap.empty) {
+                        await db.collection('inventory').add({
+                            itemName: item.itemName,
+                            branch: BRANCH,
+                            stock: item.receivedQty,
+                            unitPrice: item.unitPrice,
+                            location: item.location || 'Shelf A',
                             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                    });
+                    } else {
+                        snap.forEach(d => {
+                            d.ref.update({
+                                stock: firebase.firestore.FieldValue.increment(item.receivedQty),
+                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        });
+                    }
                 }
             }
+
+            // Log activity (non-critical, wrap in try/catch)
+            try {
+                await db.collection('activityLog').add({
+                    actionType: 'receive',
+                    shipmentId: shipId,
+                    branch: BRANCH,
+                    details: `Received by ${rep}, GRN: ${grn}, Quality: ${quality}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: rep
+                });
+            } catch (logError) {
+                console.warn('Activity log failed:', logError);
+            }
+
+            // Send notification (non-critical, wrap in try/catch)
+            try {
+                await db.collection('notifications').add({
+                    userId: 'admin',
+                    message: `Shipment ${shipId.slice(0,6)} received at ${BRANCH} by ${rep}`,
+                    read: false,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } catch (notifError) {
+                console.warn('Notification failed:', notifError);
+            }
+
+            alert(`${newStatus} - GRN: ${grn}`);
+            loadShipments();
+            loadActivityHistory();
+            loadStats();
+            loadInventory();
+        } catch (error) {
+            console.error('Receive error:', error);
+            alert('Error receiving shipment: ' + error.message);
         }
-
-        // Log activity
-        await db.collection('activityLog').add({
-            actionType: 'receive',
-            shipmentId: shipId,
-            branch: BRANCH,
-            details: `Received by ${rep}, GRN: ${grn}, Quality: ${quality}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            user: rep
-        });
-
-        // Notification
-        await db.collection('notifications').add({
-            userId: 'admin',
-            message: `Shipment ${shipId.slice(0,6)} received at ${BRANCH} by ${rep}`,
-            read: false,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        alert(`${newStatus} - GRN: ${grn}`);
-        loadShipments();
-        loadActivityHistory();
-        loadStats();
-        loadInventory();
     };
 
     window.rejectShipment = async (shipId) => {
         if (!confirm('Reject this entire shipment?')) return;
         const reason = prompt('Reason for rejection:');
         if (reason === null) return;
-        await db.collection("shipments").doc(shipId).update({
-            status: 'Rejected',
-            rejectionReason: reason,
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        await db.collection('activityLog').add({
-            actionType: 'reject',
-            shipmentId: shipId,
-            branch: BRANCH,
-            details: `Rejected: ${reason}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            user: currentUserEmail
-        });
-        alert('Shipment rejected');
-        loadShipments();
-        loadActivityHistory();
-        loadStats();
+        try {
+            await db.collection("shipments").doc(shipId).update({
+                status: 'Rejected',
+                rejectionReason: reason,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            try {
+                await db.collection('activityLog').add({
+                    actionType: 'reject',
+                    shipmentId: shipId,
+                    branch: BRANCH,
+                    details: `Rejected: ${reason}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentUserEmail
+                });
+            } catch (logError) { console.warn('Reject log failed:', logError); }
+            alert('Shipment rejected');
+            loadShipments();
+            loadActivityHistory();
+            loadStats();
+        } catch (error) {
+            alert('Error rejecting shipment: ' + error.message);
+        }
     };
 
     window.viewInvoice = async (shipId) => {
-        const doc = await db.collection("shipments").doc(shipId).get();
-        if (!doc.exists) return;
-        const data = doc.data();
-        const items = data.items || [];
-        let itemsHtml = '';
-        items.forEach(it => {
-            itemsHtml += `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>`;
-        });
-        const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
-        const html = `
-            <h2>NEVAMAK Enterprises</h2>
-            <h3>Goods Received Note (GRN)</h3>
-            <p><strong>GRN:</strong> ${data.grnNumber || 'N/A'}</p>
-            <p><strong>Date:</strong> ${data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleString() : 'N/A'}</p>
-            <p><strong>Supplier:</strong> ${data.senderName}</p>
-            <p><strong>Branch:</strong> ${BRANCH}</p>
-            <p><strong>Vehicle:</strong> ${data.vehicleNo || 'N/A'}</p>
-            <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
-                <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
-                ${itemsHtml}
-                <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
-                <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(data.transportCost||0).toLocaleString()}</strong></td></tr>
-            </table>
-            <p><em>Received by: ${data.receivingRep}</em></p>
-        `;
-        document.getElementById('invoiceContent').innerHTML = html;
-        document.getElementById('invoiceModal').style.display = 'flex';
+        try {
+            const doc = await db.collection("shipments").doc(shipId).get();
+            if (!doc.exists) return;
+            const data = doc.data();
+            const items = data.items || [];
+            let itemsHtml = '';
+            items.forEach(it => {
+                itemsHtml += `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>`;
+            });
+            const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
+            const html = `
+                <h2>NEVAMAK Enterprises</h2>
+                <h3>Goods Received Note (GRN)</h3>
+                <p><strong>GRN:</strong> ${data.grnNumber || 'N/A'}</p>
+                <p><strong>Date:</strong> ${data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleString() : 'N/A'}</p>
+                <p><strong>Supplier:</strong> ${data.senderName}</p>
+                <p><strong>Branch:</strong> ${BRANCH}</p>
+                <p><strong>Vehicle:</strong> ${data.vehicleNo || 'N/A'}</p>
+                <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
+                    <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                    ${itemsHtml}
+                    <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
+                    <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(data.transportCost||0).toLocaleString()}</strong></td></tr>
+                </table>
+                <p><em>Received by: ${data.receivingRep}</em></p>
+            `;
+            document.getElementById('invoiceContent').innerHTML = html;
+            document.getElementById('invoiceModal').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading invoice: ' + error.message);
+        }
     };
 
     function closeModal(id) {
@@ -404,115 +438,139 @@
         }
     };
 
-    // ---- Returns ----
+    // ==================== Returns ====================
     async function loadReturnShipmentsDropdown() {
-        const snap = await db.collection("shipments")
-            .where("destinationBranch", "==", BRANCH)
-            .where("status", "in", ["Delivered", "Partially Delivered"])
-            .get();
-        const sel = document.getElementById("returnShipmentSelect");
-        sel.innerHTML = '<option value="">-- Select Shipment --</option>';
-        snap.forEach(doc => {
-            const opt = document.createElement("option");
-            opt.value = doc.id;
-            opt.textContent = `${doc.id.slice(0,8)} - ${doc.data().senderName}`;
-            sel.appendChild(opt);
-        });
-        sel.onchange = () => loadReturnItems(sel.value);
+        try {
+            const snap = await db.collection("shipments")
+                .where("destinationBranch", "==", BRANCH)
+                .where("status", "in", ["Delivered", "Partially Delivered"])
+                .get();
+            const sel = document.getElementById("returnShipmentSelect");
+            sel.innerHTML = '<option value="">-- Select Shipment --</option>';
+            snap.forEach(doc => {
+                const opt = document.createElement("option");
+                opt.value = doc.id;
+                opt.textContent = `${doc.id.slice(0,8)} - ${doc.data().senderName}`;
+                sel.appendChild(opt);
+            });
+            sel.onchange = () => loadReturnItems(sel.value);
+        } catch (error) {
+            console.error('Load return dropdown error:', error);
+        }
     }
 
     async function loadReturnItems(shipmentId) {
-        const itemSelect = document.getElementById("returnItemSelect");
-        if (!shipmentId) { itemSelect.innerHTML = '<option value="">-- Select Item --</option>'; return; }
-        const doc = await db.collection("shipments").doc(shipmentId).get();
-        const items = doc.data().items;
-        itemSelect.innerHTML = '<option value="">-- Select Item --</option>';
-        items.forEach((it, idx) => {
-            const opt = document.createElement("option");
-            opt.value = idx;
-            opt.textContent = `${it.itemName} (OK: ${it.receivedQty}, Damaged: ${it.damageQty})`;
-            itemSelect.appendChild(opt);
-        });
+        try {
+            const itemSelect = document.getElementById("returnItemSelect");
+            if (!shipmentId) { itemSelect.innerHTML = '<option value="">-- Select Item --</option>'; return; }
+            const doc = await db.collection("shipments").doc(shipmentId).get();
+            const items = doc.data().items;
+            itemSelect.innerHTML = '<option value="">-- Select Item --</option>';
+            items.forEach((it, idx) => {
+                const opt = document.createElement("option");
+                opt.value = idx;
+                opt.textContent = `${it.itemName} (OK: ${it.receivedQty}, Damaged: ${it.damageQty})`;
+                itemSelect.appendChild(opt);
+            });
+        } catch (error) {
+            console.error('Load return items error:', error);
+        }
     }
 
     document.getElementById("recordReturnBtn").addEventListener("click", async () => {
-        const shipmentId = document.getElementById("returnShipmentSelect").value;
-        const itemIdx = document.getElementById("returnItemSelect").value;
-        const qty = parseInt(document.getElementById("returnQty").value);
-        const reason = document.getElementById("returnReason").value.trim();
-        if (!shipmentId || itemIdx === "" || !qty || qty <= 0) return alert("Select shipment, item, and valid quantity");
+        try {
+            const shipmentId = document.getElementById("returnShipmentSelect").value;
+            const itemIdx = document.getElementById("returnItemSelect").value;
+            const qty = parseInt(document.getElementById("returnQty").value);
+            const reason = document.getElementById("returnReason").value.trim();
+            if (!shipmentId || itemIdx === "" || !qty || qty <= 0) return alert("Select shipment, item, and valid quantity");
 
-        const shipmentDoc = await db.collection("shipments").doc(shipmentId).get();
-        const items = shipmentDoc.data().items;
-        const item = items[parseInt(itemIdx)];
-        if (qty > (item.receivedQty - item.damageQty)) return alert("Cannot return more than received good units");
+            const shipmentDoc = await db.collection("shipments").doc(shipmentId).get();
+            const items = shipmentDoc.data().items;
+            const item = items[parseInt(itemIdx)];
+            if (qty > (item.receivedQty - item.damageQty)) return alert("Cannot return more than received good units");
 
-        items[parseInt(itemIdx)].receivedQty -= qty;
-        await db.collection("shipments").doc(shipmentId).update({ items });
+            items[parseInt(itemIdx)].receivedQty -= qty;
+            await db.collection("shipments").doc(shipmentId).update({ items });
 
-        await db.collection("returns").add({
-            shipmentId,
-            branch: BRANCH,
-            itemName: item.itemName,
-            returnedQty: qty,
-            reason,
-            date: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUserEmail
-        });
-
-        await db.collection("activityLog").add({
-            actionType: "return",
-            shipmentId,
-            branch: BRANCH,
-            details: `Returned ${qty} x ${item.itemName}. Reason: ${reason}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            user: currentUserEmail
-        });
-
-        // Reduce inventory
-        const invRef = db.collection('inventory')
-            .where('itemName', '==', item.itemName)
-            .where('branch', '==', BRANCH);
-        const snap = await invRef.get();
-        if (!snap.empty) {
-            snap.forEach(d => {
-                d.ref.update({
-                    stock: firebase.firestore.FieldValue.increment(-qty)
-                });
+            await db.collection("returns").add({
+                shipmentId,
+                branch: BRANCH,
+                itemName: item.itemName,
+                returnedQty: qty,
+                reason,
+                date: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: currentUserEmail
             });
-        }
 
-        alert("Return recorded");
-        document.getElementById("returnQty").value = "";
-        document.getElementById("returnReason").value = "";
-        loadPastReturns();
-        loadActivityHistory();
-        loadReturnShipmentsDropdown();
-        loadStats();
-        loadInventory();
+            // Reduce inventory
+            const invRef = db.collection('inventory')
+                .where('itemName', '==', item.itemName)
+                .where('branch', '==', BRANCH);
+            const snap = await invRef.get();
+            if (!snap.empty) {
+                snap.forEach(d => {
+                    d.ref.update({
+                        stock: firebase.firestore.FieldValue.increment(-qty)
+                    });
+                });
+            }
+
+            try {
+                await db.collection('activityLog').add({
+                    actionType: "return",
+                    shipmentId,
+                    branch: BRANCH,
+                    details: `Returned ${qty} x ${item.itemName}. Reason: ${reason}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentUserEmail
+                });
+            } catch (logError) { console.warn('Return log failed:', logError); }
+
+            alert("Return recorded");
+            document.getElementById("returnQty").value = "";
+            document.getElementById("returnReason").value = "";
+            loadPastReturns();
+            loadActivityHistory();
+            loadReturnShipmentsDropdown();
+            loadStats();
+            loadInventory();
+        } catch (error) {
+            alert('Error recording return: ' + error.message);
+        }
     });
 
     async function loadPastReturns() {
-        const snap = await db.collection("returns").where("branch", "==", BRANCH).orderBy("date", "desc").get();
-        let html = "<ul>";
-        snap.forEach(doc => {
-            const r = doc.data();
-            html += `<li>${new Date(r.date?.toDate()).toLocaleString()}: ${r.itemName} x${r.returnedQty} (${r.reason})</li>`;
-        });
-        html += "</ul>";
-        document.getElementById("pastReturnsList").innerHTML = html || "No returns";
+        try {
+            const snap = await db.collection("returns").where("branch", "==", BRANCH).orderBy("date", "desc").get();
+            let html = "<ul>";
+            snap.forEach(doc => {
+                const r = doc.data();
+                html += `<li>${new Date(r.date?.toDate()).toLocaleString()}: ${r.itemName} x${r.returnedQty} (${r.reason})</li>`;
+            });
+            html += "</ul>";
+            document.getElementById("pastReturnsList").innerHTML = html || "No returns";
+        } catch (error) {
+            console.error('Load past returns error:', error);
+            document.getElementById("pastReturnsList").innerHTML = '<p>Error loading returns.</p>';
+        }
     }
 
-    // ---- Inventory ----
+    // ==================== Inventory ====================
     async function loadInventory() {
-        const snap = await db.collection("inventory").where("branch", "==", BRANCH).get();
-        let html = '<table><tr><th>Item</th><th>Stock</th><th>Location</th><th>Unit Price</th></tr>';
-        snap.forEach(doc => {
-            const d = doc.data();
-            html += `<tr><td>${d.itemName}</td><td>${d.stock}</td><td>${d.location||'N/A'}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>`;
-        });
-        html += '</table>';
-        document.getElementById("inventoryList").innerHTML = html || 'No inventory';
+        try {
+            const snap = await db.collection("inventory").where("branch", "==", BRANCH).get();
+            let html = '<table><tr><th>Item</th><th>Stock</th><th>Location</th><th>Unit Price</th></tr>';
+            snap.forEach(doc => {
+                const d = doc.data();
+                html += `<tr><td>${d.itemName}</td><td>${d.stock}</td><td>${d.location||'N/A'}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>`;
+            });
+            html += '</table>';
+            document.getElementById("inventoryList").innerHTML = html || 'No inventory';
+        } catch (error) {
+            console.error('Load inventory error:', error);
+            document.getElementById("inventoryList").innerHTML = '<p>Error loading inventory.</p>';
+        }
     }
 
     document.getElementById('invSearch').addEventListener('input', function() {
@@ -525,28 +583,33 @@
         });
     });
 
-    // ---- Activity History ----
+    // ==================== Activity History ====================
     async function loadActivityHistory(startDate, endDate) {
-        let query = db.collection("activityLog").where("branch", "==", BRANCH).orderBy("timestamp", "desc").limit(100);
-        if (startDate && endDate) {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            end.setHours(23,59,59);
-            query = query.where("timestamp", ">=", start).where("timestamp", "<=", end);
+        try {
+            let query = db.collection("activityLog").where("branch", "==", BRANCH).orderBy("timestamp", "desc").limit(100);
+            if (startDate && endDate) {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                end.setHours(23,59,59);
+                query = query.where("timestamp", ">=", start).where("timestamp", "<=", end);
+            }
+            const snap = await query.get();
+            let html = '<table style="width:100%; border-collapse:collapse;"><tr><th>Time</th><th>Action</th><th>Details</th><th>User</th></tr>';
+            snap.forEach(doc => {
+                const a = doc.data();
+                html += `<tr>
+                    <td>${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ""}</td>
+                    <td>${a.actionType}</td>
+                    <td>${a.details}</td>
+                    <td>${a.user || ''}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            document.getElementById("activityList").innerHTML = html || "No activity";
+        } catch (error) {
+            console.error('Load activity error:', error);
+            document.getElementById("activityList").innerHTML = '<p>Error loading activity.</p>';
         }
-        const snap = await query.get();
-        let html = '<table style="width:100%; border-collapse:collapse;"><tr><th>Time</th><th>Action</th><th>Details</th><th>User</th></tr>';
-        snap.forEach(doc => {
-            const a = doc.data();
-            html += `<tr>
-                <td>${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ""}</td>
-                <td>${a.actionType}</td>
-                <td>${a.details}</td>
-                <td>${a.user || ''}</td>
-            </tr>`;
-        });
-        html += '</table>';
-        document.getElementById("activityList").innerHTML = html || "No activity";
     }
 
     document.getElementById('filterHistoryBtn').addEventListener('click', () => {
