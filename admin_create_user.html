@@ -2,20 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEVAMAK – Admin: Create User</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Admin User Management</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
-        *{ font-family: 'Segoe UI', sans-serif; }
-        body{ background: #f0f2f5; margin: 0; padding: 16px; }
-        .card{ max-width: 500px; margin: auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        input, select, button{ width: 100%; padding: 14px; margin: 8px 0; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; }
-        button{ background: #0a3d62; color: white; font-weight: bold; border: none; cursor: pointer; }
-        .nav{ display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
-        .nav a, .logout-btn{ background: #2c3e50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 40px; border: none; cursor: pointer; }
-        .success{ color: green; } .error{ color: red; }
+        * { font-family: 'Segoe UI', -apple-system, sans-serif; box-sizing: border-box; }
+        body { background: #f0f2f5; margin: 0; padding: 16px; }
+        .card { max-width: 700px; margin: auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; }
+        button { background: #0a3d62; color: white; font-weight: bold; border: none; cursor: pointer; }
+        .nav { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
+        .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 40px; border: none; cursor: pointer; }
+        .user-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .user-table th, .user-table td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+        .btn-edit, .btn-disable, .btn-enable { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; color: white; font-size: 0.8rem; }
+        .btn-edit { background: #f39c12; }
+        .btn-disable { background: #e74c3c; }
+        .btn-enable { background: #27ae60; }
+        @media (max-width: 500px) { .nav { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
 <body>
@@ -23,23 +29,36 @@
     <div class="nav">
         <a href="index.html">🏠 Dashboard</a>
         <a href="chat.html">💬 Chat</a>
+        <a href="reports.html">📊 Reports</a>
         <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
-    <h2>👥 Create User</h2>
-    <input type="email" id="userEmail" placeholder="Email">
-    <input type="password" id="userPassword" placeholder="Password">
-    <select id="userRole">
-        <option value="lagos_sender">Lagos Sender</option>
-        <option value="abuja_rep">Abuja Representative</option>
-        <option value="ph_rep">Port Harcourt Rep</option>
-        <option value="admin">Admin</option>
-    </select>
-    <button id="createUserBtn">➕ Create User</button>
-    <div id="message"></div>
+    <h2>👥 User Management</h2>
+    <form id="createUserForm">
+        <input type="email" id="userEmail" placeholder="Email">
+        <input type="password" id="userPassword" placeholder="Password">
+        <select id="userRole">
+            <option value="lagos_sender">Lagos Sender</option>
+            <option value="abuja_rep">Abuja Rep</option>
+            <option value="ph_rep">PH Rep</option>
+            <option value="admin">Admin</option>
+        </select>
+        <button type="submit">➕ Create User</button>
+        <div id="message"></div>
+    </form>
+    <h3>Existing Users</h3>
+    <div id="userList">Loading...</div>
 </div>
 
 <script>
-    const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
@@ -50,22 +69,67 @@
         if (userDoc.data()?.role !== 'admin') {
             alert('Only admin can access');
             window.location.href = 'index.html';
+            return;
         }
+        loadUsers();
     });
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
-    document.getElementById('createUserBtn').addEventListener('click', async () => {
+
+    document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
         const email = document.getElementById('userEmail').value.trim();
         const password = document.getElementById('userPassword').value;
         const role = document.getElementById('userRole').value;
         if (!email || !password) { document.getElementById('message').innerText = 'Fill all fields'; return; }
         try {
             const uc = await auth.createUserWithEmailAndPassword(email, password);
-            await db.collection('users').doc(uc.user.uid).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-            document.getElementById('message').innerHTML = `<span class="success">✅ ${email} created as ${role}</span>`;
+            await db.collection('users').doc(uc.user.uid).set({ email, role, enabled: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            document.getElementById('message').innerHTML = `<span style="color:green;">✅ ${email} created as ${role}</span>`;
             document.getElementById('userEmail').value = '';
             document.getElementById('userPassword').value = '';
-        } catch(err) { document.getElementById('message').innerHTML = `<span class="error">❌ ${err.message}</span>`; }
+            loadUsers();
+        } catch(err) { document.getElementById('message').innerHTML = `<span style="color:red;">❌ ${err.message}</span>`; }
     });
+
+    async function loadUsers() {
+        const snap = await db.collection('users').get();
+        let html = '<table class="user-table"><tr><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>';
+        snap.forEach(doc => {
+            const u = doc.data();
+            const uid = doc.id;
+            const enabled = u.enabled !== false;
+            html += `<tr>
+                <td>${u.email}</td>
+                <td>${u.role}</td>
+                <td>${enabled ? '✅ Active' : '❌ Disabled'}</td>
+                <td>
+                    <button class="btn-edit" onclick="editUser('${uid}')">✏️ Edit</button>
+                    <button class="${enabled ? 'btn-disable' : 'btn-enable'}" onclick="toggleUser('${uid}', ${!enabled})">
+                        ${enabled ? 'Disable' : 'Enable'}
+                    </button>
+                </td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('userList').innerHTML = html;
+    }
+
+    window.editUser = function(uid) {
+        const newRole = prompt('Enter new role (admin, lagos_sender, abuja_rep, ph_rep):');
+        if (newRole) {
+            db.collection('users').doc(uid).update({ role: newRole }).then(() => {
+                alert('Role updated');
+                loadUsers();
+            });
+        }
+    };
+
+    window.toggleUser = function(uid, enable) {
+        db.collection('users').doc(uid).update({ enabled: enable }).then(() => {
+            alert(enable ? 'User enabled' : 'User disabled');
+            loadUsers();
+        });
+    };
 </script>
 </body>
 </html>
