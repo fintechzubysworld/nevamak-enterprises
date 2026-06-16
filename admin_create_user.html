@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NEVAMAK – Admin Create User</title>
+    <title>NEVAMAK – Admin: Create User</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -13,18 +13,17 @@
         .card{ max-width: 500px; margin: auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         input, select, button{ width: 100%; padding: 14px; margin: 8px 0; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; }
         button{ background: #0a3d62; color: white; font-weight: bold; border: none; cursor: pointer; }
-        .logout-btn{ background: #e74c3c; margin-top: 20px; }
         .nav{ display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
-        .nav a, .logout-btn2{ background: #2c3e50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 40px; border: none; cursor: pointer; }
-        .success{ color: green; }
-        .error{ color: red; }
+        .nav a, .logout-btn{ background: #2c3e50; color: white; padding: 8px 16px; text-decoration: none; border-radius: 40px; border: none; cursor: pointer; }
+        .success{ color: green; } .error{ color: red; }
     </style>
 </head>
 <body>
 <div class="card">
     <div class="nav">
         <a href="index.html">🏠 Dashboard</a>
-        <button id="logoutBtn" class="logout-btn2">🚪 Logout</button>
+        <a href="chat.html">💬 Chat</a>
+        <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
     <h2>👥 Create User</h2>
     <input type="email" id="userEmail" placeholder="Email">
@@ -40,15 +39,7 @@
 </div>
 
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
-        authDomain: "nevamak-enterprises.firebaseapp.com",
-        projectId: "nevamak-enterprises",
-        storageBucket: "nevamak-enterprises.firebasestorage.app",
-        messagingSenderId: "144324172534",
-        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-        measurementId: "G-MZ8NT6KK8N"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
@@ -68,12 +59,12 @@
         const role = document.getElementById('userRole').value;
         if (!email || !password) { document.getElementById('message').innerText = 'Fill all fields'; return; }
         try {
-            const userCred = await auth.createUserWithEmailAndPassword(email, password);
-            await db.collection('users').doc(userCred.user.uid).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            const uc = await auth.createUserWithEmailAndPassword(email, password);
+            await db.collection('users').doc(uc.user.uid).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
             document.getElementById('message').innerHTML = `<span class="success">✅ ${email} created as ${role}</span>`;
             document.getElementById('userEmail').value = '';
             document.getElementById('userPassword').value = '';
-        } catch (err) { document.getElementById('message').innerHTML = `<span class="error">❌ ${err.message}</span>`; }
+        } catch(err) { document.getElementById('message').innerHTML = `<span class="error">❌ ${err.message}</span>`; }
     });
 </script>
 </body>
