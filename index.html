@@ -55,6 +55,7 @@
         .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
         .item-row input { flex: 1; margin: 0; }
         .removeItem { background: #e74c3c; color: white; width: auto; padding: 10px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; }
     </style>
 </head>
 <body>
@@ -143,7 +144,16 @@
     <footer>NEVAMAK Connect – Advanced Suite</footer>
 </div>
 
-<!-- Modal: Approve Request (convert to dispatch) -->
+<!-- Modal: View Shipment Details -->
+<div id="viewShipmentModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('viewShipmentModal')">&times;</span>
+        <h2>📄 Shipment Details</h2>
+        <div id="viewShipmentContent"></div>
+    </div>
+</div>
+
+<!-- Modal: Approve Request (convert to dispatch) - already present but keep for reference -->
 <div id="approveRequestModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('approveRequestModal')">&times;</span>
@@ -348,15 +358,69 @@
         });
     });
 
-    // ---- View Shipment ----
-    window.viewShipment = function(id) {
-        alert('View details for shipment ' + id + ' (implement full view modal)');
+    // ---- View Shipment Details (Modal) ----
+    window.viewShipment = async function(id) {
+        try {
+            const doc = await db.collection('shipments').doc(id).get();
+            if (!doc.exists) return alert('Shipment not found.');
+            const d = doc.data();
+            let itemsHtml = '<table><tr><th>Item</th><th>Qty Ordered</th><th>Unit Price</th><th>Total</th><th>Received</th><th>Damaged</th></tr>';
+            if (d.items && d.items.length > 0) {
+                d.items.forEach(it => {
+                    itemsHtml += `<tr>
+                        <td>${it.itemName}</td>
+                        <td>${it.orderedQty}</td>
+                        <td>₦${it.unitPrice?.toLocaleString()}</td>
+                        <td>₦${(it.totalItemCost||0).toLocaleString()}</td>
+                        <td>${it.receivedQty || 0}</td>
+                        <td>${it.damageQty || 0}</td>
+                    </tr>`;
+                });
+            } else {
+                itemsHtml += '<tr><td colspan="6">No items</td></tr>';
+            }
+            const totalGoods = d.items ? d.items.reduce((s,i)=>s+(i.totalItemCost||0),0) : 0;
+            const statusClass = `status-badge status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+            const html = `
+                <p><strong>Shipment ID:</strong> ${id.slice(0,8)}</p>
+                <p><strong>Sender:</strong> ${d.senderName}</p>
+                <p><strong>Destination:</strong> ${d.destinationBranch}</p>
+                <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
+                <p><strong>Tracking #:</strong> ${d.trackingNo || 'N/A'}</p>
+                <p><strong>Expected Date:</strong> ${d.expectedDate || 'N/A'}</p>
+                <p><strong>Driver:</strong> ${d.driver || 'N/A'}</p>
+                <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${d.status}</span></p>
+                <p><strong>Total Goods Value:</strong> ₦${totalGoods.toLocaleString()}</p>
+                <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
+                <p><strong>Created:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleString() : ''}</p>
+                ${d.receivedDate ? `<p><strong>Received:</strong> ${new Date(d.receivedDate.toDate()).toLocaleString()}</p>` : ''}
+                ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                <h4>Items</h4>
+                ${itemsHtml}
+            `;
+            document.getElementById('viewShipmentContent').innerHTML = html;
+            document.getElementById('viewShipmentModal').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading shipment details: ' + error.message);
+        }
     };
 
     // ---- Notification bell ----
     document.getElementById('notifBell').addEventListener('click', () => {
         document.getElementById('notifPanel').classList.toggle('show');
     });
+
+    // ---- Modal close ----
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+        document.getElementById('approveMessage').innerText = '';
+    }
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+            document.getElementById('approveMessage').innerText = '';
+        }
+    };
 
     // ==================== Pending Invoice Requests ====================
     function loadPendingRequests() {
@@ -388,6 +452,9 @@
                     html += '</table>';
                 }
                 document.getElementById('pendingRequestsList').innerHTML = html;
+            }, (error) => {
+                console.error('Pending requests error:', error);
+                document.getElementById('pendingRequestsList').innerHTML = '<p style="color:red;">Error loading requests.</p>';
             });
     }
 
@@ -396,50 +463,53 @@
     let currentRequestData = null;
 
     window.openApproveModal = async function(requestId) {
-        const doc = await db.collection('invoiceRequests').doc(requestId).get();
-        if (!doc.exists) return;
-        currentRequestId = requestId;
-        currentRequestData = doc.data();
+        try {
+            const doc = await db.collection('invoiceRequests').doc(requestId).get();
+            if (!doc.exists) return;
+            currentRequestId = requestId;
+            currentRequestData = doc.data();
 
-        document.getElementById('approveBranch').innerText = currentRequestData.branch;
-        document.getElementById('approveRequestedBy').innerText = currentRequestData.requestedBy;
-        document.getElementById('approveSenderName').value = currentUser.email.split('@')[0] + ' (Lagos Sender)';
-        document.getElementById('approveVehicleNo').value = '';
-        document.getElementById('approveExpectedDate').value = '';
-        document.getElementById('approveTransportCost').value = '0';
-        document.getElementById('approveNotes').value = currentRequestData.notes || '';
+            document.getElementById('approveBranch').innerText = currentRequestData.branch;
+            document.getElementById('approveRequestedBy').innerText = currentRequestData.requestedBy;
+            document.getElementById('approveSenderName').value = currentUser.email.split('@')[0] + ' (Lagos Sender)';
+            document.getElementById('approveVehicleNo').value = '';
+            document.getElementById('approveExpectedDate').value = '';
+            document.getElementById('approveTransportCost').value = '0';
+            document.getElementById('approveNotes').value = currentRequestData.notes || '';
 
-        // Populate items
-        const container = document.getElementById('approveItemsContainer');
-        container.innerHTML = '';
-        if (currentRequestData.items && currentRequestData.items.length > 0) {
-            currentRequestData.items.forEach(it => {
+            // Populate items
+            const container = document.getElementById('approveItemsContainer');
+            container.innerHTML = '';
+            if (currentRequestData.items && currentRequestData.items.length > 0) {
+                currentRequestData.items.forEach(it => {
+                    const div = document.createElement('div');
+                    div.className = 'item-row';
+                    div.innerHTML = `
+                        <input type="text" placeholder="Item name" class="appItemName" value="${it.itemName}">
+                        <input type="number" placeholder="Qty" class="appItemQty" value="${it.quantity}">
+                        <input type="number" placeholder="Price/unit (₦)" class="appItemPrice" value="${it.estimatedPrice || 0}">
+                        <button type="button" class="removeItem appRemoveItem">✖</button>
+                    `;
+                    container.appendChild(div);
+                    div.querySelector('.appRemoveItem').onclick = () => div.remove();
+                });
+            } else {
                 const div = document.createElement('div');
                 div.className = 'item-row';
                 div.innerHTML = `
-                    <input type="text" placeholder="Item name" class="appItemName" value="${it.itemName}">
-                    <input type="number" placeholder="Qty" class="appItemQty" value="${it.quantity}">
-                    <input type="number" placeholder="Price/unit (₦)" class="appItemPrice" value="${it.estimatedPrice || 0}">
+                    <input type="text" placeholder="Item name" class="appItemName">
+                    <input type="number" placeholder="Qty" class="appItemQty">
+                    <input type="number" placeholder="Price/unit (₦)" class="appItemPrice">
                     <button type="button" class="removeItem appRemoveItem">✖</button>
                 `;
                 container.appendChild(div);
                 div.querySelector('.appRemoveItem').onclick = () => div.remove();
-            });
-        } else {
-            // Add one empty row
-            const div = document.createElement('div');
-            div.className = 'item-row';
-            div.innerHTML = `
-                <input type="text" placeholder="Item name" class="appItemName">
-                <input type="number" placeholder="Qty" class="appItemQty">
-                <input type="number" placeholder="Price/unit (₦)" class="appItemPrice">
-                <button type="button" class="removeItem appRemoveItem">✖</button>
-            `;
-            container.appendChild(div);
-            div.querySelector('.appRemoveItem').onclick = () => div.remove();
+            }
+            updateApprovePreview();
+            document.getElementById('approveRequestModal').style.display = 'flex';
+        } catch (error) {
+            alert('Error opening approve modal: ' + error.message);
         }
-        updateApprovePreview();
-        document.getElementById('approveRequestModal').style.display = 'flex';
     };
 
     document.getElementById('addApproveItemBtn').addEventListener('click', () => {
@@ -535,8 +605,7 @@
             alert('Request approved and dispatched successfully!');
             closeModal('approveRequestModal');
             loadPendingRequests();
-            loadShipments();
-            loadStats();
+            // Refresh shipments via listener
         } catch (error) {
             document.getElementById('approveMessage').innerText = 'Error: ' + error.message;
         }
@@ -545,56 +614,36 @@
     window.rejectRequest = async function(requestId) {
         if (!confirm('Reject this request?')) return;
         const reason = prompt('Reason for rejection (optional):');
-        await db.collection('invoiceRequests').doc(requestId).update({
-            status: 'rejected',
-            rejectionReason: reason || 'No reason provided',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        alert('Request rejected.');
-        loadPendingRequests();
+        try {
+            await db.collection('invoiceRequests').doc(requestId).update({
+                status: 'rejected',
+                rejectionReason: reason || 'No reason provided',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert('Request rejected.');
+            loadPendingRequests();
+        } catch (error) {
+            alert('Error rejecting: ' + error.message);
+        }
     };
 
     document.getElementById('rejectRequestBtn').addEventListener('click', async () => {
         if (!currentRequestId) return;
         if (!confirm('Reject this request?')) return;
         const reason = prompt('Reason for rejection:');
-        await db.collection('invoiceRequests').doc(currentRequestId).update({
-            status: 'rejected',
-            rejectionReason: reason || 'No reason provided',
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        alert('Request rejected.');
-        closeModal('approveRequestModal');
-        loadPendingRequests();
-    });
-
-    function closeModal(id) {
-        document.getElementById(id).style.display = 'none';
-        document.getElementById('approveMessage').innerText = '';
-    }
-    window.onclick = function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-            document.getElementById('approveMessage').innerText = '';
-        }
-    };
-
-    // ---- Stats ----
-    function loadStats() {
-        db.collection("shipments").onSnapshot(snap => {
-            let total = 0, dispatched = 0, delivered = 0, drafts = 0, goods = 0;
-            snap.forEach(doc => {
-                const d = doc.data();
-                total++;
-                if (d.status === 'Dispatched') dispatched++;
-                else if (d.status === 'Delivered') delivered++;
-                else if (d.status === 'Draft') drafts++;
-                if (d.items) d.items.forEach(i => goods += i.totalItemCost || 0);
+        try {
+            await db.collection('invoiceRequests').doc(currentRequestId).update({
+                status: 'rejected',
+                rejectionReason: reason || 'No reason provided',
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            document.getElementById('totalShipments').innerText = total;
-            // Already handled in shipments listener
-        });
-    }
+            alert('Request rejected.');
+            closeModal('approveRequestModal');
+            loadPendingRequests();
+        } catch (error) {
+            alert('Error rejecting: ' + error.message);
+        }
+    });
 </script>
 </body>
 </html>
