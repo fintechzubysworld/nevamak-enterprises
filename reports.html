@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Reports & Analytics</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1300px; margin: auto; }
+        header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+        .tab-btn { background: #ccc; color: #333; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; }
+        .tab-btn.active { background: #0a3d62; color: white; }
+        .tab-content { display: none; background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .tab-content.active { display: block; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+        .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
+        .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
+        .filters button.export { background: #27ae60; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+        .status-dispatched { background: #ffeaa7; color: #b85c00; }
+        .status-delivered { background: #d4edda; color: #155724; }
+        .status-partial { background: #fff3cd; color: #856404; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .scroll { overflow-x: auto; }
+        .empty { text-align: center; color: #888; padding: 20px; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.8rem; }
+        .invoice-box { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; }
+        .invoice-box table { width: 100%; border-collapse: collapse; }
+        .invoice-box th, .invoice-box td { border: 1px solid #ddd; padding: 8px; }
+        @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>📊 Reports & Analytics</h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="chat.html">💬 Chat</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="invoices">🧾 Invoices</button>
+        <button class="tab-btn" data-tab="returns">🔄 Returns</button>
+        <button class="tab-btn" data-tab="dispatched">📦 Dispatched</button>
+        <button class="tab-btn" data-tab="received">📥 Received</button>
+        <button class="tab-btn" data-tab="chat">💬 Chat History</button>
+    </div>
+
+    <!-- Invoices Tab -->
+    <div id="tab-invoices" class="tab-content active">
+        <div class="filters">
+            <input type="date" id="invDateStart">
+            <input type="date" id="invDateEnd">
+            <select id="invBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
+            <button id="invFilterBtn">Filter</button>
+            <button class="export" onclick="exportCSV('invTable')">📄 Export CSV</button>
+        </div>
+        <div class="scroll" id="invoiceList">Loading...</div>
+    </div>
+
+    <!-- Returns Tab -->
+    <div id="tab-returns" class="tab-content">
+        <div class="filters">
+            <input type="date" id="retDateStart">
+            <input type="date" id="retDateEnd">
+            <select id="retBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Port Harcourt">Port Harcourt</option></select>
+            <button id="retFilterBtn">Filter</button>
+            <button class="export" onclick="exportCSV('retTable')">📄 Export CSV</button>
+        </div>
+        <div class="scroll" id="returnsList">Loading...</div>
+    </div>
+
+    <!-- Dispatched Tab -->
+    <div id="tab-dispatched" class="tab-content">
+        <div class="filters">
+            <input type="date" id="dispDateStart">
+            <input type="date" id="dispDateEnd">
+            <select id="dispStatus"><option value="">All Status</option><option value="Dispatched">Dispatched</option><option value="Delivered">Delivered</option><option value="Partially Delivered">Partial</option><option value="Rejected">Rejected</option></select>
+            <button id="dispFilterBtn">Filter</button>
+            <button class="export" onclick="exportCSV('dispTable')">📄 Export CSV</button>
+        </div>
+        <div class="scroll" id="dispatchedList">Loading...</div>
+    </div>
+
+    <!-- Received Tab -->
+    <div id="tab-received" class="tab-content">
+        <div class="filters">
+            <input type="date" id="recvDateStart">
+            <input type="date" id="recvDateEnd">
+            <select id="recvBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
+            <button id="recvFilterBtn">Filter</button>
+            <button class="export" onclick="exportCSV('recvTable')">📄 Export CSV</button>
+        </div>
+        <div class="scroll" id="receivedList">Loading...</div>
+    </div>
+
+    <!-- Chat History Tab -->
+    <div id="tab-chat" class="tab-content">
+        <div class="filters">
+            <input type="date" id="chatDateStart">
+            <input type="date" id="chatDateEnd">
+            <input type="text" id="chatSearch" placeholder="🔍 Search messages...">
+            <button id="chatFilterBtn">Filter</button>
+            <button class="export" onclick="exportCSV('chatTable')">📄 Export CSV</button>
+        </div>
+        <div class="scroll" id="chatList">Loading...</div>
+    </div>
+
+    <!-- Invoice Modal -->
+    <div id="invoiceModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('invoiceModal')">&times;</span>
+            <div id="invoiceContent"></div>
+            <button id="printInvoiceBtn" onclick="window.print()" style="margin-top:16px; background:#0a3d62; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">🖨️ Print</button>
+            <button id="downloadInvoiceBtn" onclick="downloadInvoicePDF()" style="margin-top:16px; background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">📥 Download PDF</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ========== Firebase Config ==========
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+
+    // ========== Auth ==========
+    auth.onAuthStateChanged(user => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        // Load all reports
+        loadInvoices();
+        loadReturns();
+        loadDispatched();
+        loadReceived();
+        loadChatHistory();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+
+    // ========== Tab Switching ==========
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+        });
+    });
+
+    // ========== Utility: Export CSV ==========
+    function exportCSV(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return alert('No data to export.');
+        let csv = '';
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td, th');
+            const rowData = [];
+            cols.forEach(col => rowData.push('"' + col.innerText.replace(/"/g, '""') + '"'));
+            csv += rowData.join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${tableId}_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+    }
+
+    // ========== Invoices ==========
+    async function loadInvoices() {
+        const start = document.getElementById('invDateStart').value;
+        const end = document.getElementById('invDateEnd').value;
+        const branch = document.getElementById('invBranch').value;
+        let query = db.collection('shipments').where('status', '==', 'Delivered').where('grnNumber', '!=', null);
+        if (start) query = query.where('receivedDate', '>=', new Date(start));
+        if (end) {
+            const endDate = new Date(end);
+            endDate.setHours(23,59,59);
+            query = query.where('receivedDate', '<=', endDate);
+        }
+        if (branch) query = query.where('destinationBranch', '==', branch);
+        const snap = await query.get();
+        let html = '<table id="invTable"><tr><th>GRN</th><th>Date</th><th>Branch</th><th>Supplier</th><th>Total Goods</th><th>Transport</th><th>Action</th></tr>';
+        if (snap.empty) html += '<tr><td colspan="7" class="empty">No invoices found</td></tr>';
+        snap.forEach(doc => {
+            const d = doc.data();
+            const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
+            html += `<tr>
+                <td>${d.grnNumber || 'N/A'}</td>
+                <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
+                <td>${d.destinationBranch}</td>
+                <td>${d.senderName}</td>
+                <td>₦${totalGoods.toLocaleString()}</td>
+                <td>₦${(d.transportCost||0).toLocaleString()}</td>
+                <td><button onclick="viewInvoice('${doc.id}')" style="background:#f39c12; border:none; color:white; padding:4px 16px; border-radius:40px; cursor:pointer;">Preview</button></td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('invoiceList').innerHTML = html;
+    }
+
+    window.viewInvoice = async (shipId) => {
+        const doc = await db.collection('shipments').doc(shipId).get();
+        if (!doc.exists) return;
+        const d = doc.data();
+        const items = d.items || [];
+        let itemsHtml = '';
+        items.forEach(it => {
+            itemsHtml += `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>`;
+        });
+        const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
+        const html = `
+            <div id="invoiceContentInner">
+                <h2>NEVAMAK Enterprises</h2>
+                <h3>Goods Received Note (GRN)</h3>
+                <p><strong>GRN:</strong> ${d.grnNumber || 'N/A'}</p>
+                <p><strong>Date:</strong> ${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleString() : 'N/A'}</p>
+                <p><strong>Supplier:</strong> ${d.senderName}</p>
+                <p><strong>Branch:</strong> ${d.destinationBranch}</p>
+                <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
+                <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
+                    <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                    ${itemsHtml}
+                    <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
+                    <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(d.transportCost||0).toLocaleString()}</strong></td></tr>
+                </table>
+                <p><em>Received by: ${d.receivingRep}</em></p>
+                <p>This is a system-generated invoice.</p>
+            </div>
+        `;
+        document.getElementById('invoiceContent').innerHTML = html;
+        document.getElementById('invoiceModal').style.display = 'flex';
+    };
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+
+    async function downloadInvoicePDF() {
+        const element = document.getElementById('invoiceContentInner');
+        if (!element) return alert('No invoice to download.');
+        const canvas = await html2canvas(element, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 190;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+        pdf.save(`Invoice_${new Date().toISOString().slice(0,10)}.pdf`);
+    }
+
+    // Filter listeners
+    document.getElementById('invFilterBtn').addEventListener('click', loadInvoices);
+
+    // ========== Returns ==========
+    async function loadReturns() {
+        const start = document.getElementById('retDateStart').value;
+        const end = document.getElementById('retDateEnd').value;
+        const branch = document.getElementById('retBranch').value;
+        let query = db.collection('returns').orderBy('date', 'desc');
+        if (start) query = query.where('date', '>=', new Date(start));
+        if (end) {
+            const endDate = new Date(end);
+            endDate.setHours(23,59,59);
+            query = query.where('date', '<=', endDate);
+        }
+        if (branch) query = query.where('branch', '==', branch);
+        const snap = await query.get();
+        let html = '<table id="retTable"><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr>';
+        if (snap.empty) html += '<tr><td colspan="7" class="empty">No returns found</td></tr>';
+        snap.forEach(doc => {
+            const r = doc.data();
+            html += `<tr>
+                <td>${r.date ? new Date(r.date.toDate()).toLocaleDateString() : ''}</td>
+                <td>${r.branch}</td>
+                <td>${r.shipmentId.slice(0,8)}</td>
+                <td>${r.itemName}</td>
+                <td>${r.returnedQty}</td>
+                <td>${r.reason || '-'}</td>
+                <td>${r.createdBy || '-'}</td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('returnsList').innerHTML = html;
+    }
+    document.getElementById('retFilterBtn').addEventListener('click', loadReturns);
+
+    // ========== Dispatched ==========
+    async function loadDispatched() {
+        const start = document.getElementById('dispDateStart').value;
+        const end = document.getElementById('dispDateEnd').value;
+        const status = document.getElementById('dispStatus').value;
+        let query = db.collection('shipments').orderBy('createdAt', 'desc');
+        if (start) query = query.where('createdAt', '>=', new Date(start));
+        if (end) {
+            const endDate = new Date(end);
+            endDate.setHours(23,59,59);
+            query = query.where('createdAt', '<=', endDate);
+        }
+        if (status) query = query.where('status', '==', status);
+        const snap = await query.get();
+        let html = '<table id="dispTable"><tr><th>ID</th><th>Date</th><th>Destination</th><th>Sender</th><th>Items</th><th>Goods Value</th><th>Status</th></tr>';
+        if (snap.empty) html += '<tr><td colspan="7" class="empty">No dispatched shipments found</td></tr>';
+        snap.forEach(doc => {
+            const d = doc.data();
+            const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : '-';
+            const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
+            const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'') || 'dispatched'}`;
+            html += `<tr>
+                <td>${doc.id.slice(0,8)}</td>
+                <td>${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ''}</td>
+                <td>${d.destinationBranch}</td>
+                <td>${d.senderName}</td>
+                <td>${itemsShort}</td>
+                <td>₦${totalGoods.toLocaleString()}</td>
+                <td><span class="status-badge ${statusClass}">${d.status}</span></td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('dispatchedList').innerHTML = html;
+    }
+    document.getElementById('dispFilterBtn').addEventListener('click', loadDispatched);
+
+    // ========== Received ==========
+    async function loadReceived() {
+        const start = document.getElementById('recvDateStart').value;
+        const end = document.getElementById('recvDateEnd').value;
+        const branch = document.getElementById('recvBranch').value;
+        let query = db.collection('shipments').where('status', 'in', ['Delivered', 'Partially Delivered']).orderBy('receivedDate', 'desc');
+        if (start) query = query.where('receivedDate', '>=', new Date(start));
+        if (end) {
+            const endDate = new Date(end);
+            endDate.setHours(23,59,59);
+            query = query.where('receivedDate', '<=', endDate);
+        }
+        if (branch) query = query.where('destinationBranch', '==', branch);
+        const snap = await query.get();
+        let html = '<table id="recvTable"><tr><th>Date</th><th>Branch</th><th>GRN</th><th>Supplier</th><th>Items</th><th>Goods Value</th><th>Received By</th></tr>';
+        if (snap.empty) html += '<tr><td colspan="7" class="empty">No received shipments found</td></tr>';
+        snap.forEach(doc => {
+            const d = doc.data();
+            const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0})`).join(", ").substring(0,40) : '-';
+            const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
+            html += `<tr>
+                <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
+                <td>${d.destinationBranch}</td>
+                <td>${d.grnNumber || 'N/A'}</td>
+                <td>${d.senderName}</td>
+                <td>${itemsShort}</td>
+                <td>₦${totalGoods.toLocaleString()}</td>
+                <td>${d.receivingRep || '-'}</td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('receivedList').innerHTML = html;
+    }
+    document.getElementById('recvFilterBtn').addEventListener('click', loadReceived);
+
+    // ========== Chat History ==========
+    async function loadChatHistory() {
+        const start = document.getElementById('chatDateStart').value;
+        const end = document.getElementById('chatDateEnd').value;
+        const search = document.getElementById('chatSearch').value.toLowerCase().trim();
+        let query = db.collection('messages')
+            .where('senderId', '==', currentUser.uid)
+            .orderBy('timestamp', 'desc');
+        if (start) query = query.where('timestamp', '>=', new Date(start));
+        if (end) {
+            const endDate = new Date(end);
+            endDate.setHours(23,59,59);
+            query = query.where('timestamp', '<=', endDate);
+        }
+        const snap = await query.get();
+        let html = '<table id="chatTable"><tr><th>Time</th><th>Chat</th><th>Text</th><th>File</th></tr>';
+        if (snap.empty) html += '<tr><td colspan="4" class="empty">No messages found</td></tr>';
+        snap.forEach(doc => {
+            const m = doc.data();
+            let chatDisplay = 'Global';
+            if (m.chatId !== 'global') {
+                // Try to extract other user
+                const parts = m.chatId.split('_');
+                const other = parts.find(p => p !== currentUser.uid);
+                if (other) {
+                    const user = allUsers ? allUsers.find(u => u.uid === other) : null;
+                    chatDisplay = user ? user.email.split('@')[0] : other;
+                } else {
+                    chatDisplay = m.chatId;
+                }
+            }
+            const text = m.text || '';
+            if (search && !text.toLowerCase().includes(search)) return;
+            const file = m.fileName ? `📎 ${m.fileName}` : '';
+            html += `<tr>
+                <td>${m.timestamp ? new Date(m.timestamp.toDate()).toLocaleString() : ''}</td>
+                <td>${chatDisplay}</td>
+                <td>${text}</td>
+                <td>${file}</td>
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('chatList').innerHTML = html;
+    }
+
+    // Load users for chat display
+    let allUsers = [];
+    async function loadUsers() {
+        const snap = await db.collection('users').get();
+        allUsers = [];
+        snap.forEach(doc => {
+            allUsers.push({ uid: doc.id, email: doc.data().email });
+        });
+    }
+    loadUsers();
+
+    document.getElementById('chatFilterBtn').addEventListener('click', loadChatHistory);
+    document.getElementById('chatSearch').addEventListener('input', loadChatHistory);
+
+    // ========== Initial Load ==========
+    // All data loads on auth state change.
+</script>
+</body>
+</html>
