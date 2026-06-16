@@ -42,6 +42,7 @@
 <div class="nav">
     <a href="index.html">🏠 Dashboard</a>
     <a href="chat.html">💬 Chat</a>
+    <a href="reports.html">📊 Reports</a>
     <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
 </div>
 <h2>🏢 Abuja Receiving</h2>
@@ -137,7 +138,6 @@
         if (!user) { window.location.href = 'login.html'; return; }
         const userDoc = await db.collection('users').doc(user.uid).get();
         const role = userDoc.data()?.role || '';
-        // Allow: admin, lagos_sender, or abuja_rep. Otherwise redirect to dashboard (without logging out).
         if (!['admin', 'lagos_sender', 'abuja_rep'].includes(role)) {
             window.location.href = 'index.html';
             return;
@@ -553,7 +553,7 @@
         const end = document.getElementById('historyEnd').value;
         loadActivityHistory(start, end);
     });
-    // Initial load without filter
+    // Initial load
     loadActivityHistory();
 </script>
 </body>
