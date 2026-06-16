@@ -8,7 +8,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
-        /* Same styles as Abuja but with orange accents */
         * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; box-sizing: border-box; }
         body { background: #eef2fa; margin: 0; padding: 12px; }
         .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
@@ -43,6 +42,7 @@
 <div class="nav">
     <a href="index.html">🏠 Dashboard</a>
     <a href="chat.html">💬 Chat</a>
+    <a href="reports.html">📊 Reports</a>
     <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
 </div>
 <h2>🌊 Port Harcourt Receiving</h2>
@@ -138,7 +138,6 @@
         if (!user) { window.location.href = 'login.html'; return; }
         const userDoc = await db.collection('users').doc(user.uid).get();
         const role = userDoc.data()?.role || '';
-        // Allow: admin, lagos_sender, or ph_rep. Otherwise redirect to dashboard (without logging out).
         if (!['admin', 'lagos_sender', 'ph_rep'].includes(role)) {
             window.location.href = 'index.html';
             return;
@@ -153,10 +152,15 @@
     });
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // ---- All functions are identical to Abuja, but with BRANCH = "Portharcourt" ----
-    // To save space, I'll include the full functions here (they are the same as above).
-    // In production, you can copy the Abuja script and replace "Abuja" with "Portharcourt".
-    // I'll provide the complete script block for clarity.
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+        });
+    });
 
     // ---- Stats ----
     function loadStats() {
@@ -184,16 +188,6 @@
             document.getElementById('stockValue').innerText = '₦' + val.toLocaleString();
         });
     }
-
-    // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-        });
-    });
 
     // ---- Receive Shipments ----
     async function loadShipments() {
@@ -559,7 +553,6 @@
         const end = document.getElementById('historyEnd').value;
         loadActivityHistory(start, end);
     });
-    // Initial load without filter
     loadActivityHistory();
 </script>
 </body>
