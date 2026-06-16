@@ -57,6 +57,7 @@
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 90%; max-height: 90%; overflow: auto; }
         .close { float: right; cursor: pointer; font-size: 1.5rem; }
         .file-preview { max-width: 100%; max-height: 80vh; }
+        .error-msg { color: #e74c3c; padding: 10px; text-align: center; }
     </style>
 </head>
 <body>
@@ -72,7 +73,7 @@
     </header>
 
     <div class="chat-layout">
-        <!-- Sidebar: User list + global -->
+        <!-- Sidebar -->
         <div class="sidebar">
             <h3>👥 Contacts</h3>
             <input class="search-box" id="userSearch" placeholder="Search users...">
@@ -111,6 +112,7 @@
 </div>
 
 <script>
+    // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -125,6 +127,7 @@
     const db = firebase.firestore();
     const storage = firebase.storage();
 
+    // ==================== State ====================
     let currentUser = null;
     let currentUserId = "";
     let currentUserEmail = "";
@@ -135,6 +138,7 @@
     let unsubscribeTyping = null;
     let typingTimeout = null;
 
+    // ==================== DOM ====================
     const messagesContainer = document.getElementById('messagesContainer');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -148,16 +152,25 @@
     const userSearch = document.getElementById('userSearch');
     const logoutBtn = document.getElementById('logoutBtn');
 
+    // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
-        if (!user) { window.location.href = 'login.html'; return; }
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
         currentUser = user;
         currentUserId = user.uid;
         currentUserEmail = user.email;
-        await loadUsers();
-        await updatePresence(true);
-        switchChat('global');
-        setInterval(() => updatePresence(true), 30000);
-        window.addEventListener('beforeunload', () => updatePresence(false));
+        try {
+            await loadUsers();
+            await updatePresence(true);
+            switchChat('global');
+            setInterval(() => updatePresence(true), 30000);
+            window.addEventListener('beforeunload', () => updatePresence(false));
+        } catch (err) {
+            console.error('Auth init error:', err);
+            messagesContainer.innerHTML = `<div class="error-msg">❌ Failed to load chat: ${err.message}</div>`;
+        }
     });
 
     logoutBtn.addEventListener('click', () => {
@@ -165,21 +178,28 @@
         auth.signOut().then(() => window.location.href = 'login.html');
     });
 
+    // ==================== Load Users ====================
     async function loadUsers() {
-        const snap = await db.collection('users').get();
-        allUsers = [];
-        snap.forEach(doc => {
-            const data = doc.data();
-            if (doc.id !== currentUserId) {
-                allUsers.push({
-                    uid: doc.id,
-                    email: data.email,
-                    role: data.role || 'user',
-                    online: data.online || false
-                });
-            }
-        });
-        renderUserList(allUsers);
+        try {
+            const snap = await db.collection('users').get();
+            allUsers = [];
+            snap.forEach(doc => {
+                const data = doc.data();
+                if (doc.id !== currentUserId) {
+                    allUsers.push({
+                        uid: doc.id,
+                        email: data.email,
+                        role: data.role || 'user',
+                        online: data.online || false
+                    });
+                }
+            });
+            renderUserList(allUsers);
+        } catch (err) {
+            console.error('Load users error:', err);
+            // Non‑critical: continue without user list
+            allUsers = [];
+        }
     }
 
     function renderUserList(users) {
@@ -197,6 +217,7 @@
                     </div>`;
         });
         userList.innerHTML = html;
+        // Apply search filter
         const q = userSearch.value.toLowerCase();
         document.querySelectorAll('.user-item[data-userid]').forEach(el => {
             const uid = el.dataset.userid;
@@ -210,11 +231,13 @@
         });
     }
 
+    // ==================== Unread Counts ====================
     let unreadCounts = {};
     function getUnreadCount(uid) {
         return unreadCounts[uid] || 0;
     }
 
+    // ==================== Switch Chat ====================
     function switchChat(chatId) {
         if (unsubscribeMessages) {
             unsubscribeMessages();
@@ -247,6 +270,7 @@
             firestoreChatId = [myUid, otherUid].sort().join('_');
         }
 
+        // ---- Listen to messages ----
         const q = db.collection('messages')
             .where('chatId', '==', firestoreChatId)
             .orderBy('timestamp', 'asc');
@@ -261,8 +285,12 @@
             });
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             typingIndicator.innerText = '';
-        }, error => console.error(error));
+        }, error => {
+            console.error('Messages listener error:', error);
+            messagesContainer.innerHTML = `<div class="error-msg">❌ Error loading messages: ${error.message}</div>`;
+        });
 
+        // ---- Listen to typing ----
         if (chatId !== 'global') {
             const typingRef = db.collection('typing').doc(firestoreChatId);
             unsubscribeTyping = typingRef.onSnapshot(doc => {
@@ -276,10 +304,14 @@
                         typingIndicator.innerText = '';
                     }
                 }
+            }, error => {
+                console.error('Typing listener error:', error);
+                // Non‑critical
             });
         }
     }
 
+    // ==================== Create Message Element ====================
     function createMessageElement(data, isMine) {
         const div = document.createElement('div');
         div.className = `message ${isMine ? 'sent' : 'received'}`;
@@ -349,6 +381,7 @@
         return div;
     }
 
+    // ==================== Send Message ====================
     async function sendMessage() {
         const text = messageInput.value.trim();
         if (!text && !fileInput.files.length) return;
@@ -396,12 +429,13 @@
         clearTyping();
     }
 
+    // ==================== File Upload ====================
     fileUploadBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length) sendMessage();
     });
 
-    // Emoji picker
+    // ==================== Emoji Picker ====================
     const emojis = ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','☺️','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠','🤬','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','❤️','🧡','💛','💚','💙','💜','🖤','💔','💕','💞','💓','💗','💖','💘','💝','✨','⭐','🌟','💫','🔥','💯','💢','💥','💦','💨','🕊️','🎉','🎊','🎁','🎈','🏆','🥇','🥈','🥉','🎖️','🏅','🎗️','🎀','🎯','🎲'];
     emojis.forEach(e => {
         const span = document.createElement('span');
@@ -420,7 +454,7 @@
     });
     document.addEventListener('click', () => emojiPicker.classList.remove('show'));
 
-    // Typing indicator
+    // ==================== Typing Indicator ====================
     messageInput.addEventListener('input', () => {
         if (currentChatId === 'global') return;
         const chatId = [currentUserId, currentChatId].sort().join('_');
@@ -428,20 +462,20 @@
         typingRef.set({
             typingUser: currentUserId,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        }).catch(err => console.warn('Typing set error:', err));
         clearTimeout(typingTimeout);
         typingTimeout = setTimeout(() => {
-            typingRef.delete();
+            typingRef.delete().catch(err => console.warn('Typing delete error:', err));
         }, 2000);
     });
 
     function clearTyping() {
         if (currentChatId === 'global') return;
         const chatId = [currentUserId, currentChatId].sort().join('_');
-        db.collection('typing').doc(chatId).delete();
+        db.collection('typing').doc(chatId).delete().catch(() => {});
     }
 
-    // Reactions
+    // ==================== Reactions ====================
     async function toggleReaction(messageId, emoji) {
         const msgRef = db.collection('messages').doc(messageId);
         try {
@@ -460,32 +494,38 @@
                 }
                 transaction.update(msgRef, { reactions });
             });
-        } catch (err) { console.error(err); }
+        } catch (err) {
+            console.error('Reaction error:', err);
+        }
     }
 
-    // Mark chat read
+    // ==================== Mark Chat Read ====================
     async function markChatRead(chatId) {
         if (chatId === 'global') return;
         const composite = [currentUserId, chatId].sort().join('_');
-        const snapshot = await db.collection('messages')
-            .where('chatId', '==', composite)
-            .where('senderId', '!=', currentUserId)
-            .get();
-        const batch = db.batch();
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const readBy = data.readBy || [];
-            if (!readBy.includes(currentUserId)) {
-                readBy.push(currentUserId);
-                batch.update(doc.ref, { readBy });
-            }
-        });
-        await batch.commit();
-        unreadCounts[chatId] = 0;
-        renderUserList(allUsers);
+        try {
+            const snapshot = await db.collection('messages')
+                .where('chatId', '==', composite)
+                .where('senderId', '!=', currentUserId)
+                .get();
+            const batch = db.batch();
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const readBy = data.readBy || [];
+                if (!readBy.includes(currentUserId)) {
+                    readBy.push(currentUserId);
+                    batch.update(doc.ref, { readBy });
+                }
+            });
+            await batch.commit();
+            unreadCounts[chatId] = 0;
+            renderUserList(allUsers);
+        } catch (err) {
+            console.warn('Mark chat read error:', err);
+        }
     }
 
-    // View file modal
+    // ==================== View File Modal ====================
     function viewFile(url, type) {
         const modal = document.getElementById('fileModal');
         const img = document.getElementById('fileModalImage');
@@ -518,19 +558,20 @@
         }
     };
 
-    // Presence
+    // ==================== Presence ====================
     async function updatePresence(online) {
         if (!currentUserId) return;
         await db.collection('users').doc(currentUserId).update({
             online: online,
             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
         }).catch(() => {});
+        // Update local list
         const user = allUsers.find(u => u.uid === currentUserId);
         if (user) user.online = online;
         renderUserList(allUsers);
     }
 
-    // Send on Enter
+    // ==================== Send on Enter ====================
     messageInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -538,7 +579,7 @@
         }
     });
 
-    // Search users
+    // ==================== Search Users ====================
     userSearch.addEventListener('input', () => {
         const q = userSearch.value.toLowerCase();
         document.querySelectorAll('.user-item[data-userid]').forEach(el => {
@@ -553,13 +594,16 @@
         });
     });
 
+    // ==================== Send Button ====================
     sendBtn.addEventListener('click', sendMessage);
+
+    // ==================== Auto-resize Textarea ====================
     messageInput.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = this.scrollHeight + 'px';
     });
 
-    console.log('NEVAMAK Chat loaded successfully.');
+    console.log('NEVAMAK Chat loaded with error handling.');
 </script>
 </body>
 </html>
