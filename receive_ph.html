@@ -2,163 +2,59 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NEVAMAK – Port Harcourt Receiving</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
-        body { background: #eef2fa; margin: 0; padding: 12px; }
-        .card, .shipment-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .shipment-card { border-left: 6px solid #e67e22; background: #fef9e6; }
-        button { background: #e67e22; color: white; padding: 12px 20px; border-radius: 48px; border: none; font-size: 1rem; width: 100%; margin-top: 8px; cursor: pointer; }
-        input, select, textarea { padding: 10px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin: 4px 0; }
-        .nav { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-        .nav button, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; }
-        .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-        .tab-btn { background: #ccc; color: #333; width: auto; padding: 8px 16px; margin: 0; }
-        .tab-btn.active { background: #e67e22; color: white; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .item-row { background: #fff9e6; padding: 12px; border-radius: 20px; margin-bottom: 12px; }
-        .cost-info { background: #fef0d8; padding: 8px; border-radius: 16px; margin: 8px 0; font-size: 0.9rem; }
-        .input-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .input-group input { flex: 1; min-width: 80px; }
-        h2 { font-size: 1.3rem; margin-top: 0; color: #e67e22; }
-        .report-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-        .report-filters input, .report-filters button { width: auto; flex: 1; }
-        .invoice-box { border: 1px solid #ccc; padding: 16px; margin-top: 16px; background: white; border-radius: 16px; }
+        *{ font-family: system-ui, -apple-system; }
+        body{ background: #eef2fa; margin: 0; padding: 12px; }
+        .card, .shipment-card{ background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .shipment-card{ border-left: 6px solid #e67e22; }
+        button{ background: #e67e22; color: white; padding: 12px 20px; border-radius: 48px; border: none; font-size: 1rem; width: 100%; margin-top: 8px; cursor: pointer; }
+        input{ padding: 10px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin: 4px 0; }
+        .nav{ display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .nav a, .logout-btn{ background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        .item-row{ background: #fef9e6; padding: 12px; border-radius: 20px; margin-bottom: 12px; }
+        .cost-info{ background: #fff0db; padding: 8px; border-radius: 16px; margin: 8px 0; }
+        .input-group{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .input-group input{ flex: 1; min-width: 80px; }
+        h2{ font-size: 1.3rem; }
         @media (max-width: 500px) { .input-group { flex-direction: column; } .input-group input { width: 100%; } }
     </style>
 </head>
 <body>
 <div class="nav">
+    <a href="index.html">🏠 Dashboard</a>
+    <a href="chat.html">💬 Chat</a>
     <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
 </div>
 <h2>🌊 Port Harcourt Receiving</h2>
-
-<!-- Tabs -->
-<div class="tabs">
-    <button class="tab-btn active" data-tab="receive">📦 Receive Goods</button>
-    <button class="tab-btn" data-tab="returns">🔄 Return Goods</button>
-    <button class="tab-btn" data-tab="history">📜 Activity History</button>
-    <button class="tab-btn" data-tab="reports">📊 Reports</button>
-    <button class="tab-btn" data-tab="invoices">🧾 Invoices</button>
-</div>
-
-<!-- Tab: Receive Goods -->
-<div id="tab-receive" class="tab-content active">
-    <div id="shipmentsList" class="card">Loading pending shipments...</div>
-</div>
-
-<!-- Tab: Return Goods -->
-<div id="tab-returns" class="tab-content">
-    <div class="card">
-        <h3>Record Return of Goods</h3>
-        <select id="returnShipmentSelect"><option value="">-- Select Shipment --</option></select>
-        <select id="returnItemSelect"><option value="">-- Select Item --</option></select>
-        <input type="number" id="returnQty" placeholder="Quantity to return">
-        <textarea id="returnReason" placeholder="Reason for return (e.g., damaged, expiry)"></textarea>
-        <button id="recordReturnBtn">📤 Record Return</button>
-        <div id="returnMessage"></div>
-    </div>
-    <div class="card">
-        <h3>Past Returns</h3>
-        <div id="pastReturnsList">Loading...</div>
-    </div>
-</div>
-
-<!-- Tab: Activity History -->
-<div id="tab-history" class="tab-content">
-    <div class="card">
-        <h3>All Activities (Receiving, Returns)</h3>
-        <div id="activityList">Loading...</div>
-    </div>
-</div>
-
-<!-- Tab: Reports -->
-<div id="tab-reports" class="tab-content">
-    <div class="card">
-        <h3>Generate Report</h3>
-        <div class="report-filters">
-            <input type="date" id="reportStartDate">
-            <input type="date" id="reportEndDate">
-            <button id="generateReportBtn">Generate Report</button>
-        </div>
-        <div id="reportOutput" style="overflow-x: auto;"></div>
-    </div>
-</div>
-
-<!-- Tab: Invoices -->
-<div id="tab-invoices" class="tab-content">
-    <div class="card">
-        <h3>Generate Invoice from GRN</h3>
-        <select id="invoiceShipmentSelect"><option value="">-- Select Received Shipment --</option></select>
-        <button id="previewInvoiceBtn">Preview Invoice</button>
-        <button id="downloadInvoiceBtn" style="background:#27ae60;">Download PDF</button>
-        <div id="invoicePreview" class="invoice-box" style="display:none;"></div>
-    </div>
-</div>
+<div id="phShipments" class="card">Loading...</div>
 
 <script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
-        authDomain: "nevamak-enterprises.firebaseapp.com",
-        projectId: "nevamak-enterprises",
-        storageBucket: "nevamak-enterprises.firebasestorage.app",
-        messagingSenderId: "144324172534",
-        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-        measurementId: "G-MZ8NT6KK8N"
-    };
+    const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    let currentUserEmail = "";
 
-    auth.onAuthStateChanged(async (user) => {
+    auth.onAuthStateChanged(user => {
         if (!user) { window.location.href = 'login.html'; return; }
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        if (userDoc.data()?.role !== 'ph_rep') {
-            await auth.signOut();
-            window.location.href = 'login.html';
-        } else {
-            currentUserEmail = user.email;
-            loadShipments();
-            loadReturnShipmentsDropdown();
-            loadPastReturns();
-            loadActivityHistory();
-            loadInvoiceShipmentsDropdown();
-        }
+        loadPHShipments();
     });
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-        });
-    });
-
-    // ----- Receive Goods (with activity logging) -----
-    async function loadShipments() {
-        const snap = await db.collection("shipments")
-            .where("destinationBranch","==","Portharcourt")
-            .where("status","in",["Dispatched","Partially Delivered"])
-            .get();
-        if(snap.empty) { document.getElementById("shipmentsList").innerHTML = "<div class='card'>✅ No pending shipments</div>"; return; }
+    async function loadPHShipments() {
+        const snap = await db.collection("shipments").where("destinationBranch","==","Portharcourt").where("status","in",["Dispatched","Partially Delivered"]).get();
+        if(snap.empty) { document.getElementById("phShipments").innerHTML = "<div class='card'>No pending shipments</div>"; return; }
         let docs = []; snap.forEach(d => docs.push({id:d.id, data:d.data()}));
         docs.sort((a,b)=>(b.data.createdAt?.toDate()||0)-(a.data.createdAt?.toDate()||0));
         let html = "";
         for(const {id, data: ship} of docs){
             const items = ship.items;
             const totalGoods = items.reduce((s,i)=>s+(i.totalItemCost||0),0);
-            html += `<div class="shipment-card" id="ship-${id}">
+            html += `<div class="shipment-card" id="ph-${id}">
                         <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName}</h3>
                         <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div>`;
             for(let idx=0; idx<items.length; idx++){
@@ -168,267 +64,48 @@
                             <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit)<br>
                             Ordered: ${it.orderedQty} | OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}
                             <div class="input-group">
-                                <input type="number" id="recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}">
-                                <input type="number" id="dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}">
+                                <input type="number" id="ph_recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}">
+                                <input type="number" id="ph_dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}">
                             </div>
                           </div>`;
             }
-            html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div>
-                     <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div>
-                     <button onclick="receiveShipment('${id}')">✅ Confirm Receipt</button>
+            html += `<div><input type="text" id="ph_rep_${id}" placeholder="Receiving Officer Name"></div>
+                     <div><input type="text" id="ph_grn_${id}" placeholder="GRN Number"></div>
+                     <button onclick="receivePH('${id}')">✅ Confirm Receipt</button>
                      </div>`;
         }
-        document.getElementById("shipmentsList").innerHTML = html;
+        document.getElementById("phShipments").innerHTML = html;
     }
 
-    window.receiveShipment = async (shipId) => {
+    window.receivePH = async (shipId) => {
         const docRef = db.collection("shipments").doc(shipId);
         const doc = await docRef.get();
-        if(!doc.exists) return;
         const data = doc.data();
         let items = [...data.items];
         let updated = false;
         for(let i=0; i<items.length; i++){
-            const addRecv = parseInt(document.getElementById(`recv_${shipId}_${i}`)?.value || 0);
-            const addDam = parseInt(document.getElementById(`dam_${shipId}_${i}`)?.value || 0);
+            const addRecv = parseInt(document.getElementById(`ph_recv_${shipId}_${i}`)?.value || 0);
+            const addDam = parseInt(document.getElementById(`ph_dam_${shipId}_${i}`)?.value || 0);
             if(addRecv>0 || addDam>0){
                 updated = true;
                 items[i].receivedQty = (items[i].receivedQty||0) + addRecv;
                 items[i].damageQty = (items[i].damageQty||0) + addDam;
                 if(items[i].receivedQty+items[i].damageQty > items[i].orderedQty){
-                    alert(`Over-receipt on ${items[i].itemName}`);
+                    alert(`Adjusting ${items[i].itemName}`);
                     items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
                 }
             }
         }
         if(!updated) return alert("Enter quantities");
-        const rep = document.getElementById(`repName_${shipId}`).value.trim();
-        const grn = document.getElementById(`grn_${shipId}`).value.trim();
-        if(!rep) return alert("Enter rep name");
-        const allCompleted = items.every(it => (it.receivedQty+it.damageQty) >= it.orderedQty);
-        const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
-        await docRef.update({ items, status:newStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep:rep, grnNumber:grn||`GRN-${Date.now()}` });
-        
-        // Log activity
-        await db.collection("activityLog").add({
-            actionType: "receive",
-            shipmentId: shipId,
-            branch: "Port Harcourt",
-            details: `Received by ${rep}, GRN: ${grn}, Status: ${newStatus}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            user: currentUserEmail
-        });
-        alert(`${newStatus} - GRN: ${grn}`);
-        loadShipments();
-        loadActivityHistory();
-        loadInvoiceShipmentsDropdown(); // refresh invoice list
+        const officer = document.getElementById(`ph_rep_${shipId}`).value.trim();
+        const grn = document.getElementById(`ph_grn_${shipId}`).value.trim();
+        if(!officer) return alert("Enter receiving officer");
+        const allDelivered = items.every(it => (it.receivedQty+it.damageQty) >= it.orderedQty);
+        const finalStatus = allDelivered ? "Delivered" : "Partially Delivered";
+        await docRef.update({ items, status:finalStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep:officer, grnNumber:grn||`GRN-PH-${Date.now()}` });
+        alert(`Port Harcourt: ${finalStatus}`);
+        loadPHShipments();
     };
-
-    // ----- Return Goods -----
-    async function loadReturnShipmentsDropdown() {
-        const snap = await db.collection("shipments")
-            .where("destinationBranch","==","Portharcourt")
-            .where("status","in",["Delivered","Partially Delivered"])
-            .get();
-        const select = document.getElementById("returnShipmentSelect");
-        select.innerHTML = '<option value="">-- Select Shipment --</option>';
-        snap.forEach(doc => {
-            const option = document.createElement("option");
-            option.value = doc.id;
-            option.textContent = `${doc.id.slice(0,8)} - ${doc.data().senderName}`;
-            select.appendChild(option);
-        });
-        select.onchange = () => loadReturnItems(select.value);
-    }
-    async function loadReturnItems(shipmentId) {
-        const itemSelect = document.getElementById("returnItemSelect");
-        if(!shipmentId) { itemSelect.innerHTML = '<option value="">-- Select Item --</option>'; return; }
-        const doc = await db.collection("shipments").doc(shipmentId).get();
-        const items = doc.data().items;
-        itemSelect.innerHTML = '<option value="">-- Select Item --</option>';
-        items.forEach((it, idx) => {
-            const opt = document.createElement("option");
-            opt.value = idx;
-            opt.textContent = `${it.itemName} (Received: ${it.receivedQty}, Damaged: ${it.damageQty})`;
-            itemSelect.appendChild(opt);
-        });
-    }
-    document.getElementById("recordReturnBtn").addEventListener("click", async () => {
-        const shipmentId = document.getElementById("returnShipmentSelect").value;
-        const itemIdx = document.getElementById("returnItemSelect").value;
-        const qty = parseInt(document.getElementById("returnQty").value);
-        const reason = document.getElementById("returnReason").value.trim();
-        if(!shipmentId || itemIdx === "" || !qty || qty<=0) return alert("Select shipment, item, and valid quantity");
-        const shipmentDoc = await db.collection("shipments").doc(shipmentId).get();
-        const items = shipmentDoc.data().items;
-        const item = items[parseInt(itemIdx)];
-        if(qty > (item.receivedQty - item.damageQty)) return alert("Cannot return more than received good units");
-        // Update shipment: reduce receivedQty by qty
-        items[parseInt(itemIdx)].receivedQty -= qty;
-        await db.collection("shipments").doc(shipmentId).update({ items });
-        // Record return
-        await db.collection("returns").add({
-            shipmentId: shipmentId,
-            branch: "Port Harcourt",
-            itemName: item.itemName,
-            returnedQty: qty,
-            reason: reason,
-            date: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUserEmail
-        });
-        // Log activity
-        await db.collection("activityLog").add({
-            actionType: "return",
-            shipmentId: shipmentId,
-            branch: "Port Harcourt",
-            details: `Returned ${qty} x ${item.itemName}. Reason: ${reason}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            user: currentUserEmail
-        });
-        alert("Return recorded");
-        document.getElementById("returnQty").value = "";
-        document.getElementById("returnReason").value = "";
-        loadPastReturns();
-        loadActivityHistory();
-        loadReturnShipmentsDropdown(); // refresh dropdowns
-    });
-    async function loadPastReturns() {
-        const snap = await db.collection("returns").where("branch","==","Port Harcourt").orderBy("date","desc").get();
-        let html = "<ul>";
-        snap.forEach(doc => {
-            const r = doc.data();
-            html += `<li>${new Date(r.date?.toDate()).toLocaleString()}: ${r.itemName} x${r.returnedQty} (${r.reason})</li>`;
-        });
-        html += "</ul>";
-        document.getElementById("pastReturnsList").innerHTML = html || "No returns";
-    }
-
-    // ----- Activity History -----
-    async function loadActivityHistory() {
-        const snap = await db.collection("activityLog").where("branch","==","Port Harcourt").orderBy("timestamp","desc").limit(50).get();
-        let html = "<table style='width:100%'><tr><th>Time</th><th>Action</th><th>Details</th></tr>";
-        snap.forEach(doc => {
-            const a = doc.data();
-            html += `<tr>
-                <td>${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ""}</td>
-                <td>${a.actionType}</td>
-                <td>${a.details}</td>
-            </tr>`;
-        });
-        html += "</table>";
-        document.getElementById("activityList").innerHTML = html || "No activity";
-    }
-
-    // ----- Reports -----
-    document.getElementById("generateReportBtn").addEventListener("click", async () => {
-        const startDate = document.getElementById("reportStartDate").value;
-        const endDate = document.getElementById("reportEndDate").value;
-        if(!startDate || !endDate) return alert("Select date range");
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        end.setHours(23,59,59);
-        // Fetch shipments received in this period
-        const shipmentsSnap = await db.collection("shipments")
-            .where("destinationBranch","==","Portharcourt")
-            .where("receivedDate",">=",start)
-            .where("receivedDate","<=",end)
-            .get();
-        const returnsSnap = await db.collection("returns")
-            .where("branch","==","Port Harcourt")
-            .where("date",">=",start)
-            .where("date","<=",end)
-            .get();
-        let totalGoods = 0, totalReturns = 0;
-        shipmentsSnap.forEach(doc => {
-            const data = doc.data();
-            if(data.items) data.items.forEach(it => totalGoods += (it.totalItemCost||0));
-        });
-        returnsSnap.forEach(doc => totalReturns += doc.data().returnedQty);
-        const html = `<h3>Report (${startDate} to ${endDate})</h3>
-                      <p><strong>Total value of goods received:</strong> ₦${totalGoods.toLocaleString()}</p>
-                      <p><strong>Total units returned:</strong> ${totalReturns}</p>
-                      <p><strong>Number of shipments received:</strong> ${shipmentsSnap.size}</p>`;
-        document.getElementById("reportOutput").innerHTML = html;
-    });
-
-    // ----- Invoices (GRN based) -----
-    async function loadInvoiceShipmentsDropdown() {
-        const snap = await db.collection("shipments")
-            .where("destinationBranch","==","Portharcourt")
-            .where("status","==","Delivered")
-            .orderBy("receivedDate","desc")
-            .get();
-        const select = document.getElementById("invoiceShipmentSelect");
-        select.innerHTML = '<option value="">-- Select Shipment --</option>';
-        snap.forEach(doc => {
-            const data = doc.data();
-            const option = document.createElement("option");
-            option.value = doc.id;
-            option.textContent = `${doc.id.slice(0,8)} - ${data.grnNumber || "No GRN"} (${new Date(data.receivedDate?.toDate()).toLocaleDateString()})`;
-            select.appendChild(option);
-        });
-    }
-    let currentInvoiceShipment = null;
-    document.getElementById("previewInvoiceBtn").addEventListener("click", async () => {
-        const shipmentId = document.getElementById("invoiceShipmentSelect").value;
-        if(!shipmentId) return alert("Select a shipment");
-        const doc = await db.collection("shipments").doc(shipmentId).get();
-        currentInvoiceShipment = { id: shipmentId, ...doc.data() };
-        const data = currentInvoiceShipment;
-        let itemsHtml = "";
-        data.items.forEach(it => {
-            itemsHtml += `<tr>
-                <td>${it.itemName}</td>
-                <td>${it.orderedQty}</td>
-                <td>₦${it.unitPrice?.toLocaleString()}</td>
-                <td>₦${(it.totalItemCost||0).toLocaleString()}</td>
-              </tr>`;
-        });
-        const totalGoods = data.items.reduce((s,i)=>s+(i.totalItemCost||0),0);
-        const invoiceHtml = `
-            <div id="invoiceContent">
-                <h2>NEVAMAK Enterprises</h2>
-                <h3>Goods Received Note (GRN)</h3>
-                <p><strong>GRN Number:</strong> ${data.grnNumber || "N/A"}</p>
-                <p><strong>Date:</strong> ${new Date(data.receivedDate?.toDate()).toLocaleString()}</p>
-                <p><strong>Supplier (Lagos):</strong> ${data.senderName}</p>
-                <p><strong>Branch:</strong> Port Harcourt</p>
-                <p><strong>Vehicle/Waybill:</strong> ${data.vehicleNo || "N/A"}</p>
-                <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
-                    <tr><th>Item</th><th>Qty Ordered</th><th>Unit Price</th><th>Total</th></tr>
-                    ${itemsHtml}
-                    <tr><td colspan="3"><strong>Total Goods Value</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
-                    <tr><td colspan="3"><strong>Transport Cost</strong></td><td><strong>₦${data.transportCost?.toLocaleString()}</strong></td></tr>
-                </table>
-                <p><em>Received by: ${data.receivingRep}</em></p>
-                <p>This is a system-generated invoice. Thank you for your business.</p>
-            </div>
-        `;
-        document.getElementById("invoicePreview").innerHTML = invoiceHtml;
-        document.getElementById("invoicePreview").style.display = "block";
-    });
-    document.getElementById("downloadInvoiceBtn").addEventListener("click", async () => {
-        if(!currentInvoiceShipment) return alert("Preview an invoice first");
-        const { jsPDF } = window.jspdf;
-        const element = document.getElementById("invoiceContent");
-        const canvas = await html2canvas(element, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgWidth = 190;
-        const pageHeight = 277;
-        const imgHeight = (canvas.height * imgWidth) / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 10;
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-        while (heightLeft >= 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-        }
-        pdf.save(`Invoice_${currentInvoiceShipment.grnNumber || "GRN"}.pdf`);
-    });
 </script>
 </body>
 </html>
