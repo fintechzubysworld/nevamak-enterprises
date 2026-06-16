@@ -259,10 +259,14 @@
     }
 
     window.receiveShipment = async (shipId) => {
+        let errors = [];
         try {
             const docRef = db.collection("shipments").doc(shipId);
             const doc = await docRef.get();
-            if (!doc.exists) return;
+            if (!doc.exists) {
+                alert('Shipment not found.');
+                return;
+            }
             const data = doc.data();
             let items = [...data.items];
             let updated = false;
@@ -291,45 +295,60 @@
             const allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
             const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
 
-            // Update shipment
-            await docRef.update({
-                items,
-                status: newStatus,
-                receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
-                receivingRep: rep,
-                grnNumber: grn || `GRN-${Date.now()}`,
-                qualityCheck: quality,
-                receivedBy: rep
-            });
-
-            // Update inventory
-            for (const item of items) {
-                if (item.receivedQty > 0) {
-                    const invRef = db.collection('inventory')
-                        .where('itemName', '==', item.itemName)
-                        .where('branch', '==', BRANCH);
-                    const snap = await invRef.get();
-                    if (snap.empty) {
-                        await db.collection('inventory').add({
-                            itemName: item.itemName,
-                            branch: BRANCH,
-                            stock: item.receivedQty,
-                            unitPrice: item.unitPrice,
-                            location: item.location || 'Shelf A',
-                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    } else {
-                        snap.forEach(d => {
-                            d.ref.update({
-                                stock: firebase.firestore.FieldValue.increment(item.receivedQty),
-                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        });
-                    }
-                }
+            // ---- Step 1: Update shipment ----
+            try {
+                await docRef.update({
+                    items,
+                    status: newStatus,
+                    receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+                    receivingRep: rep,
+                    grnNumber: grn || `GRN-${Date.now()}`,
+                    qualityCheck: quality,
+                    receivedBy: rep
+                });
+                console.log('Shipment updated successfully.');
+            } catch (err) {
+                console.error('Shipment update failed:', err);
+                errors.push('Failed to update shipment status.');
+                alert('Failed to update shipment. Please try again or contact admin.');
+                return; // critical, stop here
             }
 
-            // Log activity (non-critical, wrap in try/catch)
+            // ---- Step 2: Update inventory ----
+            try {
+                for (const item of items) {
+                    if (item.receivedQty > 0) {
+                        const invRef = db.collection('inventory')
+                            .where('itemName', '==', item.itemName)
+                            .where('branch', '==', BRANCH);
+                        const snap = await invRef.get();
+                        if (snap.empty) {
+                            await db.collection('inventory').add({
+                                itemName: item.itemName,
+                                branch: BRANCH,
+                                stock: item.receivedQty,
+                                unitPrice: item.unitPrice,
+                                location: item.location || 'Shelf A',
+                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        } else {
+                            for (const d of snap.docs) {
+                                await d.ref.update({
+                                    stock: firebase.firestore.FieldValue.increment(item.receivedQty),
+                                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                                });
+                            }
+                        }
+                    }
+                }
+                console.log('Inventory updated successfully.');
+            } catch (err) {
+                console.error('Inventory update failed:', err);
+                errors.push('Failed to update inventory.');
+                // Non-critical, we continue
+            }
+
+            // ---- Step 3: Log activity ----
             try {
                 await db.collection('activityLog').add({
                     actionType: 'receive',
@@ -339,11 +358,13 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     user: rep
                 });
-            } catch (logError) {
-                console.warn('Activity log failed:', logError);
+                console.log('Activity logged successfully.');
+            } catch (err) {
+                console.error('Activity log failed:', err);
+                errors.push('Failed to log activity.');
             }
 
-            // Send notification (non-critical, wrap in try/catch)
+            // ---- Step 4: Send notification ----
             try {
                 await db.collection('notifications').add({
                     userId: 'admin',
@@ -351,11 +372,18 @@
                     read: false,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-            } catch (notifError) {
-                console.warn('Notification failed:', notifError);
+                console.log('Notification sent successfully.');
+            } catch (err) {
+                console.error('Notification failed:', err);
+                errors.push('Failed to send notification.');
             }
 
-            alert(`${newStatus} - GRN: ${grn}`);
+            // ---- Final feedback ----
+            if (errors.length === 0) {
+                alert(`${newStatus} - GRN: ${grn}. All operations successful.`);
+            } else {
+                alert(`${newStatus} - GRN: ${grn}. But some non-critical operations failed:\n- ${errors.join('\n- ')}`);
+            }
             loadShipments();
             loadActivityHistory();
             loadStats();
