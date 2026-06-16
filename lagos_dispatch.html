@@ -34,7 +34,7 @@
         .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
         .stat-card .num { font-size: 1.5rem; font-weight: bold; color: #0a3d62; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 700px; width: 95%; max-height: 80vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.5rem; }
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
@@ -162,9 +162,55 @@
         </div>
     </div>
 
+    <!-- View Shipment Modal -->
+    <div id="viewShipmentModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('viewShipmentModal')">&times;</span>
+            <h2>📄 Shipment Details</h2>
+            <div id="viewShipmentContent"></div>
+        </div>
+    </div>
+
+    <!-- Edit Draft Modal -->
+    <div id="editDraftModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('editDraftModal')">&times;</span>
+            <h2>✏️ Edit Draft</h2>
+            <form id="editDraftForm">
+                <input type="text" id="editSenderName" placeholder="Sender Name" required>
+                <select id="editDestBranch">
+                    <option value="Abuja">Abuja</option>
+                    <option value="Portharcourt">Port Harcourt</option>
+                </select>
+                <input type="text" id="editVehicleNo" placeholder="Vehicle / Waybill">
+                <input type="date" id="editExpectedDate">
+                <input type="text" id="editDriverName" placeholder="Driver Name">
+                <input type="text" id="editTrackingNo" placeholder="Tracking #" readonly>
+                <label>Items:</label>
+                <div id="editItemsContainer">
+                    <div class="item-row">
+                        <input type="text" placeholder="Item name" class="editItemName">
+                        <input type="number" placeholder="Qty" class="editItemQty">
+                        <input type="number" placeholder="Price/unit" class="editItemPrice">
+                        <button type="button" class="removeItem editRemoveItem">✖</button>
+                    </div>
+                </div>
+                <button type="button" id="editAddItemBtn" class="btn-success">+ Add product</button>
+                <div class="cost-summary" id="editCostPreview">Total goods value: ₦0</div>
+                <textarea id="editNotes" placeholder="Additional notes"></textarea>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <button type="submit" class="btn-primary" style="flex:2;">💾 Update Draft</button>
+                    <button type="button" id="editDeleteBtn" class="btn-danger" style="flex:1;">🗑️ Delete Draft</button>
+                </div>
+            </form>
+            <div id="editMessage" style="color:red; margin-top:8px;"></div>
+        </div>
+    </div>
+
 </div>
 
 <script>
+    // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -178,15 +224,16 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    let currentUser;
+    let currentUser = null;
+    let currentUserRole = '';
 
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
-            const role = userDoc.data().role;
-            document.getElementById('senderName').value = user.email.split('@')[0] + ' (' + role + ')';
+            currentUserRole = userDoc.data().role || '';
+            document.getElementById('senderName').value = user.email.split('@')[0] + ' (' + currentUserRole + ')';
         }
         document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
         loadSuppliers();
@@ -196,7 +243,7 @@
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // ---- Suppliers ----
+    // ==================== Suppliers ====================
     async function loadSuppliers() {
         const snap = await db.collection('suppliers').get();
         const sel = document.getElementById('supplierSelect');
@@ -236,7 +283,7 @@
         }
     };
 
-    // ---- Inventory Check ----
+    // ==================== Inventory Check ====================
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('checkStockBtn')) {
             const row = e.target.closest('.item-row');
@@ -256,7 +303,7 @@
         }
     });
 
-    // ---- Items Management ----
+    // ==================== Items Management ====================
     const itemsContainer = document.getElementById("itemsContainer");
     document.getElementById("addItemBtn").addEventListener("click", () => {
         const div = document.createElement("div");
@@ -284,7 +331,7 @@
     }
     itemsContainer.addEventListener("input", updatePreview);
 
-    // ---- Barcode ----
+    // ==================== Barcode ====================
     document.getElementById('barcodeInput').addEventListener('change', function() {
         const code = this.value.trim();
         if (code) {
@@ -296,7 +343,7 @@
         }
     });
 
-    // ---- Save Shipment ----
+    // ==================== Save Shipment ====================
     async function saveShipment(status) {
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
@@ -368,7 +415,7 @@
         saveShipment('Draft');
     });
 
-    // ---- Load Shipments ----
+    // ==================== Load Shipments ====================
     function loadShipments() {
         const searchInput = document.getElementById('searchShipment');
         const filterSelect = document.getElementById('filterStatus');
@@ -391,8 +438,8 @@
                     <td><span class="status-badge ${statusClass}">${d.status}</span></td>
                     <td>${date}</td>
                     <td>
-                        <button class="btn-sm btn-primary" onclick="viewShipment('${doc.id}')">👁️</button>
-                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${doc.id}')">✏️</button>` : ''}
+                        <button class="btn-sm btn-primary" onclick="viewShipment('${doc.id}')">👁️ View</button>
+                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${doc.id}')">✏️ Edit</button>` : ''}
                     </td>
                 </tr>`;
             });
@@ -428,8 +475,8 @@
                     <td><span class="status-badge ${statusClass}">${d.status}</span></td>
                     <td>${date}</td>
                     <td>
-                        <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️</button>
-                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️</button>` : ''}
+                        <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️ View</button>
+                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️ Edit</button>` : ''}
                     </td>
                 </tr>`;
             });
@@ -440,14 +487,205 @@
         filterSelect.addEventListener('change', () => loadShipments());
     }
 
-    window.viewShipment = function(id) {
-        alert('View details for shipment ' + id);
-    };
-    window.editDraft = function(id) {
-        alert('Edit draft ' + id);
+    // ==================== View Shipment Modal ====================
+    window.viewShipment = async function(id) {
+        try {
+            const doc = await db.collection('shipments').doc(id).get();
+            if (!doc.exists) return alert('Shipment not found.');
+            const d = doc.data();
+            let itemsHtml = '<table><tr><th>Item</th><th>Qty Ordered</th><th>Unit Price</th><th>Total</th><th>Received</th><th>Damaged</th></tr>';
+            if (d.items) {
+                d.items.forEach(it => {
+                    itemsHtml += `<tr>
+                        <td>${it.itemName}</td>
+                        <td>${it.orderedQty}</td>
+                        <td>₦${it.unitPrice?.toLocaleString()}</td>
+                        <td>₦${(it.totalItemCost||0).toLocaleString()}</td>
+                        <td>${it.receivedQty || 0}</td>
+                        <td>${it.damageQty || 0}</td>
+                    </tr>`;
+                });
+            }
+            const totalGoods = d.items ? d.items.reduce((s,i)=>s+(i.totalItemCost||0),0) : 0;
+            const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+            const html = `
+                <p><strong>Shipment ID:</strong> ${id.slice(0,8)}</p>
+                <p><strong>Sender:</strong> ${d.senderName}</p>
+                <p><strong>Destination:</strong> ${d.destinationBranch}</p>
+                <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
+                <p><strong>Tracking #:</strong> ${d.trackingNo || 'N/A'}</p>
+                <p><strong>Expected Date:</strong> ${d.expectedDate || 'N/A'}</p>
+                <p><strong>Driver:</strong> ${d.driver || 'N/A'}</p>
+                <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${d.status}</span></p>
+                <p><strong>Total Goods Value:</strong> ₦${totalGoods.toLocaleString()}</p>
+                <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
+                <p><strong>Created:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleString() : ''}</p>
+                ${d.receivedDate ? `<p><strong>Received:</strong> ${new Date(d.receivedDate.toDate()).toLocaleString()}</p>` : ''}
+                ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                <h4>Items</h4>
+                ${itemsHtml}
+            `;
+            document.getElementById('viewShipmentContent').innerHTML = html;
+            document.getElementById('viewShipmentModal').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading shipment details: ' + error.message);
+        }
     };
 
-    // ---- Stats ----
+    // ==================== Edit Draft Modal ====================
+    let editDraftId = null;
+
+    window.editDraft = async function(id) {
+        try {
+            const doc = await db.collection('shipments').doc(id).get();
+            if (!doc.exists) return alert('Draft not found.');
+            const d = doc.data();
+            if (d.status !== 'Draft') {
+                alert('Only draft shipments can be edited.');
+                return;
+            }
+            editDraftId = id;
+
+            // Populate form fields
+            document.getElementById('editSenderName').value = d.senderName || '';
+            document.getElementById('editDestBranch').value = d.destinationBranch || 'Abuja';
+            document.getElementById('editVehicleNo').value = d.vehicleNo || '';
+            document.getElementById('editExpectedDate').value = d.expectedDate || '';
+            document.getElementById('editDriverName').value = d.driver || '';
+            document.getElementById('editTrackingNo').value = d.trackingNo || 'NEV-' + Date.now().toString(36).toUpperCase();
+            document.getElementById('editNotes').value = d.notes || '';
+
+            // Populate items
+            const container = document.getElementById('editItemsContainer');
+            container.innerHTML = '';
+            if (d.items && d.items.length > 0) {
+                d.items.forEach(it => {
+                    const div = document.createElement('div');
+                    div.className = 'item-row';
+                    div.innerHTML = `
+                        <input type="text" placeholder="Item name" class="editItemName" value="${it.itemName}">
+                        <input type="number" placeholder="Qty" class="editItemQty" value="${it.orderedQty}">
+                        <input type="number" placeholder="Price/unit" class="editItemPrice" value="${it.unitPrice}">
+                        <button type="button" class="removeItem editRemoveItem">✖</button>
+                    `;
+                    container.appendChild(div);
+                    div.querySelector('.editRemoveItem').onclick = () => div.remove();
+                });
+            } else {
+                // Add one empty row
+                const div = document.createElement('div');
+                div.className = 'item-row';
+                div.innerHTML = `
+                    <input type="text" placeholder="Item name" class="editItemName">
+                    <input type="number" placeholder="Qty" class="editItemQty">
+                    <input type="number" placeholder="Price/unit" class="editItemPrice">
+                    <button type="button" class="removeItem editRemoveItem">✖</button>
+                `;
+                container.appendChild(div);
+                div.querySelector('.editRemoveItem').onclick = () => div.remove();
+            }
+            updateEditPreview();
+            document.getElementById('editDraftModal').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading draft: ' + error.message);
+        }
+    };
+
+    // Edit items management
+    document.getElementById('editAddItemBtn').addEventListener('click', () => {
+        const container = document.getElementById('editItemsContainer');
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.innerHTML = `
+            <input type="text" placeholder="Item name" class="editItemName">
+            <input type="number" placeholder="Qty" class="editItemQty">
+            <input type="number" placeholder="Price/unit" class="editItemPrice">
+            <button type="button" class="removeItem editRemoveItem">✖</button>
+        `;
+        container.appendChild(div);
+        div.querySelector('.editRemoveItem').onclick = () => div.remove();
+        updateEditPreview();
+    });
+
+    function updateEditPreview() {
+        let total = 0;
+        document.querySelectorAll('#editItemsContainer .item-row').forEach(r => {
+            const qty = parseInt(r.querySelector('.editItemQty')?.value || 0);
+            const price = parseFloat(r.querySelector('.editItemPrice')?.value || 0);
+            total += qty * price;
+        });
+        document.getElementById('editCostPreview').innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
+    }
+    document.getElementById('editItemsContainer').addEventListener('input', updateEditPreview);
+
+    // Submit edit form
+    document.getElementById('editDraftForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!editDraftId) return alert('No draft selected.');
+        const senderName = document.getElementById('editSenderName').value.trim();
+        const destBranch = document.getElementById('editDestBranch').value;
+        const vehicleNo = document.getElementById('editVehicleNo').value.trim();
+        const expectedDate = document.getElementById('editExpectedDate').value;
+        const driver = document.getElementById('editDriverName').value.trim();
+        const trackingNo = document.getElementById('editTrackingNo').value.trim();
+        const notes = document.getElementById('editNotes').value.trim();
+        const items = [];
+        document.querySelectorAll('#editItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.editItemName').value.trim();
+            const qty = parseInt(row.querySelector('.editItemQty').value);
+            const price = parseFloat(row.querySelector('.editItemPrice').value);
+            if (name && qty > 0 && price >= 0) {
+                items.push({
+                    itemName: name,
+                    orderedQty: qty,
+                    unitPrice: price,
+                    totalItemCost: qty * price,
+                    receivedQty: 0,
+                    damageQty: 0
+                });
+            }
+        });
+        if (!items.length || !senderName) {
+            document.getElementById('editMessage').innerText = 'Please fill all required fields and add items.';
+            return;
+        }
+        try {
+            await db.collection('shipments').doc(editDraftId).update({
+                senderName,
+                destinationBranch: destBranch,
+                vehicleNo,
+                expectedDate,
+                driver,
+                trackingNo,
+                notes,
+                items,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert('Draft updated successfully.');
+            closeModal('editDraftModal');
+            loadShipments();
+            loadStats();
+        } catch (error) {
+            document.getElementById('editMessage').innerText = 'Error: ' + error.message;
+        }
+    });
+
+    // Delete draft button
+    document.getElementById('editDeleteBtn').addEventListener('click', async () => {
+        if (!editDraftId) return;
+        if (!confirm('Delete this draft permanently?')) return;
+        try {
+            await db.collection('shipments').doc(editDraftId).delete();
+            alert('Draft deleted.');
+            closeModal('editDraftModal');
+            loadShipments();
+            loadStats();
+        } catch (error) {
+            alert('Error deleting draft: ' + error.message);
+        }
+    });
+
+    // ==================== Stats ====================
     function loadStats() {
         db.collection("shipments").onSnapshot(snap => {
             let total = 0, dispatched = 0, delivered = 0, drafts = 0, goods = 0;
