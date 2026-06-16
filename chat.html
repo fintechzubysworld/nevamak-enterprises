@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Chat & Collaboration</title>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -67,6 +66,7 @@
         <div class="nav-links">
             <a href="index.html">🏠 Dashboard</a>
             <a href="lagos_dispatch.html">📦 Dispatch</a>
+            <a href="reports.html">📊 Reports</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -111,7 +111,6 @@
 </div>
 
 <script>
-    // ========== Firebase Config ==========
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -126,18 +125,16 @@
     const db = firebase.firestore();
     const storage = firebase.storage();
 
-    // ========== State ==========
     let currentUser = null;
-    let currentUserEmail = "";
     let currentUserId = "";
-    let currentChatId = "global"; // "global" or composite UID
+    let currentUserEmail = "";
+    let currentChatId = "global";
     let currentChatDisplay = "Global Chat";
-    let allUsers = []; // {uid, email, role, online}
+    let allUsers = [];
     let unsubscribeMessages = null;
     let unsubscribeTyping = null;
     let typingTimeout = null;
 
-    // ========== DOM ==========
     const messagesContainer = document.getElementById('messagesContainer');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -151,22 +148,14 @@
     const userSearch = document.getElementById('userSearch');
     const logoutBtn = document.getElementById('logoutBtn');
 
-    // ========== Auth ==========
     auth.onAuthStateChanged(async (user) => {
-        if (!user) {
-            window.location.href = 'login.html';
-            return;
-        }
+        if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
         currentUserId = user.uid;
         currentUserEmail = user.email;
         await loadUsers();
         await updatePresence(true);
-        // Listen to global chat by default
         switchChat('global');
-        // Listen for typing indicators
-        setupTypingListener();
-        // Periodic presence update
         setInterval(() => updatePresence(true), 30000);
         window.addEventListener('beforeunload', () => updatePresence(false));
     });
@@ -176,7 +165,6 @@
         auth.signOut().then(() => window.location.href = 'login.html');
     });
 
-    // ========== Load Users ==========
     async function loadUsers() {
         const snap = await db.collection('users').get();
         allUsers = [];
@@ -209,7 +197,6 @@
                     </div>`;
         });
         userList.innerHTML = html;
-        // Apply search filter
         const q = userSearch.value.toLowerCase();
         document.querySelectorAll('.user-item[data-userid]').forEach(el => {
             const uid = el.dataset.userid;
@@ -223,13 +210,11 @@
         });
     }
 
-    // ========== Unread count tracking ==========
     let unreadCounts = {};
     function getUnreadCount(uid) {
         return unreadCounts[uid] || 0;
     }
 
-    // ========== Switch Chat ==========
     function switchChat(chatId) {
         if (unsubscribeMessages) {
             unsubscribeMessages();
@@ -241,13 +226,11 @@
         }
         currentChatId = chatId;
 
-        // Update header and UI
         if (chatId === 'global') {
             currentChatDisplay = '🌐 Global Chat';
         } else {
             const user = allUsers.find(u => u.uid === chatId);
             currentChatDisplay = `💬 ${user ? user.email.split('@')[0] : 'User'}`;
-            // Mark messages as read for this chat
             markChatRead(chatId);
         }
         chatHeader.innerText = currentChatDisplay;
@@ -255,10 +238,8 @@
         const target = document.querySelector(`.user-item[data-userid="${chatId}"]`);
         if (target) target.classList.add('active');
 
-        // Clear messages
         messagesContainer.innerHTML = '';
 
-        // Build composite chatId for private
         let firestoreChatId = chatId;
         if (chatId !== 'global') {
             const otherUid = chatId;
@@ -266,13 +247,11 @@
             firestoreChatId = [myUid, otherUid].sort().join('_');
         }
 
-        // Listen to messages
         const q = db.collection('messages')
             .where('chatId', '==', firestoreChatId)
             .orderBy('timestamp', 'asc');
 
         unsubscribeMessages = q.onSnapshot(snapshot => {
-            // Clear messages
             messagesContainer.innerHTML = '';
             snapshot.forEach(doc => {
                 const data = doc.data();
@@ -281,15 +260,9 @@
                 messagesContainer.appendChild(msgDiv);
             });
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            // Reset typing indicator
             typingIndicator.innerText = '';
-        }, error => {
-            console.error('Message listener error:', error);
-            // If error is about missing index, we could fallback to no orderBy
-            // But we'll assume index exists; if not, create it as per error link.
-        });
+        }, error => console.error(error));
 
-        // Listen to typing indicators
         if (chatId !== 'global') {
             const typingRef = db.collection('typing').doc(firestoreChatId);
             unsubscribeTyping = typingRef.onSnapshot(doc => {
@@ -304,12 +277,9 @@
                     }
                 }
             });
-        } else {
-            // Global typing not implemented for simplicity
         }
     }
 
-    // ========== Create Message Element ==========
     function createMessageElement(data, isMine) {
         const div = document.createElement('div');
         div.className = `message ${isMine ? 'sent' : 'received'}`;
@@ -350,7 +320,6 @@
             }
             div.appendChild(fileDiv);
         }
-        // Reactions
         if (data.reactions) {
             const reactDiv = document.createElement('div');
             reactDiv.className = 'reactions';
@@ -363,7 +332,6 @@
                 btn.onclick = () => toggleReaction(data.messageId || data.id, emoji);
                 reactDiv.appendChild(btn);
             });
-            // Quick add buttons
             ['👍', '❤️', '😄', '🙏', '👏'].forEach(emoji => {
                 const btn = document.createElement('button');
                 btn.className = 'reaction-btn';
@@ -373,18 +341,14 @@
             });
             div.appendChild(reactDiv);
         }
-        // Time
         const timeSpan = document.createElement('div');
         timeSpan.className = 'time';
         timeSpan.innerText = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : '';
         div.appendChild(timeSpan);
-
-        // Store message ID for reactions
         div.dataset.msgId = data.messageId || data.id;
         return div;
     }
 
-    // ========== Send Message ==========
     async function sendMessage() {
         const text = messageInput.value.trim();
         if (!text && !fileInput.files.length) return;
@@ -417,14 +381,11 @@
             fileType: fileType,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             reactions: {},
-            readBy: [currentUserId] // mark as read by sender
+            readBy: [currentUserId]
         };
 
         try {
-            const docRef = await db.collection('messages').add(msgData);
-            // Update the message with its ID for reactions later (we can store reactions in the doc itself)
-            // We don't need to store messageId in doc, we can use doc.id as key
-            // For reactions, we'll update the doc directly using doc.id
+            await db.collection('messages').add(msgData);
         } catch (err) {
             console.error('Send error:', err);
             alert('Failed to send message: ' + err.message);
@@ -432,20 +393,16 @@
 
         messageInput.value = '';
         messageInput.style.height = 'auto';
-        // Clear typing indicator (stop typing)
         clearTyping();
     }
 
-    // ========== File upload ==========
     fileUploadBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
-        if (fileInput.files.length) {
-            sendMessage();
-        }
+        if (fileInput.files.length) sendMessage();
     });
 
-    // ========== Emoji Picker ==========
-    const emojis = ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','☺️','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠','🤬','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','❤️','🧡','💛','💚','💙','💜','🖤','💔','💕','💞','💓','💗','💖','💘','💝','✨','⭐','🌟','💫','🔥','💯','💢','💥','💦','💨','🕊️','🎉','🎊','🎁','🎈','🏆','🥇','🥈','🥉','🎖️','🏅','🎗️','🎀','🎯','🎲'];
+    // Emoji picker
+    const emojis = ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','☺️','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠','🤬','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','❤️','🧡','💛','💚','💙','💜','🖤','💔','💕','💞','💓','💗','💖','💘','💝','✨','⭐','🌟','💫','🔥','💯','💢','💥','💦','💨','🕊️','🎉','🎊','🎁','🎈','🏆','🥇','🥈','🥉','🎖️','🏅','🎗️','🎀','🎯','🎲'];
     emojis.forEach(e => {
         const span = document.createElement('span');
         span.innerText = e;
@@ -463,7 +420,7 @@
     });
     document.addEventListener('click', () => emojiPicker.classList.remove('show'));
 
-    // ========== Typing Indicator ==========
+    // Typing indicator
     messageInput.addEventListener('input', () => {
         if (currentChatId === 'global') return;
         const chatId = [currentUserId, currentChatId].sort().join('_');
@@ -484,11 +441,7 @@
         db.collection('typing').doc(chatId).delete();
     }
 
-    function setupTypingListener() {
-        // Already handled per chat
-    }
-
-    // ========== Reactions ==========
+    // Reactions
     async function toggleReaction(messageId, emoji) {
         const msgRef = db.collection('messages').doc(messageId);
         try {
@@ -507,12 +460,10 @@
                 }
                 transaction.update(msgRef, { reactions });
             });
-        } catch (err) {
-            console.error('Reaction error:', err);
-        }
+        } catch (err) { console.error(err); }
     }
 
-    // ========== Mark chat read ==========
+    // Mark chat read
     async function markChatRead(chatId) {
         if (chatId === 'global') return;
         const composite = [currentUserId, chatId].sort().join('_');
@@ -530,12 +481,11 @@
             }
         });
         await batch.commit();
-        // Update unread counts (local)
         unreadCounts[chatId] = 0;
         renderUserList(allUsers);
     }
 
-    // ========== View file modal ==========
+    // View file modal
     function viewFile(url, type) {
         const modal = document.getElementById('fileModal');
         const img = document.getElementById('fileModalImage');
@@ -568,20 +518,19 @@
         }
     };
 
-    // ========== Presence ==========
+    // Presence
     async function updatePresence(online) {
         if (!currentUserId) return;
         await db.collection('users').doc(currentUserId).update({
             online: online,
             lastSeen: firebase.firestore.FieldValue.serverTimestamp()
         }).catch(() => {});
-        // Update local list
         const user = allUsers.find(u => u.uid === currentUserId);
         if (user) user.online = online;
         renderUserList(allUsers);
     }
 
-    // ========== Send on Enter ==========
+    // Send on Enter
     messageInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -589,7 +538,7 @@
         }
     });
 
-    // ========== Search users ==========
+    // Search users
     userSearch.addEventListener('input', () => {
         const q = userSearch.value.toLowerCase();
         document.querySelectorAll('.user-item[data-userid]').forEach(el => {
@@ -604,20 +553,11 @@
         });
     });
 
-    // ========== sendBtn ==========
     sendBtn.addEventListener('click', sendMessage);
-
-    // ========== Auto-resize textarea ==========
     messageInput.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = this.scrollHeight + 'px';
     });
-
-    // ========== Handle unread counts via listener ==========
-    // We'll listen to messages where senderId != currentUserId and readBy doesn't include currentUserId
-    // But to keep it simple, we'll just update on chat switch.
-    // We'll also periodically check (or use onSnapshot) but we'll manage manually.
-    // Let's add a listener for unread counts globally - but we can keep it simple.
 
     console.log('NEVAMAK Chat loaded successfully.');
 </script>
