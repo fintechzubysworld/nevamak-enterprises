@@ -9,57 +9,61 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
-    <!-- Emoji Picker (lite) -->
-    <script src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.16.0/index.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; display: flex; flex-direction: column; height: 100vh; max-height: 100vh; }
-        .container { max-width: 900px; margin: auto; width: 100%; display: flex; flex-direction: column; flex: 1; }
-        header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .container { max-width: 1100px; margin: auto; width: 100%; display: flex; flex-direction: column; flex: 1; }
+        header { background: #0a3d62; color: white; padding: 10px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
         header h1 { margin: 0; font-size: 1.2rem; }
         .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
-        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 12px; border-radius: 40px; font-size: 0.8rem; border: none; cursor: pointer; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; border: none; cursor: pointer; }
         .chat-layout { display: flex; flex: 1; gap: 12px; min-height: 0; }
-        .user-list { background: white; border-radius: 20px; padding: 12px; width: 200px; overflow-y: auto; flex-shrink: 0; display: none; }
-        .user-list h3 { margin: 0 0 8px; font-size: 0.9rem; }
-        .user-item { padding: 8px 12px; border-radius: 40px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+        .sidebar { background: white; border-radius: 20px; padding: 12px; width: 220px; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+        .sidebar h3 { margin: 0 0 8px; font-size: 0.9rem; }
+        .user-list { flex: 1; overflow-y: auto; }
+        .user-item { padding: 8px 12px; border-radius: 40px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; transition: background 0.2s; }
         .user-item:hover { background: #eef2f5; }
-        .user-item.active { background: #d4e2f0; font-weight: bold; }
-        .user-item .online { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .user-item.active { background: #d4e2f0; font-weight: 600; }
+        .user-item .online { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
         .online-true { background: #27ae60; }
         .online-false { background: #bbb; }
-        .chat-main { background: white; border-radius: 20px; display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-        .chat-header { padding: 12px 16px; border-bottom: 1px solid #ddd; font-weight: bold; background: #f8f9fa; }
-        .messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-        .message { max-width: 80%; padding: 8px 12px; border-radius: 20px; word-wrap: break-word; position: relative; }
+        .user-item .unread { background: #e74c3c; color: white; border-radius: 50%; padding: 0 6px; font-size: 0.7rem; margin-left: auto; }
+        .chat-main { background: white; border-radius: 20px; display: flex; flex-direction: column; flex: 1; min-width: 0; }
+        .chat-header { padding: 10px 16px; border-bottom: 1px solid #ddd; font-weight: bold; background: #f8f9fa; border-radius: 20px 20px 0 0; flex-shrink: 0; }
+        .messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+        .message { max-width: 80%; padding: 8px 12px; border-radius: 18px; word-wrap: break-word; position: relative; }
         .message.sent { align-self: flex-end; background: #0a3d62; color: white; border-bottom-right-radius: 4px; }
-        .message.received { align-self: flex-start; background: #e9ecef; border-bottom-left-radius: 4px; }
+        .message.received { align-self: flex-start; background: #e9ecef; color: #222; border-bottom-left-radius: 4px; }
         .message .sender { font-size: 0.7rem; opacity: 0.7; margin-bottom: 2px; }
         .message .time { font-size: 0.6rem; opacity: 0.5; margin-top: 4px; text-align: right; }
         .message .file-attach { display: block; margin-top: 4px; }
-        .message .file-attach img { max-width: 150px; max-height: 150px; border-radius: 8px; }
-        .message .file-attach a { color: #0a3d62; }
-        .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #ddd; background: #f8f9fa; flex-wrap: wrap; align-items: center; }
-        .chat-input textarea { flex: 1; padding: 8px 12px; border-radius: 40px; border: 1px solid #ccc; font-size: 0.95rem; resize: none; min-height: 44px; font-family: inherit; }
-        .chat-input button { background: #0a3d62; color: white; border: none; padding: 8px 16px; border-radius: 40px; cursor: pointer; }
-        .chat-input .file-btn { background: #27ae60; }
-        .chat-input .emoji-btn { background: #f39c12; }
-        .emoji-picker { display: none; background: white; border: 1px solid #ccc; border-radius: 20px; padding: 8px; position: absolute; bottom: 70px; right: 20px; z-index: 10; }
-        .emoji-picker.show { display: block; }
-        @media (min-width: 768px) { .user-list { display: block; } }
-        @media (max-width: 767px) { .chat-layout { flex-direction: column; } .user-list { width: 100%; max-height: 150px; } }
+        .message .file-attach img { max-width: 180px; max-height: 150px; border-radius: 8px; cursor: pointer; }
+        .message .file-attach a { color: #0a3d62; word-break: break-all; }
         .reactions { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
-        .reaction-btn { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 20px; background: #f0f0f0; }
+        .reaction-btn { background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 2px 6px; border-radius: 20px; background: #f0f0f0; }
         .reaction-btn:hover { background: #ddd; }
-        .search-box { padding: 8px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin-bottom: 8px; }
-        .typing-indicator { font-size: 0.8rem; color: #888; padding: 4px 12px; }
-        .unread-badge { background: #e74c3c; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; margin-left: auto; }
+        .message-input-area { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #ddd; background: #f8f9fa; flex-wrap: wrap; align-items: flex-end; border-radius: 0 0 20px 20px; flex-shrink: 0; }
+        .message-input-area textarea { flex: 1; padding: 8px 14px; border-radius: 40px; border: 1px solid #ccc; font-size: 0.95rem; resize: none; min-height: 44px; max-height: 120px; font-family: inherit; }
+        .message-input-area button { background: #0a3d62; color: white; border: none; padding: 8px 16px; border-radius: 40px; cursor: pointer; font-weight: bold; height: 44px; }
+        .message-input-area .file-btn { background: #27ae60; }
+        .message-input-area .emoji-btn { background: #f39c12; }
+        .emoji-picker { display: none; background: white; border: 1px solid #ddd; border-radius: 20px; padding: 8px; position: absolute; bottom: 70px; right: 20px; z-index: 100; max-width: 300px; max-height: 200px; overflow-y: auto; }
+        .emoji-picker.show { display: block; }
+        .emoji-picker span { font-size: 1.6rem; cursor: pointer; padding: 4px; display: inline-block; transition: 0.1s; }
+        .emoji-picker span:hover { background: #ddd; border-radius: 8px; }
+        .typing-indicator { font-size: 0.8rem; color: #888; padding: 4px 12px; height: 24px; }
+        .search-box { padding: 6px 12px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin-bottom: 8px; }
+        @media (max-width: 768px) { .sidebar { width: 100%; max-height: 150px; flex-shrink: 0; } .chat-layout { flex-direction: column; } .user-list { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 4px; } .user-item { flex-shrink: 0; } }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 90%; max-height: 90%; overflow: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.5rem; }
+        .file-preview { max-width: 100%; max-height: 80vh; }
     </style>
 </head>
 <body>
 <div class="container">
     <header>
-        <h1>💬 NEVAMAK Chat</h1>
+        <h1>💬 NEVAMAK Collaboration</h1>
         <div class="nav-links">
             <a href="index.html">🏠 Dashboard</a>
             <a href="lagos_dispatch.html">📦 Dispatch</a>
@@ -68,36 +72,46 @@
     </header>
 
     <div class="chat-layout">
-        <!-- User List (for private chat) -->
-        <div class="user-list" id="userList">
-            <h3>👥 Users</h3>
+        <!-- Sidebar: User list + global -->
+        <div class="sidebar">
+            <h3>👥 Contacts</h3>
             <input class="search-box" id="userSearch" placeholder="Search users...">
-            <div id="userListItems"></div>
-            <hr>
-            <div class="user-item" data-userid="global" onclick="switchChat('global')">
-                <span>🌐 Global Chat</span>
+            <div class="user-list" id="userList">
+                <div class="user-item active" data-userid="global" onclick="switchChat('global')">
+                    <span>🌐 Global Chat</span>
+                </div>
             </div>
         </div>
 
-        <!-- Chat Main -->
+        <!-- Chat main -->
         <div class="chat-main">
             <div class="chat-header" id="chatHeader">Global Chat</div>
             <div class="messages" id="messagesContainer"></div>
             <div class="typing-indicator" id="typingIndicator"></div>
-            <div class="chat-input">
+            <div class="message-input-area" style="position:relative;">
                 <button class="emoji-btn" id="emojiToggle">😊</button>
                 <textarea id="messageInput" rows="1" placeholder="Type a message..."></textarea>
                 <button class="file-btn" id="fileUploadBtn">📎</button>
                 <button id="sendBtn">Send</button>
-                <input type="file" id="fileInput" style="display:none;">
+                <input type="file" id="fileInput" style="display:none;" multiple>
                 <div class="emoji-picker" id="emojiPicker"></div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- File preview modal -->
+<div id="fileModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('fileModal')">&times;</span>
+        <img id="fileModalImage" class="file-preview" style="display:none;" />
+        <iframe id="fileModalIframe" style="width:100%; height:80vh; display:none;" frameborder="0"></iframe>
+        <a id="fileModalLink" href="#" target="_blank" style="display:none;">Download</a>
+    </div>
+</div>
+
 <script>
-    // Firebase Config
+    // ========== Firebase Config ==========
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -112,14 +126,18 @@
     const db = firebase.firestore();
     const storage = firebase.storage();
 
+    // ========== State ==========
     let currentUser = null;
     let currentUserEmail = "";
-    let currentUserRole = "";
-    let currentChatId = "global"; // "global" or userId
-    let allUsers = [];
+    let currentUserId = "";
+    let currentChatId = "global"; // "global" or composite UID
+    let currentChatDisplay = "Global Chat";
+    let allUsers = []; // {uid, email, role, online}
     let unsubscribeMessages = null;
+    let unsubscribeTyping = null;
+    let typingTimeout = null;
 
-    // DOM elements
+    // ========== DOM ==========
     const messagesContainer = document.getElementById('messagesContainer');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -128,97 +146,111 @@
     const emojiToggle = document.getElementById('emojiToggle');
     const emojiPicker = document.getElementById('emojiPicker');
     const typingIndicator = document.getElementById('typingIndicator');
-    const userListItems = document.getElementById('userListItems');
+    const userList = document.getElementById('userList');
     const chatHeader = document.getElementById('chatHeader');
     const userSearch = document.getElementById('userSearch');
+    const logoutBtn = document.getElementById('logoutBtn');
 
-    // Auth check
+    // ========== Auth ==========
     auth.onAuthStateChanged(async (user) => {
-        if (!user) { window.location.href = 'login.html'; return; }
-        currentUser = user;
-        currentUserEmail = user.email;
-        // Get user role and name (from Firestore)
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        if (userDoc.exists) {
-            currentUserRole = userDoc.data().role;
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
         }
-        // Load users for private chat
-        loadUsers();
-        // Listen to messages for global
+        currentUser = user;
+        currentUserId = user.uid;
+        currentUserEmail = user.email;
+        await loadUsers();
+        await updatePresence(true);
+        // Listen to global chat by default
         switchChat('global');
-        // Update online presence (optional)
-        updatePresence(true);
-        // When user leaves, set offline
+        // Listen for typing indicators
+        setupTypingListener();
+        // Periodic presence update
+        setInterval(() => updatePresence(true), 30000);
         window.addEventListener('beforeunload', () => updatePresence(false));
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+    logoutBtn.addEventListener('click', () => {
         updatePresence(false);
         auth.signOut().then(() => window.location.href = 'login.html');
     });
 
-    // ---- Load users for private chat ----
+    // ========== Load Users ==========
     async function loadUsers() {
         const snap = await db.collection('users').get();
-        const users = [];
+        allUsers = [];
         snap.forEach(doc => {
             const data = doc.data();
-            if (doc.id !== currentUser.uid) {
-                users.push({ uid: doc.id, email: data.email, role: data.role });
+            if (doc.id !== currentUserId) {
+                allUsers.push({
+                    uid: doc.id,
+                    email: data.email,
+                    role: data.role || 'user',
+                    online: data.online || false
+                });
             }
         });
-        allUsers = users;
-        renderUserList(users);
+        renderUserList(allUsers);
     }
 
     function renderUserList(users) {
-        let html = '';
+        let html = `<div class="user-item ${currentChatId === 'global' ? 'active' : ''}" data-userid="global" onclick="switchChat('global')">
+                        <span>🌐 Global Chat</span>
+                    </div>`;
         users.forEach(u => {
-            const active = currentChatId === u.uid ? 'active' : '';
-            html += `<div class="user-item ${active}" data-userid="${u.uid}" onclick="switchChat('${u.uid}')">
-                        <span class="online online-${u.online ? 'true' : 'false'}"></span>
+            const isActive = currentChatId === u.uid;
+            const onlineClass = u.online ? 'true' : 'false';
+            const unread = getUnreadCount(u.uid);
+            html += `<div class="user-item ${isActive ? 'active' : ''}" data-userid="${u.uid}" onclick="switchChat('${u.uid}')">
+                        <span class="online online-${onlineClass}"></span>
                         <span>${u.email.split('@')[0]}</span>
-                        <span class="unread-badge" id="unread-${u.uid}" style="display:none;">0</span>
+                        ${unread > 0 ? `<span class="unread">${unread}</span>` : ''}
                     </div>`;
         });
-        userListItems.innerHTML = html;
-        // Update global chat indicator
-        const globalItem = document.querySelector('.user-item[data-userid="global"]');
-        if (globalItem) {
-            if (currentChatId === 'global') globalItem.classList.add('active');
-            else globalItem.classList.remove('active');
-        }
-        // Search filter
-        userSearch.addEventListener('input', () => {
-            const q = userSearch.value.toLowerCase();
-            document.querySelectorAll('.user-item[data-userid]').forEach(el => {
-                const uid = el.dataset.userid;
-                if (uid === 'global') return;
-                const user = users.find(u => u.uid === uid);
-                if (user && user.email.toLowerCase().includes(q)) {
-                    el.style.display = 'flex';
-                } else {
-                    el.style.display = 'none';
-                }
-            });
+        userList.innerHTML = html;
+        // Apply search filter
+        const q = userSearch.value.toLowerCase();
+        document.querySelectorAll('.user-item[data-userid]').forEach(el => {
+            const uid = el.dataset.userid;
+            if (uid === 'global') return;
+            const user = allUsers.find(u => u.uid === uid);
+            if (user && user.email.toLowerCase().includes(q)) {
+                el.style.display = 'flex';
+            } else {
+                el.style.display = 'none';
+            }
         });
     }
 
-    // ---- Switch chat (global or private) ----
+    // ========== Unread count tracking ==========
+    let unreadCounts = {};
+    function getUnreadCount(uid) {
+        return unreadCounts[uid] || 0;
+    }
+
+    // ========== Switch Chat ==========
     function switchChat(chatId) {
         if (unsubscribeMessages) {
             unsubscribeMessages();
             unsubscribeMessages = null;
         }
+        if (unsubscribeTyping) {
+            unsubscribeTyping();
+            unsubscribeTyping = null;
+        }
         currentChatId = chatId;
-        // Update header
+
+        // Update header and UI
         if (chatId === 'global') {
-            chatHeader.innerText = '🌐 Global Chat';
+            currentChatDisplay = '🌐 Global Chat';
         } else {
             const user = allUsers.find(u => u.uid === chatId);
-            chatHeader.innerText = `💬 ${user ? user.email.split('@')[0] : 'User'}`;
+            currentChatDisplay = `💬 ${user ? user.email.split('@')[0] : 'User'}`;
+            // Mark messages as read for this chat
+            markChatRead(chatId);
         }
-        // Highlight user in list
+        chatHeader.innerText = currentChatDisplay;
         document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
         const target = document.querySelector(`.user-item[data-userid="${chatId}"]`);
         if (target) target.classList.add('active');
@@ -226,183 +258,330 @@
         // Clear messages
         messagesContainer.innerHTML = '';
 
-        // Listen to messages
-        let query = db.collection('messages')
-            .where('chatId', '==', chatId)
-            .orderBy('timestamp', 'asc');
-
-        // For private chats, also include messages where chatId is the user's UID and receiverId is current user? 
-        // We'll use chatId as a composite key: for private, chatId = senderId + '_' + receiverId sorted alphabetically.
-        // But for simplicity, we'll store chatId as "private_uid1_uid2" sorted.
-        // However, we need to handle both sent and received. Let's use a chatId that is consistent: sort two UIDs.
-        // For global, chatId = 'global'.
-        // We'll adjust sending logic accordingly.
-
-        // Since we already use chatId = 'global' or the other user's UID, let's ensure messages are sent with that chatId.
-        // For private, we need the same chatId for both participants. We'll compute chatId as sorted pair.
-        // But to keep simple, we use the other user's UID as chatId and both users send to that chatId.
-        // Actually, we need both users to see the same chat. So we'll use a chatId that is the concatenation of the two UIDs sorted.
-        // Let's implement helper function getPrivateChatId(uid1, uid2) { return [uid1, uid2].sort().join('_'); }
-        // We'll modify send message to use that.
-        // For currentChatId, we store the other user's UID, but we actually need the composite.
-        // I'll refactor: store chatId as the composite.
-        // So in switchChat, if chatId !== 'global', compute composite.
-        // But we need to get the other user's UID. We'll store currentChatUid = chatId.
-        // For simplicity, I'll keep chatId as the other user's UID, and when sending, we'll compute composite and use that.
-        // To avoid confusion, I'll recompute when listening: query messages where chatId == composite.
-        let queryChatId = chatId;
+        // Build composite chatId for private
+        let firestoreChatId = chatId;
         if (chatId !== 'global') {
-            // composite
             const otherUid = chatId;
-            const myUid = currentUser.uid;
-            const composite = [myUid, otherUid].sort().join('_');
-            queryChatId = composite;
+            const myUid = currentUserId;
+            firestoreChatId = [myUid, otherUid].sort().join('_');
         }
-        // Store current chatId for sending
-        currentChatId = chatId; // keep original for UI
 
-        // Set up listener
+        // Listen to messages
         const q = db.collection('messages')
-            .where('chatId', '==', queryChatId)
+            .where('chatId', '==', firestoreChatId)
             .orderBy('timestamp', 'asc');
 
         unsubscribeMessages = q.onSnapshot(snapshot => {
             // Clear messages
             messagesContainer.innerHTML = '';
-            let lastSender = '';
             snapshot.forEach(doc => {
                 const data = doc.data();
-                const isMine = data.senderId === currentUser.uid;
-                const msgDiv = document.createElement('div');
-                msgDiv.className = `message ${isMine ? 'sent' : 'received'}`;
-                // Sender name
-                if (!isMine && data.senderName) {
-                    const senderSpan = document.createElement('div');
-                    senderSpan.className = 'sender';
-                    senderSpan.innerText = data.senderName;
-                    msgDiv.appendChild(senderSpan);
-                }
-                // Text
-                if (data.text) {
-                    const textSpan = document.createElement('span');
-                    textSpan.innerText = data.text;
-                    msgDiv.appendChild(textSpan);
-                }
-                // File attachment
-                if (data.fileUrl) {
-                    const fileDiv = document.createElement('div');
-                    fileDiv.className = 'file-attach';
-                    if (data.fileType && data.fileType.startsWith('image/')) {
-                        const img = document.createElement('img');
-                        img.src = data.fileUrl;
-                        img.alt = data.fileName || 'Attachment';
-                        fileDiv.appendChild(img);
-                    } else {
-                        const a = document.createElement('a');
-                        a.href = data.fileUrl;
-                        a.target = '_blank';
-                        a.innerText = `📎 ${data.fileName || 'Download'}`;
-                        fileDiv.appendChild(a);
-                    }
-                    msgDiv.appendChild(fileDiv);
-                }
-                // Reactions
-                if (data.reactions) {
-                    const reactDiv = document.createElement('div');
-                    reactDiv.className = 'reactions';
-                    const reactionKeys = Object.keys(data.reactions);
-                    if (reactionKeys.length > 0) {
-                        reactionKeys.forEach(emoji => {
-                            const count = data.reactions[emoji].length;
-                            const btn = document.createElement('button');
-                            btn.className = 'reaction-btn';
-                            btn.innerText = `${emoji} ${count}`;
-                            btn.onclick = () => toggleReaction(doc.id, emoji);
-                            reactDiv.appendChild(btn);
-                        });
-                    }
-                    // Add quick reaction buttons
-                    ['👍', '❤️', '😄', '🙏', '👏'].forEach(emoji => {
-                        const btn = document.createElement('button');
-                        btn.className = 'reaction-btn';
-                        btn.innerText = emoji;
-                        btn.onclick = () => toggleReaction(doc.id, emoji);
-                        reactDiv.appendChild(btn);
-                    });
-                    msgDiv.appendChild(reactDiv);
-                }
-                // Time
-                const timeSpan = document.createElement('div');
-                timeSpan.className = 'time';
-                timeSpan.innerText = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : '';
-                msgDiv.appendChild(timeSpan);
+                const isMine = data.senderId === currentUserId;
+                const msgDiv = createMessageElement(data, isMine);
                 messagesContainer.appendChild(msgDiv);
             });
-            // Scroll to bottom
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
             // Reset typing indicator
             typingIndicator.innerText = '';
+        }, error => {
+            console.error('Message listener error:', error);
+            // If error is about missing index, we could fallback to no orderBy
+            // But we'll assume index exists; if not, create it as per error link.
         });
+
+        // Listen to typing indicators
+        if (chatId !== 'global') {
+            const typingRef = db.collection('typing').doc(firestoreChatId);
+            unsubscribeTyping = typingRef.onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    const typingUser = data.typingUser;
+                    if (typingUser && typingUser !== currentUserId) {
+                        const user = allUsers.find(u => u.uid === typingUser);
+                        typingIndicator.innerText = `${user ? user.email.split('@')[0] : 'Someone'} is typing...`;
+                    } else {
+                        typingIndicator.innerText = '';
+                    }
+                }
+            });
+        } else {
+            // Global typing not implemented for simplicity
+        }
     }
 
-    // ---- Send Message ----
+    // ========== Create Message Element ==========
+    function createMessageElement(data, isMine) {
+        const div = document.createElement('div');
+        div.className = `message ${isMine ? 'sent' : 'received'}`;
+        if (!isMine && data.senderName) {
+            const senderSpan = document.createElement('div');
+            senderSpan.className = 'sender';
+            senderSpan.innerText = data.senderName;
+            div.appendChild(senderSpan);
+        }
+        if (data.text) {
+            const textSpan = document.createElement('span');
+            textSpan.innerText = data.text;
+            div.appendChild(textSpan);
+        }
+        if (data.fileUrl) {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'file-attach';
+            const ext = data.fileName ? data.fileName.split('.').pop().toLowerCase() : '';
+            if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) {
+                const img = document.createElement('img');
+                img.src = data.fileUrl;
+                img.alt = data.fileName || 'Image';
+                img.style.cursor = 'pointer';
+                img.onclick = () => viewFile(data.fileUrl, 'image');
+                fileDiv.appendChild(img);
+            } else if (['pdf','doc','docx','xls','xlsx','ppt','pptx'].includes(ext)) {
+                const a = document.createElement('a');
+                a.href = data.fileUrl;
+                a.target = '_blank';
+                a.innerText = `📎 ${data.fileName || 'Download'}`;
+                fileDiv.appendChild(a);
+            } else {
+                const a = document.createElement('a');
+                a.href = data.fileUrl;
+                a.target = '_blank';
+                a.innerText = `📎 ${data.fileName || 'Download'}`;
+                fileDiv.appendChild(a);
+            }
+            div.appendChild(fileDiv);
+        }
+        // Reactions
+        if (data.reactions) {
+            const reactDiv = document.createElement('div');
+            reactDiv.className = 'reactions';
+            const reactionKeys = Object.keys(data.reactions);
+            reactionKeys.forEach(emoji => {
+                const count = data.reactions[emoji].length;
+                const btn = document.createElement('button');
+                btn.className = 'reaction-btn';
+                btn.innerText = `${emoji} ${count}`;
+                btn.onclick = () => toggleReaction(data.messageId || data.id, emoji);
+                reactDiv.appendChild(btn);
+            });
+            // Quick add buttons
+            ['👍', '❤️', '😄', '🙏', '👏'].forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.className = 'reaction-btn';
+                btn.innerText = emoji;
+                btn.onclick = () => toggleReaction(data.messageId || data.id, emoji);
+                reactDiv.appendChild(btn);
+            });
+            div.appendChild(reactDiv);
+        }
+        // Time
+        const timeSpan = document.createElement('div');
+        timeSpan.className = 'time';
+        timeSpan.innerText = data.timestamp ? new Date(data.timestamp.toDate()).toLocaleString() : '';
+        div.appendChild(timeSpan);
+
+        // Store message ID for reactions
+        div.dataset.msgId = data.messageId || data.id;
+        return div;
+    }
+
+    // ========== Send Message ==========
     async function sendMessage() {
         const text = messageInput.value.trim();
-        if (!text && !fileInput.files[0]) return;
+        if (!text && !fileInput.files.length) return;
 
         let fileUrl = null, fileName = null, fileType = null;
-        if (fileInput.files[0]) {
+        if (fileInput.files.length) {
             const file = fileInput.files[0];
-            const storageRef = storage.ref(`chat/${currentUser.uid}/${Date.now()}_${file.name}`);
-            await storageRef.put(file);
-            fileUrl = await storageRef.getDownloadURL();
-            fileName = file.name;
-            fileType = file.type;
-            fileInput.value = ''; // reset
+            const storageRef = storage.ref(`chat/${currentUserId}/${Date.now()}_${file.name}`);
+            try {
+                await storageRef.put(file);
+                fileUrl = await storageRef.getDownloadURL();
+                fileName = file.name;
+                fileType = file.type;
+            } catch (err) {
+                alert('File upload failed: ' + err.message);
+                return;
+            }
+            fileInput.value = '';
         }
 
-        // Determine chatId
-        let chatId;
-        let receiverId = null;
-        if (currentChatId === 'global') {
-            chatId = 'global';
-        } else {
-            // private chat: composite
-            const otherUid = currentChatId;
-            const myUid = currentUser.uid;
-            chatId = [myUid, otherUid].sort().join('_');
-            receiverId = otherUid;
-        }
-
-        // Get sender name
-        let senderName = currentUserEmail.split('@')[0];
-        // Optionally add role
-        if (currentUserRole) senderName += ` (${currentUserRole})`;
-
-        await db.collection('messages').add({
+        const chatId = currentChatId === 'global' ? 'global' : [currentUserId, currentChatId].sort().join('_');
+        const senderName = currentUserEmail.split('@')[0];
+        const msgData = {
             chatId: chatId,
-            senderId: currentUser.uid,
+            senderId: currentUserId,
             senderName: senderName,
-            receiverId: receiverId, // null for global
             text: text || '',
             fileUrl: fileUrl,
             fileName: fileName,
             fileType: fileType,
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             reactions: {},
-            read: false
-        });
+            readBy: [currentUserId] // mark as read by sender
+        };
+
+        try {
+            const docRef = await db.collection('messages').add(msgData);
+            // Update the message with its ID for reactions later (we can store reactions in the doc itself)
+            // We don't need to store messageId in doc, we can use doc.id as key
+            // For reactions, we'll update the doc directly using doc.id
+        } catch (err) {
+            console.error('Send error:', err);
+            alert('Failed to send message: ' + err.message);
+        }
 
         messageInput.value = '';
-        // Auto-resize textarea
         messageInput.style.height = 'auto';
-        // Update unread counts (clear for current chat)
-        if (currentChatId !== 'global') {
-            // Mark messages as read for this chat? we'll handle later
+        // Clear typing indicator (stop typing)
+        clearTyping();
+    }
+
+    // ========== File upload ==========
+    fileUploadBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) {
+            sendMessage();
+        }
+    });
+
+    // ========== Emoji Picker ==========
+    const emojis = ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','☺️','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁','😖','😞','😟','😤','😢','😭','😦','😧','😨','😩','🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡','😠','🤬','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','❤️','🧡','💛','💚','💙','💜','🖤','💔','💕','💞','💓','💗','💖','💘','💝','✨','⭐','🌟','💫','🔥','💯','💢','💥','💦','💨','🕊️','🎉','🎊','🎁','🎈','🏆','🥇','🥈','🥉','🎖️','🏅','🎗️','🎀','🎯','🎲'];
+    emojis.forEach(e => {
+        const span = document.createElement('span');
+        span.innerText = e;
+        span.onclick = () => {
+            messageInput.value += e;
+            messageInput.focus();
+            emojiPicker.classList.remove('show');
+        };
+        emojiPicker.appendChild(span);
+    });
+
+    emojiToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        emojiPicker.classList.toggle('show');
+    });
+    document.addEventListener('click', () => emojiPicker.classList.remove('show'));
+
+    // ========== Typing Indicator ==========
+    messageInput.addEventListener('input', () => {
+        if (currentChatId === 'global') return;
+        const chatId = [currentUserId, currentChatId].sort().join('_');
+        const typingRef = db.collection('typing').doc(chatId);
+        typingRef.set({
+            typingUser: currentUserId,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            typingRef.delete();
+        }, 2000);
+    });
+
+    function clearTyping() {
+        if (currentChatId === 'global') return;
+        const chatId = [currentUserId, currentChatId].sort().join('_');
+        db.collection('typing').doc(chatId).delete();
+    }
+
+    function setupTypingListener() {
+        // Already handled per chat
+    }
+
+    // ========== Reactions ==========
+    async function toggleReaction(messageId, emoji) {
+        const msgRef = db.collection('messages').doc(messageId);
+        try {
+            await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(msgRef);
+                if (!doc.exists) return;
+                const data = doc.data();
+                let reactions = data.reactions || {};
+                if (!reactions[emoji]) reactions[emoji] = [];
+                const idx = reactions[emoji].indexOf(currentUserId);
+                if (idx === -1) {
+                    reactions[emoji].push(currentUserId);
+                } else {
+                    reactions[emoji].splice(idx, 1);
+                    if (reactions[emoji].length === 0) delete reactions[emoji];
+                }
+                transaction.update(msgRef, { reactions });
+            });
+        } catch (err) {
+            console.error('Reaction error:', err);
         }
     }
 
-    sendBtn.addEventListener('click', sendMessage);
+    // ========== Mark chat read ==========
+    async function markChatRead(chatId) {
+        if (chatId === 'global') return;
+        const composite = [currentUserId, chatId].sort().join('_');
+        const snapshot = await db.collection('messages')
+            .where('chatId', '==', composite)
+            .where('senderId', '!=', currentUserId)
+            .get();
+        const batch = db.batch();
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const readBy = data.readBy || [];
+            if (!readBy.includes(currentUserId)) {
+                readBy.push(currentUserId);
+                batch.update(doc.ref, { readBy });
+            }
+        });
+        await batch.commit();
+        // Update unread counts (local)
+        unreadCounts[chatId] = 0;
+        renderUserList(allUsers);
+    }
+
+    // ========== View file modal ==========
+    function viewFile(url, type) {
+        const modal = document.getElementById('fileModal');
+        const img = document.getElementById('fileModalImage');
+        const iframe = document.getElementById('fileModalIframe');
+        const link = document.getElementById('fileModalLink');
+        img.style.display = 'none';
+        iframe.style.display = 'none';
+        link.style.display = 'none';
+        if (type === 'image') {
+            img.src = url;
+            img.style.display = 'block';
+        } else {
+            iframe.src = url;
+            iframe.style.display = 'block';
+            link.href = url;
+            link.style.display = 'block';
+            link.innerText = 'Download file';
+        }
+        modal.style.display = 'flex';
+    }
+    window.viewFile = viewFile;
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    window.closeModal = closeModal;
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+
+    // ========== Presence ==========
+    async function updatePresence(online) {
+        if (!currentUserId) return;
+        await db.collection('users').doc(currentUserId).update({
+            online: online,
+            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(() => {});
+        // Update local list
+        const user = allUsers.find(u => u.uid === currentUserId);
+        if (user) user.online = online;
+        renderUserList(allUsers);
+    }
+
+    // ========== Send on Enter ==========
     messageInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -410,94 +589,37 @@
         }
     });
 
-    // Auto-resize textarea
-    messageInput.addEventListener('input', () => {
-        messageInput.style.height = 'auto';
-        messageInput.style.height = messageInput.scrollHeight + 'px';
-    });
-
-    // ---- File upload ----
-    fileUploadBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files[0]) {
-            sendMessage(); // auto send after file selected
-        }
-    });
-
-    // ---- Emoji Picker ----
-    const picker = document.querySelector('emoji-picker');
-    emojiToggle.addEventListener('click', () => {
-        const picker = document.getElementById('emojiPicker');
-        picker.classList.toggle('show');
-    });
-    // Use the emoji-picker-element
-    const emojiPickerEl = document.createElement('emoji-picker');
-    document.getElementById('emojiPicker').appendChild(emojiPickerEl);
-    emojiPickerEl.addEventListener('emoji-click', (event) => {
-        messageInput.value += event.detail.unicode;
-        messageInput.focus();
-    });
-
-    // ---- Typing indicator (simple) ----
-    let typingTimeout = null;
-    messageInput.addEventListener('input', () => {
-        // Could implement real typing indicators via Firestore, but for simplicity we skip.
-        // We'll just show "typing..." locally.
-        typingIndicator.innerText = 'typing...';
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-            typingIndicator.innerText = '';
-        }, 1000);
-    });
-
-    // ---- Reactions ----
-    async function toggleReaction(messageId, emoji) {
-        const msgRef = db.collection('messages').doc(messageId);
-        await db.runTransaction(async (transaction) => {
-            const doc = await transaction.get(msgRef);
-            if (!doc.exists) return;
-            const data = doc.data();
-            let reactions = data.reactions || {};
-            if (!reactions[emoji]) {
-                reactions[emoji] = [];
-            }
-            const idx = reactions[emoji].indexOf(currentUser.uid);
-            if (idx === -1) {
-                reactions[emoji].push(currentUser.uid);
+    // ========== Search users ==========
+    userSearch.addEventListener('input', () => {
+        const q = userSearch.value.toLowerCase();
+        document.querySelectorAll('.user-item[data-userid]').forEach(el => {
+            const uid = el.dataset.userid;
+            if (uid === 'global') return;
+            const user = allUsers.find(u => u.uid === uid);
+            if (user && user.email.toLowerCase().includes(q)) {
+                el.style.display = 'flex';
             } else {
-                reactions[emoji].splice(idx, 1);
-                if (reactions[emoji].length === 0) {
-                    delete reactions[emoji];
-                }
+                el.style.display = 'none';
             }
-            transaction.update(msgRef, { reactions });
         });
-    }
+    });
 
-    // ---- Update presence (online/offline) ----
-    async function updatePresence(online) {
-        if (!currentUser) return;
-        await db.collection('users').doc(currentUser.uid).update({
-            online: online,
-            lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(() => {});
-        // Also update in-memory user list
-        allUsers.forEach(u => {
-            if (u.uid === currentUser.uid) u.online = online;
-        });
-        renderUserList(allUsers);
-    }
-    // Periodically update presence
-    setInterval(() => {
-        if (currentUser) updatePresence(true);
-    }, 30000);
+    // ========== sendBtn ==========
+    sendBtn.addEventListener('click', sendMessage);
 
-    // ---- Search messages (optional) ----
-    // Not implemented for simplicity.
+    // ========== Auto-resize textarea ==========
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+    });
 
-    // ---- Load unread counts (optional) ----
-    // Not implemented.
+    // ========== Handle unread counts via listener ==========
+    // We'll listen to messages where senderId != currentUserId and readBy doesn't include currentUserId
+    // But to keep it simple, we'll just update on chat switch.
+    // We'll also periodically check (or use onSnapshot) but we'll manage manually.
+    // Let's add a listener for unread counts globally - but we can keep it simple.
 
+    console.log('NEVAMAK Chat loaded successfully.');
 </script>
 </body>
 </html>
