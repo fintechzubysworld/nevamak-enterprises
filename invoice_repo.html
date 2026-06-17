@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Invoice Repository</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1100px; margin: auto; }
+        header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .tab-btn { background: #ccc; color: #333; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; }
+        .tab-btn.active { background: #0a3d62; color: white; }
+        .tab-content { display: none; background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .tab-content.active { display: block; }
+        .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { font-size: 1.3rem; margin-top: 0; color: #0a3d62; }
+        h3 { font-size: 1.1rem; color: #2c3e50; margin: 12px 0 8px; }
+        input, select, textarea { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; margin: 4px 0; }
+        button { padding: 10px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 4px 0; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
+        .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center; }
+        .item-row input { flex: 1; margin: 0; }
+        .removeItem { background: #e74c3c; color: white; width: auto; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; }
+        .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .flex-row > * { flex: 1; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.85rem; }
+        th { background: #f8f9fa; }
+        .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .scroll { overflow-x: auto; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 500px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.8rem; }
+        .invoice-preview { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; margin-top: 12px; }
+        .invoice-preview table { width: 100%; border-collapse: collapse; }
+        .invoice-preview th, .invoice-preview td { border: 1px solid #ddd; padding: 8px; }
+        @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🧾 Invoice Repository</h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="chat.html">💬 Chat</a>
+            <a href="reports.html">📊 Reports</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="create">✏️ Create Invoice</button>
+        <button class="tab-btn" data-tab="list">📋 Saved Invoices</button>
+    </div>
+
+    <!-- Create Invoice Tab -->
+    <div id="tab-create" class="tab-content active">
+        <div class="card">
+            <h2>New Invoice</h2>
+            <form id="invoiceForm">
+                <div class="flex-row">
+                    <input type="text" id="invoiceNumber" placeholder="Invoice # (auto)" readonly>
+                    <input type="date" id="invoiceDate" required>
+                </div>
+                <div class="flex-row">
+                    <input type="text" id="customerName" placeholder="Customer / Recipient" required>
+                    <input type="text" id="customerEmail" placeholder="Customer Email">
+                </div>
+                <input type="text" id="invoiceNotes" placeholder="Notes (optional)">
+                <label>Items:</label>
+                <div id="invoiceItemsContainer">
+                    <div class="item-row">
+                        <input type="text" placeholder="Item name" class="itemName">
+                        <input type="number" placeholder="Qty" class="itemQty" value="1">
+                        <input type="number" placeholder="Price/unit" class="itemPrice" value="0">
+                        <button type="button" class="removeItem">✖</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" id="addItemBtn" class="btn-success">+ Add Product</button>
+                    <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display:none;">
+                </div>
+                <div class="cost-summary" id="invoiceCostPreview">Total: ₦0</div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <button type="submit" class="btn-primary" style="flex:2;">💾 Save Invoice</button>
+                    <button type="button" id="previewInvoiceBtn" class="btn-warning" style="flex:1;">👁️ Preview</button>
+                    <button type="button" id="generatePDFBtn" class="btn-info" style="flex:1;">📄 PDF</button>
+                    <button type="button" id="generateCSVBtn" class="btn-success" style="flex:1;">📊 CSV</button>
+                </div>
+                <div id="invoicePreviewContainer" class="invoice-preview" style="display:none;"></div>
+                <div id="formMessage" style="color:red; margin-top:8px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Saved Invoices Tab -->
+    <div id="tab-list" class="tab-content">
+        <div class="card">
+            <h2>Saved Invoices</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <input type="text" id="searchInvoices" placeholder="🔍 Search by # or customer..." style="flex:1;">
+                <button id="refreshInvoicesBtn" class="btn-primary">🔄 Refresh</button>
+            </div>
+            <div class="scroll" id="invoicesList">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Send Modal -->
+<div id="sendModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('sendModal')">&times;</span>
+        <h3>📤 Send Invoice</h3>
+        <p><strong>Invoice #:</strong> <span id="sendInvoiceNumber"></span></p>
+        <p><strong>Total:</strong> ₦<span id="sendInvoiceTotal"></span></p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
+            <button onclick="sendViaEmail()" class="btn-primary" style="flex:1;">📧 Email</button>
+            <button onclick="sendViaChat()" class="btn-info" style="flex:1;">💬 Chat</button>
+            <button onclick="sendViaWhatsApp()" class="btn-success" style="flex:1;">📱 WhatsApp</button>
+        </div>
+        <div id="sendMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    // ==================== State ====================
+    let currentUser = null;
+    let currentUserRole = '';
+    let currentUserEmail = '';
+    let sendInvoiceId = null;
+
+    // ==================== DOM ====================
+    const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const importExcelBtn = document.getElementById('importExcelBtn');
+    const excelFileInput = document.getElementById('excelFileInput');
+    const invoiceForm = document.getElementById('invoiceForm');
+    const invoicePreviewContainer = document.getElementById('invoicePreviewContainer');
+    const formMessage = document.getElementById('formMessage');
+    const invoicesList = document.getElementById('invoicesList');
+    const searchInvoices = document.getElementById('searchInvoices');
+    const refreshBtn = document.getElementById('refreshInvoicesBtn');
+
+    // ==================== Auth ====================
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserEmail = user.email;
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            currentUserRole = userDoc.data().role || '';
+        }
+        // Auto-generate invoice number
+        document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+        // Set today's date
+        document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+        // Load saved invoices
+        loadInvoices();
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+            });
+        });
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+
+    // ==================== Items Management ====================
+    function addItemRow(itemName = '', qty = 1, price = 0) {
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.innerHTML = `
+            <input type="text" placeholder="Item name" class="itemName" value="${itemName}">
+            <input type="number" placeholder="Qty" class="itemQty" value="${qty}">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${price}">
+            <button type="button" class="removeItem">✖</button>
+        `;
+        invoiceItemsContainer.appendChild(div);
+        div.querySelector('.removeItem').onclick = () => {
+            div.remove();
+            updateCostPreview();
+        };
+        updateCostPreview();
+    }
+
+    addItemBtn.addEventListener('click', () => addItemRow());
+
+    function updateCostPreview() {
+        let total = 0;
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const qty = parseInt(row.querySelector('.itemQty')?.value || 0);
+            const price = parseFloat(row.querySelector('.itemPrice')?.value || 0);
+            total += qty * price;
+        });
+        document.getElementById('invoiceCostPreview').innerHTML = `Total: ₦${total.toLocaleString()}`;
+    }
+    invoiceItemsContainer.addEventListener('input', updateCostPreview);
+
+    // ==================== Import Excel ====================
+    importExcelBtn.addEventListener('click', () => excelFileInput.click());
+    excelFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(loadEvent) {
+            try {
+                const data = new Uint8Array(loadEvent.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(firstSheet);
+                // Clear existing items
+                invoiceItemsContainer.innerHTML = '';
+                // Add rows from Excel
+                json.forEach(row => {
+                    const name = row['Item'] || row['item'] || row['Product'] || row['product'] || '';
+                    const qty = parseInt(row['Quantity'] || row['qty'] || row['Qty'] || 1);
+                    const price = parseFloat(row['Price'] || row['price'] || row['Unit Price'] || row['unit_price'] || 0);
+                    if (name) addItemRow(name, qty, price);
+                });
+                alert(`Imported ${json.length} items.`);
+                excelFileInput.value = '';
+            } catch (err) {
+                alert('Error reading Excel file: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // ==================== Preview Invoice ====================
+    document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
+        const preview = generateInvoiceHTML();
+        invoicePreviewContainer.innerHTML = preview;
+        invoicePreviewContainer.style.display = 'block';
+    });
+
+    function generateInvoiceHTML() {
+        const invNum = document.getElementById('invoiceNumber').value;
+        const date = document.getElementById('invoiceDate').value;
+        const customer = document.getElementById('customerName').value.trim() || 'N/A';
+        const email = document.getElementById('customerEmail').value.trim() || 'N/A';
+        const notes = document.getElementById('invoiceNotes').value.trim() || '';
+        let itemsHtml = '';
+        let total = 0;
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            if (name && qty > 0) {
+                const subtotal = qty * price;
+                total += subtotal;
+                itemsHtml += `<tr><td>${name}</td><td>${qty}</td><td>₦${price.toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+            }
+        });
+        if (!itemsHtml) return '<p style="color:red;">Add at least one item.</p>';
+        const html = `
+            <h2>NEVAMAK Enterprises</h2>
+            <h3>Invoice</h3>
+            <p><strong>Invoice #:</strong> ${invNum}</p>
+            <p><strong>Date:</strong> ${date}</p>
+            <p><strong>Customer:</strong> ${customer}</p>
+            ${email !== 'N/A' ? `<p><strong>Email:</strong> ${email}</p>` : ''}
+            <table>
+                <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+                ${itemsHtml}
+                <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+            </table>
+            ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+            <p><em>Generated by ${currentUserEmail}</em></p>
+        `;
+        return html;
+    }
+
+    // ==================== Save Invoice ====================
+    invoiceForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const invNum = document.getElementById('invoiceNumber').value;
+        const date = document.getElementById('invoiceDate').value;
+        const customer = document.getElementById('customerName').value.trim();
+        const email = document.getElementById('customerEmail').value.trim();
+        const notes = document.getElementById('invoiceNotes').value.trim();
+        const items = [];
+        let total = 0;
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            if (name && qty > 0 && price >= 0) {
+                const subtotal = qty * price;
+                total += subtotal;
+                items.push({ itemName: name, quantity: qty, unitPrice: price, total: subtotal });
+            }
+        });
+        if (!items.length) {
+            formMessage.innerText = 'Add at least one item.';
+            return;
+        }
+        try {
+            await db.collection('invoices').add({
+                invoiceNumber: invNum,
+                date: date,
+                customer: customer,
+                customerEmail: email || '',
+                notes: notes,
+                items: items,
+                total: total,
+                createdBy: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            formMessage.style.color = 'green';
+            formMessage.innerText = '✅ Invoice saved successfully!';
+            // Reset form but keep number and date
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerEmail').value = '';
+            document.getElementById('invoiceNotes').value = '';
+            invoiceItemsContainer.innerHTML = '';
+            addItemRow();
+            updateCostPreview();
+            // Generate new invoice number
+            document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+            document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+            loadInvoices();
+        } catch (err) {
+            formMessage.style.color = 'red';
+            formMessage.innerText = 'Error: ' + err.message;
+        }
+    });
+
+    // ==================== Generate PDF ====================
+    document.getElementById('generatePDFBtn').addEventListener('click', async () => {
+        const previewHTML = generateInvoiceHTML();
+        if (previewHTML.includes('Add at least one item')) {
+            alert('Add at least one item.');
+            return;
+        }
+        // Create a temporary div to render the invoice for PDF
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = previewHTML;
+        tempDiv.style.padding = '20px';
+        tempDiv.style.fontFamily = 'sans-serif';
+        document.body.appendChild(tempDiv);
+        try {
+            const canvas = await html2canvas(tempDiv, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`Invoice_${document.getElementById('invoiceNumber').value}.pdf`);
+        } catch (err) {
+            alert('PDF generation error: ' + err.message);
+        } finally {
+            document.body.removeChild(tempDiv);
+        }
+    });
+
+    // ==================== Generate CSV ====================
+    document.getElementById('generateCSVBtn').addEventListener('click', () => {
+        const rows = [];
+        let total = 0;
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            if (name && qty > 0) {
+                const subtotal = qty * price;
+                total += subtotal;
+                rows.push([name, qty, price, subtotal]);
+            }
+        });
+        if (!rows.length) {
+            alert('Add at least one item.');
+            return;
+        }
+        const csvRows = [['Item', 'Quantity', 'Unit Price', 'Total']];
+        rows.forEach(row => csvRows.push(row));
+        csvRows.push(['', '', 'Grand Total', total]);
+        const csvContent = csvRows.map(row => row.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Invoice_${document.getElementById('invoiceNumber').value}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // ==================== Load Saved Invoices ====================
+    function loadInvoices() {
+        const search = searchInvoices.value.toLowerCase().trim();
+        db.collection('invoices')
+            .orderBy('createdAt', 'desc')
+            .onSnapshot((snap) => {
+                let html = '';
+                if (snap.empty) {
+                    html = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
+                } else {
+                    html = '<table><tr><th>#</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Created By</th><th>Actions</th></tr>';
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
+                        const total = d.total || 0;
+                        const match = search === '' || 
+                            d.invoiceNumber.toLowerCase().includes(search) || 
+                            d.customer.toLowerCase().includes(search);
+                        if (!match) return;
+                        html += `<tr>
+                            <td><strong>${d.invoiceNumber}</strong></td>
+                            <td>${d.date}</td>
+                            <td>${d.customer}</td>
+                            <td>${itemsShort}</td>
+                            <td class="cost-cell">₦${total.toLocaleString()}</td>
+                            <td>${d.createdBy || '-'}</td>
+                            <td>
+                                <button class="btn-sm btn-primary" onclick="viewInvoice('${doc.id}')">👁️</button>
+                                <button class="btn-sm btn-success" onclick="downloadPDF('${doc.id}')">📄</button>
+                                <button class="btn-sm btn-warning" onclick="downloadCSV('${doc.id}')">📊</button>
+                                <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
+                                <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                }
+                invoicesList.innerHTML = html;
+            }, (err) => {
+                console.error('Invoices load error:', err);
+                invoicesList.innerHTML = '<p style="color:red;">Error loading invoices: ' + err.message + '</p>';
+            });
+    }
+
+    refreshBtn.addEventListener('click', loadInvoices);
+    searchInvoices.addEventListener('input', loadInvoices);
+
+    // ==================== View Invoice (Preview Modal) ====================
+    window.viewInvoice = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            let itemsHtml = '';
+            let total = 0;
+            if (d.items) {
+                d.items.forEach(it => {
+                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
+                    total += subtotal;
+                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+                });
+            }
+            const html = `
+                <div style="font-family:sans-serif; padding:16px;">
+                    <h2>NEVAMAK Enterprises</h2>
+                    <h3>Invoice</h3>
+                    <p><strong>Invoice #:</strong> ${d.invoiceNumber}</p>
+                    <p><strong>Date:</strong> ${d.date}</p>
+                    <p><strong>Customer:</strong> ${d.customer}</p>
+                    ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                        ${itemsHtml}
+                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                    </table>
+                    ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                    <p><em>Created by ${d.createdBy}</em></p>
+                </div>
+            `;
+            // Show in a modal or alert? We'll open a new tab with preview.
+            const win = window.open('', '_blank', 'width=800,height=600');
+            win.document.write(html);
+            win.document.close();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // ==================== Download PDF from Saved Invoice ====================
+    window.downloadPDF = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            let itemsHtml = '';
+            let total = 0;
+            if (d.items) {
+                d.items.forEach(it => {
+                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
+                    total += subtotal;
+                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+                });
+            }
+            const html = `
+                <div id="pdfContent" style="padding:20px; font-family:sans-serif;">
+                    <h2>NEVAMAK Enterprises</h2>
+                    <h3>Invoice</h3>
+                    <p><strong>Invoice #:</strong> ${d.invoiceNumber}</p>
+                    <p><strong>Date:</strong> ${d.date}</p>
+                    <p><strong>Customer:</strong> ${d.customer}</p>
+                    ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
+                    <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <tr style="background:#f0f0f0;"><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                        ${itemsHtml}
+                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                    </table>
+                    ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                    <p><em>Created by ${d.createdBy}</em></p>
+                </div>
+            `;
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            document.body.appendChild(tempDiv);
+            const canvas = await html2canvas(tempDiv, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`Invoice_${d.invoiceNumber}.pdf`);
+            document.body.removeChild(tempDiv);
+        } catch (err) {
+            alert('PDF error: ' + err.message);
+        }
+    };
+
+    // ==================== Download CSV from Saved Invoice ====================
+    window.downloadCSV = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            const rows = [['Item', 'Quantity', 'Unit Price', 'Total']];
+            let total = 0;
+            if (d.items) {
+                d.items.forEach(it => {
+                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
+                    total += subtotal;
+                    rows.push([it.itemName, it.quantity, it.unitPrice, subtotal]);
+                });
+            }
+            rows.push(['', '', 'Grand Total', total]);
+            const csvContent = rows.map(row => row.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Invoice_${d.invoiceNumber}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('CSV error: ' + err.message);
+        }
+    };
+
+    // ==================== Delete Invoice ====================
+    window.deleteInvoice = async function(id) {
+        if (!confirm('Delete this invoice permanently?')) return;
+        try {
+            await db.collection('invoices').doc(id).delete();
+            alert('Invoice deleted.');
+            loadInvoices();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // ==================== Send Modal ====================
+    window.openSendModal = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            sendInvoiceId = id;
+            document.getElementById('sendInvoiceNumber').innerText = d.invoiceNumber;
+            document.getElementById('sendInvoiceTotal').innerText = d.total.toLocaleString();
+            document.getElementById('sendModal').style.display = 'flex';
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+        document.getElementById('sendMessage').innerText = '';
+    }
+    window.closeModal = closeModal;
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+            document.getElementById('sendMessage').innerText = '';
+        }
+    };
+
+    // ==================== Send Methods ====================
+    window.sendViaEmail = async function() {
+        if (!sendInvoiceId) return;
+        try {
+            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
+            const d = doc.data();
+            const customerEmail = d.customerEmail || '';
+            if (!customerEmail) {
+                document.getElementById('sendMessage').innerText = 'Customer email not set.';
+                return;
+            }
+            const subject = `Invoice ${d.invoiceNumber} from NEVAMAK`;
+            const body = `Dear ${d.customer},\n\nPlease find attached invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)}.\n\nThank you for your business.\n\nNEVAMAK Enterprises`;
+            window.location.href = `mailto:${customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            closeModal('sendModal');
+        } catch (err) {
+            document.getElementById('sendMessage').innerText = 'Error: ' + err.message;
+        }
+    };
+
+    window.sendViaChat = async function() {
+        if (!sendInvoiceId) return;
+        try {
+            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
+            const d = doc.data();
+            const message = `Invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)} - ${d.customer}. Please check.`;
+            // Open chat with pre-filled message
+            window.location.href = `chat.html?message=${encodeURIComponent(message)}`;
+            closeModal('sendModal');
+        } catch (err) {
+            document.getElementById('sendMessage').innerText = 'Error: ' + err.message;
+        }
+    };
+
+    window.sendViaWhatsApp = async function() {
+        if (!sendInvoiceId) return;
+        try {
+            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
+            const d = doc.data();
+            const message = `Invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)} - ${d.customer}. Please check.`;
+            const phone = prompt('Enter recipient WhatsApp number (with country code, e.g., 2348012345678):');
+            if (!phone) return;
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+            closeModal('sendModal');
+        } catch (err) {
+            document.getElementById('sendMessage').innerText = 'Error: ' + err.message;
+        }
+    };
+
+    // ==================== Initialize ====================
+    addItemRow(); // start with one row
+    console.log('NEVAMAK Invoice Repository loaded.');
+</script>
+</body>
+</html>
