@@ -238,7 +238,7 @@
     }
     invoiceItemsContainer.addEventListener('input', updateCostPreview);
 
-    // ==================== Import Excel (Improved) ====================
+    // ==================== Import Excel (Enhanced Column Detection) ====================
     importExcelBtn.addEventListener('click', () => excelFileInput.click());
 
     excelFileInput.addEventListener('change', function(e) {
@@ -264,12 +264,22 @@
                     return;
                 }
 
-                // Detect column names (case-insensitive)
+                // Detect column names (case-insensitive) with more variations
                 const headers = Object.keys(json[0]);
                 const findColumn = (variations) => {
                     for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
-                            if (h.toLowerCase().trim() === v.toLowerCase().trim()) {
+                            if (hLower === v.toLowerCase().trim()) {
+                                return h;
+                            }
+                        }
+                    }
+                    // If not found, try partial match (contains)
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const v of variations) {
+                            if (hLower.includes(v.toLowerCase().trim()) || v.toLowerCase().trim().includes(hLower)) {
                                 return h;
                             }
                         }
@@ -277,9 +287,17 @@
                     return null;
                 };
 
-                const itemCol = findColumn(['Item', 'Product', 'Product Name', 'Item Name', 'Description', 'Name']);
-                const qtyCol = findColumn(['Quantity', 'Qty', 'Count', 'Unit']);
-                const priceCol = findColumn(['Price', 'Unit Price', 'Price Per Unit', 'Rate', 'Cost', 'Unit Cost']);
+                const itemCol = findColumn([
+                    'item', 'product', 'product name', 'item name', 'description', 'description of goods', 
+                    'goods', 'name', 'particulars', 'details', 'item description', 'product description'
+                ]);
+                const qtyCol = findColumn([
+                    'quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered', 'ordered'
+                ]);
+                const priceCol = findColumn([
+                    'unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 
+                    'unit rate', 'rate per unit', 'cost per unit', 'amount' // fallback if amount is per unit
+                ]);
 
                 console.log('🔍 Detected columns:', { itemCol, qtyCol, priceCol });
 
@@ -293,8 +311,22 @@
                 const parsedItems = [];
                 json.forEach(row => {
                     const name = String(row[itemCol] || '').trim();
-                    const qty = parseFloat(row[qtyCol]) || 0;
-                    const price = parseFloat(row[priceCol]) || 0;
+                    let qty = parseFloat(row[qtyCol]) || 0;
+                    let price = parseFloat(row[priceCol]) || 0;
+                    // If price is 0 but there is an "AMOUNT" column, we might use that as total, but we need unit price.
+                    // If the user has "AMOUNT" and "QUANTITY", we can compute unit price = amount / quantity.
+                    // But to keep it simple, we use the price column as is.
+                    // If price is 0 and there's an AMOUNT column, we can compute.
+                    if (price === 0 && qty > 0) {
+                        // Try to find an "AMOUNT" or "TOTAL" column
+                        const amountCol = findColumn(['amount', 'total', 'subtotal', 'net', 'gross']);
+                        if (amountCol) {
+                            const amount = parseFloat(row[amountCol]) || 0;
+                            if (amount > 0 && qty > 0) {
+                                price = amount / qty;
+                            }
+                        }
+                    }
                     if (name && qty > 0) {
                         parsedItems.push({ itemName: name, quantity: qty, unitPrice: price });
                     }
