@@ -7,6 +7,8 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <!-- SheetJS for Excel import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f4f7fc; margin: 0; padding: 12px; }
@@ -20,6 +22,7 @@
         .btn-success { background: #27ae60; color: white; }
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
         .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
         .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
@@ -50,6 +53,7 @@
         .scroll { overflow-x: auto; }
         .inline-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .inline-add input { flex: 1; }
+        .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; }
         @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
     </style>
 </head>
@@ -110,7 +114,12 @@
                     <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
                 </div>
             </div>
-            <button type="button" id="addItemBtn" class="btn-success">+ Add product</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" id="addItemBtn" class="btn-success">+ Add product</button>
+                <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
+                <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+            </div>
+            <div id="importPreviewContainer" class="import-preview" style="display:none;"></div>
             <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
             <textarea id="dispatchNotes" placeholder="Additional notes"></textarea>
             <div style="display:flex; gap:12px; flex-wrap:wrap;">
@@ -305,24 +314,32 @@
 
     // ==================== Items Management ====================
     const itemsContainer = document.getElementById("itemsContainer");
-    document.getElementById("addItemBtn").addEventListener("click", () => {
-        const div = document.createElement("div");
-        div.className = "item-row";
+
+    function createItemRow(itemName = '', qty = 1, price = 0) {
+        const div = document.createElement('div');
+        div.className = 'item-row';
         div.innerHTML = `
-            <input type="text" placeholder="Item name" class="itemName">
-            <input type="number" placeholder="Qty" class="itemQty">
-            <input type="number" placeholder="Price/unit" class="itemPrice">
+            <input type="text" placeholder="Item name" class="itemName" value="${itemName}">
+            <input type="number" placeholder="Qty" class="itemQty" value="${qty}">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${price}">
             <button type="button" class="removeItem">✖</button>
             <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
         `;
-        itemsContainer.appendChild(div);
-        div.querySelector(".removeItem").onclick = () => div.remove();
+        div.querySelector('.removeItem').onclick = () => {
+            div.remove();
+            updatePreview();
+        };
+        return div;
+    }
+
+    document.getElementById("addItemBtn").addEventListener("click", () => {
+        itemsContainer.appendChild(createItemRow());
         updatePreview();
     });
 
     function updatePreview() {
         let total = 0;
-        document.querySelectorAll(".item-row").forEach(r => {
+        document.querySelectorAll("#itemsContainer .item-row").forEach(r => {
             const qty = parseInt(r.querySelector(".itemQty")?.value || 0);
             const price = parseFloat(r.querySelector(".itemPrice")?.value || 0);
             total += qty * price;
@@ -331,11 +348,139 @@
     }
     itemsContainer.addEventListener("input", updatePreview);
 
+    // ==================== Import Excel (Dispatch) ====================
+    const importExcelBtn = document.getElementById('importExcelBtn');
+    const excelFileInput = document.getElementById('excelFileInput');
+    const importPreviewContainer = document.getElementById('importPreviewContainer');
+    let importedItems = [];
+
+    importExcelBtn.addEventListener('click', () => excelFileInput.click());
+
+    excelFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+
+        const reader = new FileReader();
+        reader.onload = function(loadEvent) {
+            try {
+                const data = new Uint8Array(loadEvent.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(firstSheet);
+
+                console.log('📊 Excel rows:', json.length);
+                console.log('📊 Headers:', Object.keys(json[0] || {}));
+
+                if (json.length === 0) {
+                    alert('The Excel file is empty.');
+                    return;
+                }
+
+                // Column detection (same as invoice repo)
+                const headers = Object.keys(json[0]);
+                const findColumn = (variations) => {
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const v of variations) {
+                            if (hLower === v.toLowerCase().trim()) return h;
+                        }
+                    }
+                    // partial match
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const v of variations) {
+                            if (hLower.includes(v.toLowerCase().trim()) || v.toLowerCase().trim().includes(hLower)) {
+                                return h;
+                            }
+                        }
+                    }
+                    return null;
+                };
+
+                const itemCol = findColumn([
+                    'item', 'product', 'product name', 'item name', 'description', 'description of goods',
+                    'goods', 'name', 'particulars', 'details'
+                ]);
+                const qtyCol = findColumn([
+                    'quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered'
+                ]);
+                const priceCol = findColumn([
+                    'unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit',
+                    'unit rate', 'cost per unit'
+                ]);
+
+                console.log('Detected columns:', { itemCol, qtyCol, priceCol });
+
+                if (!itemCol || !qtyCol || !priceCol) {
+                    alert(`Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`);
+                    return;
+                }
+
+                const parsedItems = [];
+                json.forEach(row => {
+                    const name = String(row[itemCol] || '').trim();
+                    let qty = parseFloat(row[qtyCol]) || 0;
+                    let price = parseFloat(row[priceCol]) || 0;
+                    if (name && qty > 0) {
+                        parsedItems.push({ itemName: name, quantity: qty, unitPrice: price });
+                    }
+                });
+
+                if (parsedItems.length === 0) {
+                    alert('No valid items found.');
+                    return;
+                }
+
+                importedItems = parsedItems;
+                // Show preview
+                let previewHtml = `<p><strong>✅ ${parsedItems.length} items imported:</strong></p>
+                    <table><tr><th>Item</th><th>Qty</th><th>Price</th></tr>`;
+                parsedItems.forEach(it => {
+                    previewHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                });
+                previewHtml += `</table>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button onclick="applyImportedItems()" class="btn-success">✅ Apply</button>
+                        <button onclick="clearImportPreview()" class="btn-danger">❌ Cancel</button>
+                    </div>`;
+                importPreviewContainer.innerHTML = previewHtml;
+                importPreviewContainer.style.display = 'block';
+                excelFileInput.value = '';
+            } catch (err) {
+                console.error('Excel error:', err);
+                alert('Error reading Excel: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    window.applyImportedItems = function() {
+        if (importedItems.length === 0) return;
+        // Clear existing items
+        itemsContainer.innerHTML = '';
+        importedItems.forEach(it => {
+            itemsContainer.appendChild(createItemRow(it.itemName, it.quantity, it.unitPrice));
+        });
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        updatePreview();
+        importedItems = [];
+        alert('Items imported successfully.');
+    };
+
+    window.clearImportPreview = function() {
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        importedItems = [];
+    };
+
     // ==================== Barcode ====================
     document.getElementById('barcodeInput').addEventListener('change', function() {
         const code = this.value.trim();
         if (code) {
-            alert('Barcode scanned: ' + code + '. In production, fetch product details.');
+            alert('Barcode scanned: ' + code);
             const firstRow = document.querySelector('.item-row');
             if (firstRow) {
                 firstRow.querySelector('.itemName').value = 'Product-' + code;
@@ -354,9 +499,9 @@
         const driver = document.getElementById("driverName").value.trim();
         const trackingNo = document.getElementById("trackingNo").value.trim();
         const notes = document.getElementById("dispatchNotes").value.trim();
-        const transportCost = 0; // could add a field
+        const transportCost = 0;
         const items = [];
-        document.querySelectorAll(".item-row").forEach(row => {
+        document.querySelectorAll("#itemsContainer .item-row").forEach(row => {
             const name = row.querySelector(".itemName").value.trim();
             const qty = parseInt(row.querySelector(".itemQty").value);
             const price = parseFloat(row.querySelector(".itemPrice").value);
@@ -400,7 +545,8 @@
 
         alert(`${status} created`);
         document.getElementById("dispatchForm").reset();
-        itemsContainer.innerHTML = `<div class="item-row"><input type="text" placeholder="Item name" class="itemName"><input type="number" placeholder="Qty" class="itemQty"><input type="number" placeholder="Price/unit" class="itemPrice"><button type="button" class="removeItem">✖</button><button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button></div>`;
+        itemsContainer.innerHTML = '';
+        itemsContainer.appendChild(createItemRow());
         updatePreview();
         loadShipments();
         loadStats();
@@ -546,7 +692,6 @@
             }
             editDraftId = id;
 
-            // Populate form fields
             document.getElementById('editSenderName').value = d.senderName || '';
             document.getElementById('editDestBranch').value = d.destinationBranch || 'Abuja';
             document.getElementById('editVehicleNo').value = d.vehicleNo || '';
@@ -555,7 +700,6 @@
             document.getElementById('editTrackingNo').value = d.trackingNo || 'NEV-' + Date.now().toString(36).toUpperCase();
             document.getElementById('editNotes').value = d.notes || '';
 
-            // Populate items
             const container = document.getElementById('editItemsContainer');
             container.innerHTML = '';
             if (d.items && d.items.length > 0) {
@@ -572,7 +716,6 @@
                     div.querySelector('.editRemoveItem').onclick = () => div.remove();
                 });
             } else {
-                // Add one empty row
                 const div = document.createElement('div');
                 div.className = 'item-row';
                 div.innerHTML = `
@@ -591,7 +734,6 @@
         }
     };
 
-    // Edit items management
     document.getElementById('editAddItemBtn').addEventListener('click', () => {
         const container = document.getElementById('editItemsContainer');
         const div = document.createElement('div');
@@ -618,7 +760,6 @@
     }
     document.getElementById('editItemsContainer').addEventListener('input', updateEditPreview);
 
-    // Submit edit form
     document.getElementById('editDraftForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!editDraftId) return alert('No draft selected.');
@@ -670,7 +811,6 @@
         }
     });
 
-    // Delete draft button
     document.getElementById('editDeleteBtn').addEventListener('click', async () => {
         if (!editDraftId) return;
         if (!confirm('Delete this draft permanently?')) return;
