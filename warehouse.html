@@ -32,7 +32,7 @@
         .low-stock { background: #f8d7da; }
         .on-floor-tag { background: #8e44ad; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 500px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.8rem; }
         .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
         .btn-primary { background: #0a3d62; color: white; }
@@ -41,6 +41,12 @@
         .btn-warning { background: #f39c12; color: white; }
         .btn-floor { background: #8e44ad; color: white; }
         .hidden-count { font-size: 0.8rem; color: #888; margin-left: 12px; }
+        .bulk-actions { display: none; gap: 8px; flex-wrap: wrap; margin: 8px 0; padding: 8px; background: #f8f9fa; border-radius: 40px; align-items: center; }
+        .bulk-actions.show { display: flex; }
+        .bulk-actions select, .bulk-actions button { padding: 6px 16px; border-radius: 40px; border: none; font-size: 0.9rem; }
+        .bulk-actions select { background: white; border: 1px solid #ccc; }
+        .bulk-actions .btn-bulk { background: #0a3d62; color: white; cursor: pointer; }
+        .bulk-actions .btn-bulk-floor { background: #8e44ad; color: white; cursor: pointer; }
         @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
     </style>
 </head>
@@ -83,6 +89,24 @@
         <a href="shop_floor.html" style="background:#8e44ad; color:white; padding:8px 20px; border-radius:40px; text-decoration:none;">🏪 View Shop Floor</a>
     </div>
 
+    <!-- Bulk Actions (visible only to admin/lagos_sender) -->
+    <div id="bulkActions" class="bulk-actions">
+        <span style="font-weight:bold;">Bulk Action:</span>
+        <span id="selectedCount">0 items selected</span>
+        <select id="bulkActionType">
+            <option value="branch">Move to Branch</option>
+            <option value="floor">Move to Shop Floor</option>
+        </select>
+        <select id="bulkTargetBranch" style="display:inline-block;">
+            <option value="Abuja">Abuja</option>
+            <option value="Portharcourt">Port Harcourt</option>
+            <option value="Lagos">Lagos</option>
+        </select>
+        <button class="btn-bulk" id="bulkActionBtn">▶ Execute</button>
+        <button class="btn-bulk-floor" id="moveAllToFloorBtn">🏪 Move All to Floor</button>
+        <button class="btn-sm btn-danger" id="clearSelectionBtn">✖ Clear</button>
+    </div>
+
     <!-- Warehouse Table -->
     <div class="section-card">
         <div id="warehouseList">Loading inventory...</div>
@@ -111,7 +135,7 @@
     </div>
 </div>
 
-<!-- Modal: Move to Floor -->
+<!-- Modal: Move to Floor (single item) -->
 <div id="moveFloorModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('moveFloorModal')">&times;</span>
@@ -124,6 +148,20 @@
         <input type="text" id="moveLocation" placeholder="Floor Location (e.g., Shelf A2)" value="Floor Shelf A">
         <button id="moveConfirmBtn" class="btn-floor" style="width:100%; padding:12px; border-radius:48px; border:none; color:white; font-weight:bold; margin-top:12px;">🚚 Move to Floor</button>
         <div id="moveMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
+<!-- Bulk Confirm Modal -->
+<div id="bulkConfirmModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('bulkConfirmModal')">&times;</span>
+        <h3>⚠️ Confirm Bulk Action</h3>
+        <p id="bulkConfirmMessage"></p>
+        <div style="display:flex; gap:12px;">
+            <button id="bulkConfirmYes" class="btn-success" style="flex:1;">✅ Confirm</button>
+            <button onclick="closeModal('bulkConfirmModal')" class="btn-danger" style="flex:1;">Cancel</button>
+        </div>
+        <div id="bulkConfirmResult" style="margin-top:8px;"></div>
     </div>
 </div>
 
@@ -149,6 +187,7 @@
     let inventoryData = [];
     let floorData = {};
     let showAll = false;
+    let selectedItems = new Set(); // holds inventory doc IDs
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
@@ -161,6 +200,7 @@
         }
         if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
             document.getElementById('addStockBtn').style.display = 'inline-block';
+            document.getElementById('bulkActions').classList.add('show');
         }
         listenToInventory();
         listenToShopFloor();
@@ -168,6 +208,21 @@
             showAll = this.checked;
             renderWarehouse();
         });
+        // Bulk selection events
+        document.getElementById('bulkActionBtn').addEventListener('click', executeBulkAction);
+        document.getElementById('moveAllToFloorBtn').addEventListener('click', moveAllToFloor);
+        document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
+        // When action type changes, show/hide branch dropdown
+        document.getElementById('bulkActionType').addEventListener('change', function() {
+            const targetBranch = document.getElementById('bulkTargetBranch');
+            if (this.value === 'branch') {
+                targetBranch.style.display = 'inline-block';
+            } else {
+                targetBranch.style.display = 'none';
+            }
+        });
+        // Initial hide branch dropdown if floor selected
+        document.getElementById('bulkTargetBranch').style.display = 'none';
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
@@ -214,7 +269,6 @@
             allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
         }
 
-        // Start with all inventory items that belong to allowed branches
         let docs = inventoryData.filter(d => allowedBranches.includes(d.branch));
 
         // Count items on floor
@@ -224,7 +278,7 @@
             if (floorData[key] > 0) floorItemsCount++;
         });
 
-        // Apply "Show All" filter: if not showAll, hide items that are on floor (floor stock > 0)
+        // Apply "Show All" filter
         if (!showAll) {
             docs = docs.filter(d => {
                 const key = d.itemName + '|' + d.branch;
@@ -233,38 +287,37 @@
             });
         }
 
-        // Show hidden count
-        const hiddenCount = floorItemsCount - (showAll ? 0 : floorItemsCount);
-        document.getElementById('hiddenCount').innerText = hiddenCount > 0 ? `(${hiddenCount} hidden on floor)` : '';
+        document.getElementById('hiddenCount').innerText = floorItemsCount > 0 ? `(${floorItemsCount} hidden on floor)` : '';
 
-        // Apply search filter
         const search = searchInput.value.toLowerCase().trim();
         if (search) {
             docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
         }
 
-        // Apply branch filter from dropdown
         const filterVal = branchFilter.value;
         if (filterVal !== 'all') {
             docs = docs.filter(d => d.branch === filterVal);
         }
 
-        // Sort
         docs.sort((a, b) => {
             if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
             return (a.itemName || '').localeCompare(b.itemName || '');
         });
 
         if (docs.length === 0) {
-            document.getElementById('warehouseList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No warehouse items found. Check your filters or move items from invoices.</p>';
+            document.getElementById('warehouseList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No warehouse items found.</p>';
+            updateStats();
             return;
         }
 
         const canManage = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
         const canMove = (canManage || currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep');
+        // Show checkboxes only if canManage (admin/lagos_sender can bulk move)
+        const showCheckbox = canManage;
 
         let html = `<table id="warehouseTable">
             <tr>
+                ${showCheckbox ? '<th><input type="checkbox" id="selectAll" onchange="toggleAllCheckboxes(this.checked)"></th>' : ''}
                 <th>Item</th>
                 <th>Branch</th>
                 <th>Stock</th>
@@ -281,7 +334,9 @@
             const rowClass = isLow ? 'low-stock' : '';
             const location = d.location || 'N/A';
             const lastUpdated = d.lastUpdated ? new Date(d.lastUpdated.toDate()).toLocaleString() : 'N/A';
+            const checked = selectedItems.has(d.id) ? 'checked' : '';
             html += `<tr class="${rowClass}">
+                ${showCheckbox ? `<td><input type="checkbox" class="itemCheckbox" data-id="${d.id}" ${checked} onchange="toggleItemSelection('${d.id}')"></td>` : ''}
                 <td>
                     <strong>${d.itemName}</strong>
                     ${isOnFloor ? '<span class="on-floor-tag">On Floor</span>' : ''}
@@ -301,13 +356,44 @@
         });
         html += '</table>';
         document.getElementById('warehouseList').innerHTML = html;
-
+        updateSelectedCount();
         updateStats();
+    }
+
+    // ==================== Selection helpers ====================
+    function toggleItemSelection(id) {
+        if (selectedItems.has(id)) {
+            selectedItems.delete(id);
+        } else {
+            selectedItems.add(id);
+        }
+        renderWarehouse(); // re-render to reflect checkbox states
+    }
+
+    function toggleAllCheckboxes(checked) {
+        const checkboxes = document.querySelectorAll('.itemCheckbox');
+        checkboxes.forEach(cb => {
+            const id = cb.dataset.id;
+            if (checked) {
+                selectedItems.add(id);
+            } else {
+                selectedItems.delete(id);
+            }
+        });
+        renderWarehouse();
+    }
+
+    function clearSelection() {
+        selectedItems.clear();
+        renderWarehouse();
+    }
+
+    function updateSelectedCount() {
+        document.getElementById('selectedCount').innerText = `${selectedItems.size} items selected`;
     }
 
     // ==================== Stats ====================
     function updateStats() {
-        // Stats based on currently displayed items (respecting showAll)
         const displayDocs = (() => {
             let docs = inventoryData;
             if (!showAll) {
@@ -427,7 +513,7 @@
         }
     };
 
-    // ==================== Move to Floor Modal ====================
+    // ==================== Move to Floor (single) ====================
     let moveItemData = {};
 
     window.openMoveFloorModal = function(id, itemName, branch, stock, unitPrice) {
@@ -477,14 +563,12 @@
         }
 
         try {
-            // 1. Decrement warehouse inventory
             const warehouseRef = db.collection('inventory').doc(moveItemData.id);
             await warehouseRef.update({
                 stock: firebase.firestore.FieldValue.increment(-qty),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // 2. Add to shop floor inventory (upsert)
             const floorRef = db.collection('shopFloor')
                 .where('itemName', '==', moveItemData.itemName)
                 .where('branch', '==', moveItemData.branch);
@@ -508,7 +592,6 @@
                 });
             }
 
-            // 3. Log activity
             await db.collection('activityLog').add({
                 actionType: 'move_to_floor',
                 itemName: moveItemData.itemName,
@@ -526,6 +609,206 @@
             document.getElementById('moveMessage').innerText = 'Error: ' + error.message;
         }
     });
+
+    // ==================== Bulk Actions ====================
+    function executeBulkAction() {
+        if (selectedItems.size === 0) {
+            alert('Please select at least one item.');
+            return;
+        }
+        const actionType = document.getElementById('bulkActionType').value;
+        const targetBranch = document.getElementById('bulkTargetBranch').value;
+        let confirmMessage = '';
+        if (actionType === 'branch') {
+            confirmMessage = `Move ${selectedItems.size} selected items to ${targetBranch} warehouse?`;
+        } else {
+            confirmMessage = `Move ${selectedItems.size} selected items to shop floor (${targetBranch} branch)?`;
+        }
+        document.getElementById('bulkConfirmMessage').innerText = confirmMessage;
+        document.getElementById('bulkConfirmResult').innerText = '';
+        document.getElementById('bulkConfirmModal').style.display = 'flex';
+        // Store action for confirmation
+        document.getElementById('bulkConfirmModal').dataset.actionType = actionType;
+        document.getElementById('bulkConfirmModal').dataset.targetBranch = targetBranch;
+    }
+
+    document.getElementById('bulkConfirmYes').addEventListener('click', async function() {
+        const modal = document.getElementById('bulkConfirmModal');
+        const actionType = modal.dataset.actionType;
+        const targetBranch = modal.dataset.targetBranch;
+        const resultDiv = document.getElementById('bulkConfirmResult');
+        resultDiv.innerText = 'Processing...';
+
+        try {
+            const itemsToMove = [];
+            selectedItems.forEach(id => {
+                const item = inventoryData.find(d => d.id === id);
+                if (item) itemsToMove.push(item);
+            });
+
+            if (itemsToMove.length === 0) {
+                resultDiv.innerText = 'No valid items selected.';
+                return;
+            }
+
+            if (actionType === 'branch') {
+                // Move to warehouse (different branch)
+                for (const item of itemsToMove) {
+                    // Decrement from current branch
+                    const curRef = db.collection('inventory').doc(item.id);
+                    await curRef.update({
+                        stock: firebase.firestore.FieldValue.increment(-item.stock),
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    // Add to target branch (if not already exists with same item name)
+                    const targetRef = db.collection('inventory')
+                        .where('itemName', '==', item.itemName)
+                        .where('branch', '==', targetBranch);
+                    const snap = await targetRef.get();
+                    if (snap.empty) {
+                        await db.collection('inventory').add({
+                            itemName: item.itemName,
+                            branch: targetBranch,
+                            stock: item.stock,
+                            unitPrice: item.unitPrice,
+                            location: 'Shelf A',
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        snap.forEach(doc => {
+                            doc.ref.update({
+                                stock: firebase.firestore.FieldValue.increment(item.stock),
+                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        });
+                    }
+                }
+                resultDiv.innerText = `✅ Moved ${itemsToMove.length} items to ${targetBranch} warehouse.`;
+            } else {
+                // Move to shop floor (target branch)
+                for (const item of itemsToMove) {
+                    // Decrement warehouse stock
+                    const curRef = db.collection('inventory').doc(item.id);
+                    await curRef.update({
+                        stock: firebase.firestore.FieldValue.increment(-item.stock),
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    // Add to shop floor (target branch)
+                    const floorRef = db.collection('shopFloor')
+                        .where('itemName', '==', item.itemName)
+                        .where('branch', '==', targetBranch);
+                    const snap = await floorRef.get();
+                    if (snap.empty) {
+                        await db.collection('shopFloor').add({
+                            itemName: item.itemName,
+                            branch: targetBranch,
+                            stock: item.stock,
+                            unitPrice: item.unitPrice,
+                            location: 'Floor Shelf A',
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        snap.forEach(doc => {
+                            doc.ref.update({
+                                stock: firebase.firestore.FieldValue.increment(item.stock),
+                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        });
+                    }
+                }
+                resultDiv.innerText = `✅ Moved ${itemsToMove.length} items to shop floor (${targetBranch}).`;
+            }
+
+            // Log activity
+            await db.collection('activityLog').add({
+                actionType: 'bulk_move',
+                action: actionType,
+                targetBranch: targetBranch,
+                itemCount: itemsToMove.length,
+                details: `Bulk moved ${itemsToMove.length} items to ${actionType === 'branch' ? 'warehouse' : 'shop floor'} (${targetBranch})`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            // Clear selection and close modal after delay
+            setTimeout(() => {
+                selectedItems.clear();
+                closeModal('bulkConfirmModal');
+                renderWarehouse();
+            }, 1500);
+        } catch (err) {
+            resultDiv.innerText = '❌ Error: ' + err.message;
+        }
+    });
+
+    // ==================== Move All to Floor (current view) ====================
+    function moveAllToFloor() {
+        // Get currently displayed items (excluding those already on floor)
+        const searchInput = document.getElementById('searchItem');
+        const branchFilter = document.getElementById('filterBranch');
+        let docs = inventoryData;
+        if (!showAll) {
+            docs = docs.filter(d => {
+                const key = d.itemName + '|' + d.branch;
+                return (floorData[key] || 0) === 0;
+            });
+        }
+        // Apply filters (same as render)
+        let allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+        if (currentUserRole === 'abuja_rep') allowedBranches = ['Abuja'];
+        else if (currentUserRole === 'ph_rep') allowedBranches = ['Portharcourt'];
+        docs = docs.filter(d => allowedBranches.includes(d.branch));
+        const search = searchInput.value.toLowerCase().trim();
+        if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+        const filterVal = branchFilter.value;
+        if (filterVal !== 'all') docs = docs.filter(d => d.branch === filterVal);
+
+        const itemsToMove = docs.filter(d => {
+            const key = d.itemName + '|' + d.branch;
+            return (floorData[key] || 0) === 0 && d.stock > 0;
+        });
+
+        if (itemsToMove.length === 0) {
+            alert('No items available to move to floor.');
+            return;
+        }
+
+        // Confirm
+        if (!confirm(`Move all ${itemsToMove.length} items to shop floor (branch: ${filterVal !== 'all' ? filterVal : 'current branch'})?`)) return;
+
+        // Execute
+        const targetBranch = filterVal !== 'all' ? filterVal : (currentUserRole === 'abuja_rep' ? 'Abuja' : (currentUserRole === 'ph_rep' ? 'Portharcourt' : 'Lagos'));
+        for (const item of itemsToMove) {
+            const curRef = db.collection('inventory').doc(item.id);
+            await curRef.update({
+                stock: firebase.firestore.FieldValue.increment(-item.stock),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            const floorRef = db.collection('shopFloor')
+                .where('itemName', '==', item.itemName)
+                .where('branch', '==', targetBranch);
+            const snap = await floorRef.get();
+            if (snap.empty) {
+                await db.collection('shopFloor').add({
+                    itemName: item.itemName,
+                    branch: targetBranch,
+                    stock: item.stock,
+                    unitPrice: item.unitPrice,
+                    location: 'Floor Shelf A',
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                snap.forEach(doc => {
+                    doc.ref.update({
+                        stock: firebase.firestore.FieldValue.increment(item.stock),
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                });
+            }
+        }
+        alert(`✅ Moved ${itemsToMove.length} items to shop floor.`);
+        renderWarehouse();
+    }
 
     // ==================== Modal close functions ====================
     function closeModal(id) {
@@ -562,7 +845,7 @@
     document.getElementById('searchItem').addEventListener('input', renderWarehouse);
     document.getElementById('filterBranch').addEventListener('change', renderWarehouse);
 
-    console.log('NEVAMAK Warehouse Management loaded with "Show All" toggle and all items visible.');
+    console.log('NEVAMAK Warehouse Management loaded with bulk actions.');
 </script>
 </body>
 </html>
