@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Invoice Repository</title>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
-    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -55,6 +53,7 @@
         .invoice-preview table { width: 100%; border-collapse: collapse; }
         .invoice-preview th, .invoice-preview td { border: 1px solid #ddd; padding: 8px; }
         .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; }
+        .moved-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
         @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
     </style>
 </head>
@@ -66,6 +65,7 @@
             <a href="index.html">🏠 Dashboard</a>
             <a href="chat.html">💬 Chat</a>
             <a href="reports.html">📊 Reports</a>
+            <a href="warehouse.html">🏚️ Warehouse</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -147,6 +147,23 @@
     </div>
 </div>
 
+<!-- Move to Warehouse Modal -->
+<div id="moveWarehouseModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('moveWarehouseModal')">&times;</span>
+        <h3>🏚️ Move Invoice Items to Warehouse</h3>
+        <p><strong>Invoice #:</strong> <span id="moveInvoiceNumber"></span></p>
+        <p><strong>Customer:</strong> <span id="moveCustomer"></span></p>
+        <p><strong>Date:</strong> <span id="moveDate"></span></p>
+        <div id="moveItemsList"></div>
+        <div style="display:flex; gap:12px; margin-top:16px;">
+            <button id="confirmMoveBtn" class="btn-success" style="flex:2;">✅ Move All to Warehouse</button>
+            <button onclick="closeModal('moveWarehouseModal')" class="btn-danger" style="flex:1;">Cancel</button>
+        </div>
+        <div id="moveMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
 <script>
     // ==================== Firebase Config ====================
     const firebaseConfig = {
@@ -169,6 +186,7 @@
     let currentUserEmail = '';
     let sendInvoiceId = null;
     let importedItems = [];
+    let moveInvoiceId = null;
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -238,7 +256,7 @@
     }
     invoiceItemsContainer.addEventListener('input', updateCostPreview);
 
-    // ==================== Import Excel (Enhanced Column Detection) ====================
+    // ==================== Import Excel ====================
     importExcelBtn.addEventListener('click', () => excelFileInput.click());
 
     excelFileInput.addEventListener('change', function(e) {
@@ -264,18 +282,14 @@
                     return;
                 }
 
-                // Detect column names (case-insensitive) with more variations
                 const headers = Object.keys(json[0]);
                 const findColumn = (variations) => {
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
-                            if (hLower === v.toLowerCase().trim()) {
-                                return h;
-                            }
+                            if (hLower === v.toLowerCase().trim()) return h;
                         }
                     }
-                    // If not found, try partial match (contains)
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
@@ -288,15 +302,15 @@
                 };
 
                 const itemCol = findColumn([
-                    'item', 'product', 'product name', 'item name', 'description', 'description of goods', 
-                    'goods', 'name', 'particulars', 'details', 'item description', 'product description'
+                    'item', 'product', 'product name', 'item name', 'description', 'description of goods',
+                    'goods', 'name', 'particulars', 'details'
                 ]);
                 const qtyCol = findColumn([
-                    'quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered', 'ordered'
+                    'quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered'
                 ]);
                 const priceCol = findColumn([
-                    'unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 
-                    'unit rate', 'rate per unit', 'cost per unit', 'amount' // fallback if amount is per unit
+                    'unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit',
+                    'unit rate', 'cost per unit'
                 ]);
 
                 console.log('🔍 Detected columns:', { itemCol, qtyCol, priceCol });
@@ -307,18 +321,12 @@
                     return;
                 }
 
-                // Parse items
                 const parsedItems = [];
                 json.forEach(row => {
                     const name = String(row[itemCol] || '').trim();
                     let qty = parseFloat(row[qtyCol]) || 0;
                     let price = parseFloat(row[priceCol]) || 0;
-                    // If price is 0 but there is an "AMOUNT" column, we might use that as total, but we need unit price.
-                    // If the user has "AMOUNT" and "QUANTITY", we can compute unit price = amount / quantity.
-                    // But to keep it simple, we use the price column as is.
-                    // If price is 0 and there's an AMOUNT column, we can compute.
                     if (price === 0 && qty > 0) {
-                        // Try to find an "AMOUNT" or "TOTAL" column
                         const amountCol = findColumn(['amount', 'total', 'subtotal', 'net', 'gross']);
                         if (amountCol) {
                             const amount = parseFloat(row[amountCol]) || 0;
@@ -339,7 +347,6 @@
 
                 importedItems = parsedItems;
 
-                // Show preview
                 let previewHtml = `<p><strong>✅ Imported ${parsedItems.length} items:</strong></p>
                     <table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>`;
                 parsedItems.forEach(it => {
@@ -365,9 +372,7 @@
 
     window.applyImportedItems = function() {
         if (importedItems.length === 0) return;
-        // Clear existing items
         invoiceItemsContainer.innerHTML = '';
-        // Add imported items
         importedItems.forEach(it => {
             addItemRow(it.itemName, it.quantity, it.unitPrice);
         });
@@ -463,6 +468,7 @@
                 notes: notes,
                 items: items,
                 total: total,
+                movedToWarehouse: false,
                 createdBy: currentUserEmail,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -553,7 +559,7 @@
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
                 } else {
-                    html = '<table><tr><th>#</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Created By</th><th>Actions</th></tr>';
+                    html = '<table><tr><th>#</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
                     snap.forEach(doc => {
                         const d = doc.data();
                         const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
@@ -562,18 +568,20 @@
                             d.invoiceNumber.toLowerCase().includes(search) || 
                             d.customer.toLowerCase().includes(search);
                         if (!match) return;
+                        const moved = d.movedToWarehouse || false;
                         html += `<tr>
                             <td><strong>${d.invoiceNumber}</strong></td>
                             <td>${d.date}</td>
                             <td>${d.customer}</td>
                             <td>${itemsShort}</td>
                             <td class="cost-cell">₦${total.toLocaleString()}</td>
-                            <td>${d.createdBy || '-'}</td>
+                            <td>${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}</td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="viewInvoice('${doc.id}')">👁️</button>
                                 <button class="btn-sm btn-success" onclick="downloadPDF('${doc.id}')">📄</button>
                                 <button class="btn-sm btn-warning" onclick="downloadCSV('${doc.id}')">📊</button>
                                 <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
+                                ${!moved ? `<button class="btn-sm btn-secondary" onclick="openMoveWarehouseModal('${doc.id}')" style="background:#8e44ad; color:white;">🏚️ Move</button>` : ''}
                                 <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
                             </td>
                         </tr>`;
@@ -738,12 +746,14 @@
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
         document.getElementById('sendMessage').innerText = '';
+        document.getElementById('moveMessage').innerText = '';
     }
     window.closeModal = closeModal;
     window.onclick = function(event) {
         if (event.target.classList.contains('modal')) {
             event.target.style.display = 'none';
             document.getElementById('sendMessage').innerText = '';
+            document.getElementById('moveMessage').innerText = '';
         }
     };
 
@@ -795,9 +805,105 @@
         }
     };
 
+    // ==================== Move to Warehouse ====================
+    window.openMoveWarehouseModal = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            if (d.movedToWarehouse) {
+                alert('Items from this invoice have already been moved to warehouse.');
+                return;
+            }
+            moveInvoiceId = id;
+            document.getElementById('moveInvoiceNumber').innerText = d.invoiceNumber;
+            document.getElementById('moveCustomer').innerText = d.customer;
+            document.getElementById('moveDate').innerText = d.date;
+
+            let itemsHtml = '<table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>';
+            if (d.items && d.items.length > 0) {
+                d.items.forEach(it => {
+                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                });
+            } else {
+                itemsHtml += '<tr><td colspan="3">No items</td></tr>';
+            }
+            itemsHtml += '</table>';
+            document.getElementById('moveItemsList').innerHTML = itemsHtml;
+            document.getElementById('moveMessage').innerText = '';
+            document.getElementById('moveWarehouseModal').style.display = 'flex';
+        } catch (err) {
+            alert('Error loading invoice: ' + err.message);
+        }
+    };
+
+    document.getElementById('confirmMoveBtn').addEventListener('click', async () => {
+        if (!moveInvoiceId) return;
+        try {
+            const doc = await db.collection('invoices').doc(moveInvoiceId).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            if (d.movedToWarehouse) {
+                alert('Already moved.');
+                closeModal('moveWarehouseModal');
+                loadInvoices();
+                return;
+            }
+            // For each item, add to inventory (warehouse)
+            const items = d.items || [];
+            for (const item of items) {
+                const invRef = db.collection('inventory')
+                    .where('itemName', '==', item.itemName)
+                    .where('branch', '==', 'Lagos'); // default branch, could be made configurable
+                const snap = await invRef.get();
+                if (snap.empty) {
+                    await db.collection('inventory').add({
+                        itemName: item.itemName,
+                        branch: 'Lagos',
+                        stock: item.quantity,
+                        unitPrice: item.unitPrice,
+                        location: 'Shelf A',
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    // update existing
+                    snap.forEach(doc => {
+                        doc.ref.update({
+                            stock: firebase.firestore.FieldValue.increment(item.quantity),
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                }
+            }
+
+            // Mark invoice as moved
+            await db.collection('invoices').doc(moveInvoiceId).update({
+                movedToWarehouse: true,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Log activity
+            await db.collection('activityLog').add({
+                actionType: 'invoice_moved_to_warehouse',
+                invoiceNumber: d.invoiceNumber,
+                details: `Moved ${items.length} items from invoice ${d.invoiceNumber} to warehouse`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            document.getElementById('moveMessage').innerText = '✅ All items moved to warehouse.';
+            setTimeout(() => {
+                closeModal('moveWarehouseModal');
+                loadInvoices();
+            }, 1500);
+        } catch (err) {
+            document.getElementById('moveMessage').innerText = 'Error: ' + err.message;
+        }
+    });
+
     // ==================== Initialize ====================
     addItemRow();
-    console.log('NEVAMAK Invoice Repository loaded.');
+    console.log('NEVAMAK Invoice Repository loaded with Move to Warehouse.');
 </script>
 </body>
 </html>
