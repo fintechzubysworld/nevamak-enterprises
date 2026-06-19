@@ -70,6 +70,7 @@
         <div class="stat-card"><h4>Total Stock (units)</h4><div class="num" id="totalStock">-</div></div>
         <div class="stat-card"><h4>Low Stock Items</h4><div class="num" id="lowStockCount">-</div></div>
         <div class="stat-card"><h4>Branches</h4><div class="num" id="branchCount">-</div></div>
+        <div class="stat-card"><h4>Total Stock Value (₦)</h4><div class="num" id="totalStockValue">-</div></div>
     </div>
 
     <!-- Filters -->
@@ -396,25 +397,48 @@
 
     // ==================== Stats ====================
     function updateStats() {
+        // Base displayDocs: inventory items that are visible (respecting showAll and branch filter, but not search)
         const displayDocs = (() => {
             let docs = inventoryData;
+            // Apply allowed branches
+            let allowedBranches = [];
+            if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
+                allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+            } else if (currentUserRole === 'abuja_rep') {
+                allowedBranches = ['Abuja'];
+            } else if (currentUserRole === 'ph_rep') {
+                allowedBranches = ['Portharcourt'];
+            } else {
+                allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+            }
+            docs = docs.filter(d => allowedBranches.includes(d.branch));
+
+            // Apply showAll filter (hide floor items if not showAll)
             if (!showAll) {
                 docs = docs.filter(d => {
                     const key = d.itemName + '|' + d.branch;
-                    const floorStock = floorData[key] || 0;
-                    return floorStock === 0;
+                    return (floorData[key] || 0) === 0;
                 });
+            }
+            // Apply branch filter (from dropdown)
+            const filterVal = document.getElementById('filterBranch').value;
+            if (filterVal !== 'all') {
+                docs = docs.filter(d => d.branch === filterVal);
             }
             return docs;
         })();
+
         let totalItems = displayDocs.length;
         let totalStock = displayDocs.reduce((sum, d) => sum + (d.stock || 0), 0);
         let lowStock = displayDocs.filter(d => d.stock <= LOW_STOCK_THRESHOLD).length;
         let branches = new Set(displayDocs.map(d => d.branch));
+        let totalStockValue = displayDocs.reduce((sum, d) => sum + ((d.stock || 0) * (d.unitPrice || 0)), 0);
+
         document.getElementById('totalItems').innerText = totalItems;
         document.getElementById('totalStock').innerText = totalStock;
         document.getElementById('lowStockCount').innerText = lowStock;
         document.getElementById('branchCount').innerText = branches.size;
+        document.getElementById('totalStockValue').innerText = '₦' + totalStockValue.toLocaleString();
     }
 
     // ==================== Admin Actions ====================
@@ -873,7 +897,7 @@
     document.getElementById('searchItem').addEventListener('input', renderWarehouse);
     document.getElementById('filterBranch').addEventListener('change', renderWarehouse);
 
-    console.log('NEVAMAK Warehouse Management loaded with Move All for branch reps.');
+    console.log('NEVAMAK Warehouse Management loaded with total stock value.');
 </script>
 </body>
 </html>
