@@ -23,6 +23,7 @@
         .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
         .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
         .filters button.export { background: #27ae60; }
+        .filters label { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; }
         .section-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
@@ -72,6 +73,9 @@
             <option value="Portharcourt">Port Harcourt</option>
             <option value="Lagos">Lagos</option>
         </select>
+        <label>
+            <input type="checkbox" id="showAllItems"> 📦 Show all items (including floor)
+        </label>
         <button id="addStockBtn" style="background:#27ae60; display: none;">➕ Add Stock</button>
         <button class="export" onclick="exportCSV('warehouseTable')">📄 Export CSV</button>
         <a href="shop_floor.html" style="background:#8e44ad; color:white; padding:8px 20px; border-radius:40px; text-decoration:none;">🏪 View Shop Floor</a>
@@ -140,8 +144,9 @@
     let currentUserRole = '';
     let currentUserEmail = '';
     const LOW_STOCK_THRESHOLD = 5;
-    let inventoryData = []; // cache for inventory docs
-    let floorData = {}; // cache for floor items: key = itemName+branch, stock
+    let inventoryData = [];
+    let floorData = {};
+    let showAll = false;
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
@@ -155,9 +160,12 @@
         if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
             document.getElementById('addStockBtn').style.display = 'inline-block';
         }
-        // Start listening to both collections
         listenToInventory();
         listenToShopFloor();
+        document.getElementById('showAllItems').addEventListener('change', function() {
+            showAll = this.checked;
+            renderWarehouse();
+        });
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
@@ -185,7 +193,6 @@
             renderWarehouse();
         }, (error) => {
             console.error('Shop floor listener error:', error);
-            // Non-critical, we'll continue with empty floor data
         });
     }
 
@@ -194,7 +201,6 @@
         const searchInput = document.getElementById('searchItem');
         const branchFilter = document.getElementById('filterBranch');
 
-        // Apply role-based branch filtering
         let allowedBranches = [];
         if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
             allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
@@ -206,41 +212,37 @@
             allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
         }
 
-        // Filter inventory by allowed branches, search, branch filter, and exclude items on shop floor (stock > 0)
         let docs = inventoryData.filter(d => allowedBranches.includes(d.branch));
 
-        // Exclude items that are currently on shop floor (stock > 0)
-        docs = docs.filter(d => {
-            const key = d.itemName + '|' + d.branch;
-            const floorStock = floorData[key] || 0;
-            // Only show if not on floor or floor stock is 0 (returned)
-            return floorStock === 0;
-        });
+        // Apply "Show All" filter: if not showAll, hide items that are on floor (floor stock > 0)
+        if (!showAll) {
+            docs = docs.filter(d => {
+                const key = d.itemName + '|' + d.branch;
+                const floorStock = floorData[key] || 0;
+                return floorStock === 0;
+            });
+        }
 
-        // Apply search filter
         const search = searchInput.value.toLowerCase().trim();
         if (search) {
             docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
         }
 
-        // Apply branch filter from dropdown
         const filterVal = branchFilter.value;
         if (filterVal !== 'all') {
             docs = docs.filter(d => d.branch === filterVal);
         }
 
-        // Sort
         docs.sort((a, b) => {
             if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
             return (a.itemName || '').localeCompare(b.itemName || '');
         });
 
         if (docs.length === 0) {
-            document.getElementById('warehouseList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No warehouse items. Items moved to shop floor are hidden until returned.</p>';
+            document.getElementById('warehouseList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No warehouse items found.</p>';
             return;
         }
 
-        // Determine if user can perform actions
         const canManage = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
         const canMove = (canManage || currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep');
 
@@ -255,14 +257,18 @@
                 ${canMove ? '<th>Actions</th>' : ''}
             </tr>`;
         docs.forEach(d => {
+            const key = d.itemName + '|' + d.branch;
+            const floorStock = floorData[key] || 0;
+            const isOnFloor = floorStock > 0;
             const isLow = d.stock <= LOW_STOCK_THRESHOLD;
             const rowClass = isLow ? 'low-stock' : '';
             const location = d.location || 'N/A';
             const lastUpdated = d.lastUpdated ? new Date(d.lastUpdated.toDate()).toLocaleString() : 'N/A';
-            const onFloor = floorData[d.itemName + '|' + d.branch] || 0;
-            const isOnFloor = onFloor > 0;
             html += `<tr class="${rowClass}">
-                <td><strong>${d.itemName}</strong> ${isOnFloor ? '<span class="on-floor-tag">On Floor</span>' : ''}</td>
+                <td>
+                    <strong>${d.itemName}</strong>
+                    ${isOnFloor ? '<span class="on-floor-tag">On Floor</span>' : ''}
+                </td>
                 <td>${d.branch}</td>
                 <td>${d.stock}</td>
                 <td>₦${(d.unitPrice || 0).toLocaleString()}</td>
@@ -279,22 +285,26 @@
         html += '</table>';
         document.getElementById('warehouseList').innerHTML = html;
 
-        // Also update stats
         updateStats();
     }
 
     // ==================== Stats ====================
     function updateStats() {
-        // Total items (including those on floor? we want total in warehouse excluding floor)
-        const visibleItems = inventoryData.filter(d => {
-            const key = d.itemName + '|' + d.branch;
-            const floorStock = floorData[key] || 0;
-            return floorStock === 0;
-        });
-        let totalItems = visibleItems.length;
-        let totalStock = visibleItems.reduce((sum, d) => sum + (d.stock || 0), 0);
-        let lowStock = visibleItems.filter(d => d.stock <= LOW_STOCK_THRESHOLD).length;
-        let branches = new Set(visibleItems.map(d => d.branch));
+        const displayDocs = (() => {
+            let docs = inventoryData;
+            if (!showAll) {
+                docs = docs.filter(d => {
+                    const key = d.itemName + '|' + d.branch;
+                    const floorStock = floorData[key] || 0;
+                    return floorStock === 0;
+                });
+            }
+            return docs;
+        })();
+        let totalItems = displayDocs.length;
+        let totalStock = displayDocs.reduce((sum, d) => sum + (d.stock || 0), 0);
+        let lowStock = displayDocs.filter(d => d.stock <= LOW_STOCK_THRESHOLD).length;
+        let branches = new Set(displayDocs.map(d => d.branch));
         document.getElementById('totalItems').innerText = totalItems;
         document.getElementById('totalStock').innerText = totalStock;
         document.getElementById('lowStockCount').innerText = lowStock;
@@ -403,7 +413,7 @@
     let moveItemData = {};
 
     window.openMoveFloorModal = function(id, itemName, branch, stock, unitPrice) {
-        // Check permissions: admin can move any branch; branch reps only their branch
+        // Check permissions
         if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
             // allowed
         } else if (currentUserRole === 'abuja_rep' && branch === 'Abuja') {
@@ -415,7 +425,6 @@
             return;
         }
 
-        // Check if item is already on floor
         const key = itemName + '|' + branch;
         const floorStock = floorData[key] || 0;
         if (floorStock > 0) {
@@ -536,7 +545,7 @@
     document.getElementById('searchItem').addEventListener('input', renderWarehouse);
     document.getElementById('filterBranch').addEventListener('change', renderWarehouse);
 
-    console.log('NEVAMAK Warehouse Management loaded with floor visibility filter.');
+    console.log('NEVAMAK Warehouse Management loaded with "Show All" toggle.');
 </script>
 </body>
 </html>
