@@ -23,6 +23,7 @@
         .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
         .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
         .filters button.export { background: #27ae60; }
+        .filters button.btn-floor { background: #8e44ad; color: white; }
         .filters label { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; }
         .section-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
@@ -86,6 +87,7 @@
         </label>
         <button id="addStockBtn" style="background:#27ae60; display: none;">➕ Add Stock</button>
         <button class="export" onclick="exportCSV('warehouseTable')">📄 Export CSV</button>
+        <button id="moveAllToFloorBtn" class="btn-floor" style="display:none;">🏪 Move All to Floor</button>
         <a href="shop_floor.html" style="background:#8e44ad; color:white; padding:8px 20px; border-radius:40px; text-decoration:none;">🏪 View Shop Floor</a>
     </div>
 
@@ -103,7 +105,6 @@
             <option value="Lagos">Lagos</option>
         </select>
         <button class="btn-bulk" id="bulkActionBtn">▶ Execute</button>
-        <button class="btn-bulk-floor" id="moveAllToFloorBtn">🏪 Move All to Floor</button>
         <button class="btn-sm btn-danger" id="clearSelectionBtn">✖ Clear</button>
     </div>
 
@@ -198,10 +199,17 @@
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
         }
-        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
+        const canManage = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+        const canMove = (canManage || currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep');
+
+        if (canManage) {
             document.getElementById('addStockBtn').style.display = 'inline-block';
             document.getElementById('bulkActions').classList.add('show');
         }
+        if (canMove) {
+            document.getElementById('moveAllToFloorBtn').style.display = 'inline-block';
+        }
+
         listenToInventory();
         listenToShopFloor();
         document.getElementById('showAllItems').addEventListener('change', function() {
@@ -726,26 +734,49 @@
         }
     });
 
-    // ==================== Move All to Floor (current view) ====================
+    // ==================== Move All to Floor (for all users with move permission) ====================
     async function moveAllToFloor() {
         const searchInput = document.getElementById('searchItem');
         const branchFilter = document.getElementById('filterBranch');
-        let docs = inventoryData;
-        if (!showAll) {
-            docs = docs.filter(d => {
-                const key = d.itemName + '|' + d.branch;
-                return (floorData[key] || 0) === 0;
-            });
-        }
-        let allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
-        if (currentUserRole === 'abuja_rep') allowedBranches = ['Abuja'];
-        else if (currentUserRole === 'ph_rep') allowedBranches = ['Portharcourt'];
-        docs = docs.filter(d => allowedBranches.includes(d.branch));
-        const search = searchInput.value.toLowerCase().trim();
-        if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
-        const filterVal = branchFilter.value;
-        if (filterVal !== 'all') docs = docs.filter(d => d.branch === filterVal);
 
+        // Determine the target branch
+        let targetBranch = branchFilter.value;
+        if (targetBranch === 'all') {
+            // For admin/lagos_sender, if "All Branches" is selected, they can choose to move all items from all branches? We'll limit to their allowed branches.
+            if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
+                targetBranch = null; // will move all branches
+            } else if (currentUserRole === 'abuja_rep') {
+                targetBranch = 'Abuja';
+            } else if (currentUserRole === 'ph_rep') {
+                targetBranch = 'Portharcourt';
+            }
+        }
+
+        // Get items: from inventory, not on floor, and within allowed branches
+        let docs = inventoryData;
+        // Filter by allowed branches
+        let allowedBranches = [];
+        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
+            allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+        } else if (currentUserRole === 'abuja_rep') {
+            allowedBranches = ['Abuja'];
+        } else if (currentUserRole === 'ph_rep') {
+            allowedBranches = ['Portharcourt'];
+        }
+        docs = docs.filter(d => allowedBranches.includes(d.branch));
+
+        // If targetBranch is set, filter by that branch (for admin with filter)
+        if (targetBranch && targetBranch !== 'all') {
+            docs = docs.filter(d => d.branch === targetBranch);
+        }
+
+        // Apply search filter
+        const search = searchInput.value.toLowerCase().trim();
+        if (search) {
+            docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+        }
+
+        // Exclude items already on floor
         const itemsToMove = docs.filter(d => {
             const key = d.itemName + '|' + d.branch;
             return (floorData[key] || 0) === 0 && d.stock > 0;
@@ -756,39 +787,55 @@
             return;
         }
 
-        if (!confirm(`Move all ${itemsToMove.length} items to shop floor (branch: ${filterVal !== 'all' ? filterVal : 'current branch'})?`)) return;
+        // Confirm
+        const branchDisplay = targetBranch || 'all branches';
+        if (!confirm(`Move all ${itemsToMove.length} items to shop floor (${branchDisplay})? This will move all items from the current view.`)) return;
 
-        const targetBranch = filterVal !== 'all' ? filterVal : (currentUserRole === 'abuja_rep' ? 'Abuja' : (currentUserRole === 'ph_rep' ? 'Portharcourt' : 'Lagos'));
-        for (const item of itemsToMove) {
-            const curRef = db.collection('inventory').doc(item.id);
-            await curRef.update({
-                stock: firebase.firestore.FieldValue.increment(-item.stock),
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            const floorRef = db.collection('shopFloor')
-                .where('itemName', '==', item.itemName)
-                .where('branch', '==', targetBranch);
-            const snap = await floorRef.get();
-            if (snap.empty) {
-                await db.collection('shopFloor').add({
-                    itemName: item.itemName,
-                    branch: targetBranch,
-                    stock: item.stock,
-                    unitPrice: item.unitPrice,
-                    location: 'Floor Shelf A',
+        // Execute move
+        try {
+            for (const item of itemsToMove) {
+                const curRef = db.collection('inventory').doc(item.id);
+                await curRef.update({
+                    stock: firebase.firestore.FieldValue.increment(-item.stock),
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                 });
-            } else {
-                snap.forEach(doc => {
-                    doc.ref.update({
-                        stock: firebase.firestore.FieldValue.increment(item.stock),
+                const floorRef = db.collection('shopFloor')
+                    .where('itemName', '==', item.itemName)
+                    .where('branch', '==', item.branch); // keep same branch
+                const snap = await floorRef.get();
+                if (snap.empty) {
+                    await db.collection('shopFloor').add({
+                        itemName: item.itemName,
+                        branch: item.branch,
+                        stock: item.stock,
+                        unitPrice: item.unitPrice,
+                        location: 'Floor Shelf A',
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                });
+                } else {
+                    snap.forEach(doc => {
+                        doc.ref.update({
+                            stock: firebase.firestore.FieldValue.increment(item.stock),
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                }
             }
+
+            await db.collection('activityLog').add({
+                actionType: 'move_all_to_floor',
+                branch: targetBranch || 'all',
+                itemCount: itemsToMove.length,
+                details: `Moved all ${itemsToMove.length} items to shop floor.`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            alert(`✅ Moved ${itemsToMove.length} items to shop floor.`);
+            renderWarehouse();
+        } catch (err) {
+            alert('Error: ' + err.message);
         }
-        alert(`✅ Moved ${itemsToMove.length} items to shop floor.`);
-        renderWarehouse();
     }
 
     // ==================== Modal close functions ====================
@@ -826,7 +873,7 @@
     document.getElementById('searchItem').addEventListener('input', renderWarehouse);
     document.getElementById('filterBranch').addEventListener('change', renderWarehouse);
 
-    console.log('NEVAMAK Warehouse Management loaded with bulk actions.');
+    console.log('NEVAMAK Warehouse Management loaded with Move All for branch reps.');
 </script>
 </body>
 </html>
