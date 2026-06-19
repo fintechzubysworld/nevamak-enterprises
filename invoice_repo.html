@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Invoice Repository</title>
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -89,7 +91,14 @@
                     <input type="text" id="customerName" placeholder="Customer / Recipient" required>
                     <input type="text" id="customerEmail" placeholder="Customer Email">
                 </div>
-                <input type="text" id="invoiceNotes" placeholder="Notes (optional)">
+                <div class="flex-row">
+                    <select id="invoiceBranch" required>
+                        <option value="Abuja">Abuja</option>
+                        <option value="Portharcourt">Port Harcourt</option>
+                        <option value="Lagos">Lagos</option>
+                    </select>
+                    <input type="text" id="invoiceNotes" placeholder="Notes (optional)">
+                </div>
                 <label>Items:</label>
                 <div id="invoiceItemsContainer">
                     <div class="item-row">
@@ -155,6 +164,13 @@
         <p><strong>Invoice #:</strong> <span id="moveInvoiceNumber"></span></p>
         <p><strong>Customer:</strong> <span id="moveCustomer"></span></p>
         <p><strong>Date:</strong> <span id="moveDate"></span></p>
+        <p><strong>Branch:</strong> 
+            <select id="moveBranchSelect">
+                <option value="Abuja">Abuja</option>
+                <option value="Portharcourt">Port Harcourt</option>
+                <option value="Lagos">Lagos</option>
+            </select>
+        </p>
         <div id="moveItemsList"></div>
         <div style="display:flex; gap:12px; margin-top:16px;">
             <button id="confirmMoveBtn" class="btn-success" style="flex:2;">✅ Move All to Warehouse</button>
@@ -200,6 +216,8 @@
     const searchInvoices = document.getElementById('searchInvoices');
     const refreshBtn = document.getElementById('refreshInvoicesBtn');
     const importPreviewContainer = document.getElementById('importPreviewContainer');
+    const invoiceBranch = document.getElementById('invoiceBranch');
+    const moveBranchSelect = document.getElementById('moveBranchSelect');
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
@@ -209,6 +227,16 @@
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
+            // Pre-set branch based on role
+            if (currentUserRole === 'abuja_rep') {
+                invoiceBranch.value = 'Abuja';
+                invoiceBranch.disabled = true;
+            } else if (currentUserRole === 'ph_rep') {
+                invoiceBranch.value = 'Portharcourt';
+                invoiceBranch.disabled = true;
+            } else {
+                invoiceBranch.disabled = false;
+            }
         }
         document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
         document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
@@ -404,6 +432,7 @@
         const customer = document.getElementById('customerName').value.trim() || 'N/A';
         const email = document.getElementById('customerEmail').value.trim() || 'N/A';
         const notes = document.getElementById('invoiceNotes').value.trim() || '';
+        const branch = document.getElementById('invoiceBranch').value;
         let itemsHtml = '';
         let total = 0;
         document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
@@ -423,6 +452,7 @@
             <p><strong>Invoice #:</strong> ${invNum}</p>
             <p><strong>Date:</strong> ${date}</p>
             <p><strong>Customer:</strong> ${customer}</p>
+            <p><strong>Branch:</strong> ${branch}</p>
             ${email !== 'N/A' ? `<p><strong>Email:</strong> ${email}</p>` : ''}
             <table>
                 <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
@@ -443,6 +473,7 @@
         const customer = document.getElementById('customerName').value.trim();
         const email = document.getElementById('customerEmail').value.trim();
         const notes = document.getElementById('invoiceNotes').value.trim();
+        const branch = document.getElementById('invoiceBranch').value;
         const items = [];
         let total = 0;
         document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
@@ -466,6 +497,7 @@
                 customer: customer,
                 customerEmail: email || '',
                 notes: notes,
+                branch: branch,
                 items: items,
                 total: total,
                 movedToWarehouse: false,
@@ -559,7 +591,7 @@
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
                 } else {
-                    html = '<table><tr><th>#</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+                    html = '<table><tr><th>#</th><th>Date</th><th>Customer</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
                     snap.forEach(doc => {
                         const d = doc.data();
                         const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
@@ -573,6 +605,7 @@
                             <td><strong>${d.invoiceNumber}</strong></td>
                             <td>${d.date}</td>
                             <td>${d.customer}</td>
+                            <td>${d.branch || 'N/A'}</td>
                             <td>${itemsShort}</td>
                             <td class="cost-cell">₦${total.toLocaleString()}</td>
                             <td>${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}</td>
@@ -620,6 +653,7 @@
                     <p><strong>Invoice #:</strong> ${d.invoiceNumber}</p>
                     <p><strong>Date:</strong> ${d.date}</p>
                     <p><strong>Customer:</strong> ${d.customer}</p>
+                    <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
                     <table style="width:100%; border-collapse:collapse;">
                         <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
@@ -660,6 +694,7 @@
                     <p><strong>Invoice #:</strong> ${d.invoiceNumber}</p>
                     <p><strong>Date:</strong> ${d.date}</p>
                     <p><strong>Customer:</strong> ${d.customer}</p>
+                    <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
                     <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                         <tr style="background:#f0f0f0;"><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
@@ -820,6 +855,16 @@
             document.getElementById('moveCustomer').innerText = d.customer;
             document.getElementById('moveDate').innerText = d.date;
 
+            // Set branch dropdown: default to invoice's branch, but allow admin to change
+            const branch = d.branch || 'Lagos';
+            moveBranchSelect.value = branch;
+            // If user is branch rep, disable the dropdown to prevent changing branch
+            if (currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep') {
+                moveBranchSelect.disabled = true;
+            } else {
+                moveBranchSelect.disabled = false;
+            }
+
             let itemsHtml = '<table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
@@ -839,6 +884,11 @@
 
     document.getElementById('confirmMoveBtn').addEventListener('click', async () => {
         if (!moveInvoiceId) return;
+        const targetBranch = moveBranchSelect.value;
+        if (!targetBranch) {
+            document.getElementById('moveMessage').innerText = 'Please select a branch.';
+            return;
+        }
         try {
             const doc = await db.collection('invoices').doc(moveInvoiceId).get();
             if (!doc.exists) return alert('Invoice not found.');
@@ -849,24 +899,23 @@
                 loadInvoices();
                 return;
             }
-            // For each item, add to inventory (warehouse)
+            // For each item, add to inventory (warehouse) with the selected branch
             const items = d.items || [];
             for (const item of items) {
                 const invRef = db.collection('inventory')
                     .where('itemName', '==', item.itemName)
-                    .where('branch', '==', 'Lagos'); // default branch, could be made configurable
+                    .where('branch', '==', targetBranch);
                 const snap = await invRef.get();
                 if (snap.empty) {
                     await db.collection('inventory').add({
                         itemName: item.itemName,
-                        branch: 'Lagos',
+                        branch: targetBranch,
                         stock: item.quantity,
                         unitPrice: item.unitPrice,
                         location: 'Shelf A',
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 } else {
-                    // update existing
                     snap.forEach(doc => {
                         doc.ref.update({
                             stock: firebase.firestore.FieldValue.increment(item.quantity),
@@ -886,7 +935,8 @@
             await db.collection('activityLog').add({
                 actionType: 'invoice_moved_to_warehouse',
                 invoiceNumber: d.invoiceNumber,
-                details: `Moved ${items.length} items from invoice ${d.invoiceNumber} to warehouse`,
+                branch: targetBranch,
+                details: `Moved ${items.length} items from invoice ${d.invoiceNumber} to warehouse (${targetBranch})`,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 user: currentUserEmail
             });
@@ -903,7 +953,7 @@
 
     // ==================== Initialize ====================
     addItemRow();
-    console.log('NEVAMAK Invoice Repository loaded with Move to Warehouse.');
+    console.log('NEVAMAK Invoice Repository loaded with branch support.');
 </script>
 </body>
 </html>
