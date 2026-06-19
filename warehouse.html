@@ -187,7 +187,7 @@
     let inventoryData = [];
     let floorData = {};
     let showAll = false;
-    let selectedItems = new Set(); // holds inventory doc IDs
+    let selectedItems = new Set();
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
@@ -208,11 +208,9 @@
             showAll = this.checked;
             renderWarehouse();
         });
-        // Bulk selection events
         document.getElementById('bulkActionBtn').addEventListener('click', executeBulkAction);
         document.getElementById('moveAllToFloorBtn').addEventListener('click', moveAllToFloor);
         document.getElementById('clearSelectionBtn').addEventListener('click', clearSelection);
-        // When action type changes, show/hide branch dropdown
         document.getElementById('bulkActionType').addEventListener('change', function() {
             const targetBranch = document.getElementById('bulkTargetBranch');
             if (this.value === 'branch') {
@@ -221,7 +219,6 @@
                 targetBranch.style.display = 'none';
             }
         });
-        // Initial hide branch dropdown if floor selected
         document.getElementById('bulkTargetBranch').style.display = 'none';
     });
 
@@ -271,14 +268,12 @@
 
         let docs = inventoryData.filter(d => allowedBranches.includes(d.branch));
 
-        // Count items on floor
         let floorItemsCount = 0;
         docs.forEach(d => {
             const key = d.itemName + '|' + d.branch;
             if (floorData[key] > 0) floorItemsCount++;
         });
 
-        // Apply "Show All" filter
         if (!showAll) {
             docs = docs.filter(d => {
                 const key = d.itemName + '|' + d.branch;
@@ -312,7 +307,6 @@
 
         const canManage = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
         const canMove = (canManage || currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep');
-        // Show checkboxes only if canManage (admin/lagos_sender can bulk move)
         const showCheckbox = canManage;
 
         let html = `<table id="warehouseTable">
@@ -367,7 +361,7 @@
         } else {
             selectedItems.add(id);
         }
-        renderWarehouse(); // re-render to reflect checkbox states
+        renderWarehouse();
     }
 
     function toggleAllCheckboxes(checked) {
@@ -611,7 +605,7 @@
     });
 
     // ==================== Bulk Actions ====================
-    function executeBulkAction() {
+    async function executeBulkAction() {
         if (selectedItems.size === 0) {
             alert('Please select at least one item.');
             return;
@@ -627,7 +621,6 @@
         document.getElementById('bulkConfirmMessage').innerText = confirmMessage;
         document.getElementById('bulkConfirmResult').innerText = '';
         document.getElementById('bulkConfirmModal').style.display = 'flex';
-        // Store action for confirmation
         document.getElementById('bulkConfirmModal').dataset.actionType = actionType;
         document.getElementById('bulkConfirmModal').dataset.targetBranch = targetBranch;
     }
@@ -652,15 +645,12 @@
             }
 
             if (actionType === 'branch') {
-                // Move to warehouse (different branch)
                 for (const item of itemsToMove) {
-                    // Decrement from current branch
                     const curRef = db.collection('inventory').doc(item.id);
                     await curRef.update({
                         stock: firebase.firestore.FieldValue.increment(-item.stock),
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    // Add to target branch (if not already exists with same item name)
                     const targetRef = db.collection('inventory')
                         .where('itemName', '==', item.itemName)
                         .where('branch', '==', targetBranch);
@@ -685,15 +675,12 @@
                 }
                 resultDiv.innerText = `✅ Moved ${itemsToMove.length} items to ${targetBranch} warehouse.`;
             } else {
-                // Move to shop floor (target branch)
                 for (const item of itemsToMove) {
-                    // Decrement warehouse stock
                     const curRef = db.collection('inventory').doc(item.id);
                     await curRef.update({
                         stock: firebase.firestore.FieldValue.increment(-item.stock),
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
-                    // Add to shop floor (target branch)
                     const floorRef = db.collection('shopFloor')
                         .where('itemName', '==', item.itemName)
                         .where('branch', '==', targetBranch);
@@ -719,7 +706,6 @@
                 resultDiv.innerText = `✅ Moved ${itemsToMove.length} items to shop floor (${targetBranch}).`;
             }
 
-            // Log activity
             await db.collection('activityLog').add({
                 actionType: 'bulk_move',
                 action: actionType,
@@ -730,7 +716,6 @@
                 user: currentUserEmail
             });
 
-            // Clear selection and close modal after delay
             setTimeout(() => {
                 selectedItems.clear();
                 closeModal('bulkConfirmModal');
@@ -742,8 +727,7 @@
     });
 
     // ==================== Move All to Floor (current view) ====================
-    function moveAllToFloor() {
-        // Get currently displayed items (excluding those already on floor)
+    async function moveAllToFloor() {
         const searchInput = document.getElementById('searchItem');
         const branchFilter = document.getElementById('filterBranch');
         let docs = inventoryData;
@@ -753,7 +737,6 @@
                 return (floorData[key] || 0) === 0;
             });
         }
-        // Apply filters (same as render)
         let allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
         if (currentUserRole === 'abuja_rep') allowedBranches = ['Abuja'];
         else if (currentUserRole === 'ph_rep') allowedBranches = ['Portharcourt'];
@@ -773,10 +756,8 @@
             return;
         }
 
-        // Confirm
         if (!confirm(`Move all ${itemsToMove.length} items to shop floor (branch: ${filterVal !== 'all' ? filterVal : 'current branch'})?`)) return;
 
-        // Execute
         const targetBranch = filterVal !== 'all' ? filterVal : (currentUserRole === 'abuja_rep' ? 'Abuja' : (currentUserRole === 'ph_rep' ? 'Portharcourt' : 'Lagos'));
         for (const item of itemsToMove) {
             const curRef = db.collection('inventory').doc(item.id);
