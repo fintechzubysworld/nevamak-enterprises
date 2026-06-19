@@ -43,6 +43,11 @@
         .invoice-box { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; }
         .invoice-box table { width: 100%; border-collapse: collapse; }
         .invoice-box th, .invoice-box td { border: 1px solid #ddd; padding: 8px; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
         @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
     </style>
 </head>
@@ -53,6 +58,7 @@
         <div class="nav-links">
             <a href="index.html">🏠 Dashboard</a>
             <a href="chat.html">💬 Chat</a>
+            <a href="invoice_repo.html">🧾 Invoice Repo</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -131,11 +137,14 @@
         <div class="modal-content">
             <span class="close" onclick="closeModal('invoiceModal')">&times;</span>
             <div id="invoiceContent"></div>
-            <button id="printInvoiceBtn" onclick="window.print()" style="margin-top:16px; background:#0a3d62; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">🖨️ Print</button>
-            <button id="downloadInvoiceBtn" onclick="downloadInvoicePDF()" style="margin-top:16px; background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">📥 Download PDF</button>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:16px;">
+                <button id="printInvoiceBtn" onclick="window.print()" style="background:#0a3d62; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">🖨️ Print</button>
+                <button id="downloadInvoiceBtn" style="background:#27ae60; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">📥 Download PDF</button>
+                <button id="saveToRepositoryBtn" style="background:#8e44ad; color:white; border:none; padding:10px 20px; border-radius:40px; cursor:pointer;">💾 Save to Invoice Repository</button>
+            </div>
+            <div id="saveMessage" style="color:green; margin-top:8px; text-align:center;"></div>
         </div>
     </div>
-
 </div>
 
 <script>
@@ -154,11 +163,12 @@
     const db = firebase.firestore();
 
     let currentUser = null;
+    let currentShipmentId = null; // to reference the shipment when saving
 
+    // ==================== Auth ====================
     auth.onAuthStateChanged(user => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
-        // Load all reports
         loadInvoices();
         loadReturns();
         loadDispatched();
@@ -242,6 +252,7 @@
         try {
             const doc = await db.collection('shipments').doc(shipId).get();
             if (!doc.exists) return;
+            currentShipmentId = shipId;
             const d = doc.data();
             const items = d.items || [];
             let itemsHtml = '';
@@ -258,17 +269,18 @@
                     <p><strong>Supplier:</strong> ${d.senderName}</p>
                     <p><strong>Branch:</strong> ${d.destinationBranch}</p>
                     <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
+                    <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
                     <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
                         <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
                         ${itemsHtml}
                         <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
-                        <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(d.transportCost||0).toLocaleString()}</strong></td></tr>
                     </table>
                     <p><em>Received by: ${d.receivingRep}</em></p>
                     <p>This is a system-generated invoice.</p>
                 </div>
             `;
             document.getElementById('invoiceContent').innerHTML = html;
+            document.getElementById('saveMessage').innerText = '';
             document.getElementById('invoiceModal').style.display = 'flex';
         } catch (error) {
             alert('Error loading invoice: ' + error.message);
@@ -284,7 +296,48 @@
         }
     };
 
-    async function downloadInvoicePDF() {
+    // ==================== Save to Invoice Repository ====================
+    document.getElementById('saveToRepositoryBtn').addEventListener('click', async () => {
+        if (!currentShipmentId) {
+            alert('No invoice loaded.');
+            return;
+        }
+        try {
+            const doc = await db.collection('shipments').doc(currentShipmentId).get();
+            if (!doc.exists) return alert('Shipment not found.');
+            const d = doc.data();
+            // Build invoice data
+            const items = (d.items || []).map(it => ({
+                itemName: it.itemName,
+                quantity: it.orderedQty || 0,
+                unitPrice: it.unitPrice || 0,
+                total: (it.orderedQty || 0) * (it.unitPrice || 0)
+            }));
+            const total = items.reduce((sum, i) => sum + i.total, 0);
+            const invoiceData = {
+                invoiceNumber: d.grnNumber || 'INV-' + Date.now().toString(36).toUpperCase(),
+                date: d.receivedDate ? new Date(d.receivedDate.toDate()).toISOString().slice(0,10) : new Date().toISOString().slice(0,10),
+                customer: d.senderName || 'N/A',
+                customerEmail: '',
+                notes: `Generated from GRN ${d.grnNumber}`,
+                items: items,
+                total: total,
+                createdBy: currentUser.email,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            await db.collection('invoices').add(invoiceData);
+            document.getElementById('saveMessage').innerText = '✅ Invoice saved to repository!';
+            setTimeout(() => {
+                document.getElementById('saveMessage').innerText = '';
+            }, 5000);
+        } catch (error) {
+            alert('Error saving to repository: ' + error.message);
+        }
+    });
+
+    // ==================== Download PDF (from modal) ====================
+    document.getElementById('downloadInvoiceBtn').addEventListener('click', async () => {
         const element = document.getElementById('invoiceContentInner');
         if (!element) return alert('No invoice to download.');
         try {
@@ -299,8 +352,9 @@
         } catch (error) {
             alert('Error generating PDF: ' + error.message);
         }
-    }
+    });
 
+    // ==================== Filter listeners ====================
     document.getElementById('invFilterBtn').addEventListener('click', loadInvoices);
 
     // ==================== Returns ====================
@@ -318,7 +372,6 @@
             }
             if (branch) query = query.where('branch', '==', branch);
             const snap = await query.get();
-            // Client-side sort by date desc
             let docs = [];
             snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             docs.sort((a, b) => (b.date?.toDate() || 0) - (a.date?.toDate() || 0));
@@ -362,7 +415,6 @@
             }
             if (status) query = query.where('status', '==', status);
             const snap = await query.get();
-            // Client-side sort by createdAt desc
             let docs = [];
             snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             docs.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
@@ -409,7 +461,6 @@
             }
             if (branch) query = query.where('destinationBranch', '==', branch);
             const snap = await query.get();
-            // Client-side sort by receivedDate desc
             let docs = [];
             snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             docs.sort((a, b) => (b.receivedDate?.toDate() || 0) - (a.receivedDate?.toDate() || 0));
@@ -454,33 +505,22 @@
                 query = query.where('timestamp', '<=', endDate);
             }
             const snap = await query.get();
-            // Client-side sort by timestamp desc
             let docs = [];
             snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             docs.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
-
-            // Apply search filter (if any)
-            if (search) {
-                docs = docs.filter(m => (m.text || '').toLowerCase().includes(search));
-            }
-
+            if (search) docs = docs.filter(m => (m.text || '').toLowerCase().includes(search));
             if (docs.length === 0) {
                 document.getElementById('chatList').innerHTML = '<p class="empty">No messages found. Try adjusting filters.</p>';
                 return;
             }
-
             let html = '<table id="chatTable"><tr><th>Time</th><th>Chat</th><th>Text</th><th>File</th></tr>';
             docs.forEach(m => {
                 let chatDisplay = 'Global';
                 if (m.chatId !== 'global') {
                     const parts = m.chatId.split('_');
                     const other = parts.find(p => p !== currentUser.uid);
-                    if (other) {
-                        // We don't have users list here, but we can just show the chatId
-                        chatDisplay = other.slice(0,6);
-                    } else {
-                        chatDisplay = m.chatId;
-                    }
+                    if (other) chatDisplay = other.slice(0,6);
+                    else chatDisplay = m.chatId;
                 }
                 const text = m.text || '';
                 const file = m.fileName ? `📎 ${m.fileName}` : '';
@@ -502,7 +542,7 @@
     document.getElementById('chatFilterBtn').addEventListener('click', loadChatHistory);
     document.getElementById('chatSearch').addEventListener('input', loadChatHistory);
 
-    console.log('NEVAMAK Reports loaded successfully.');
+    console.log('NEVAMAK Reports loaded with Save to Repository feature.');
 </script>
 </body>
 </html>
