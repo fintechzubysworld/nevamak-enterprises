@@ -40,6 +40,7 @@
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
         .btn-floor { background: #8e44ad; color: white; }
+        .hidden-count { font-size: 0.8rem; color: #888; margin-left: 12px; }
         @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
     </style>
 </head>
@@ -75,6 +76,7 @@
         </select>
         <label>
             <input type="checkbox" id="showAllItems"> 📦 Show all items (including floor)
+            <span class="hidden-count" id="hiddenCount"></span>
         </label>
         <button id="addStockBtn" style="background:#27ae60; display: none;">➕ Add Stock</button>
         <button class="export" onclick="exportCSV('warehouseTable')">📄 Export CSV</button>
@@ -212,7 +214,15 @@
             allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
         }
 
+        // Start with all inventory items that belong to allowed branches
         let docs = inventoryData.filter(d => allowedBranches.includes(d.branch));
+
+        // Count items on floor
+        let floorItemsCount = 0;
+        docs.forEach(d => {
+            const key = d.itemName + '|' + d.branch;
+            if (floorData[key] > 0) floorItemsCount++;
+        });
 
         // Apply "Show All" filter: if not showAll, hide items that are on floor (floor stock > 0)
         if (!showAll) {
@@ -223,23 +233,30 @@
             });
         }
 
+        // Show hidden count
+        const hiddenCount = floorItemsCount - (showAll ? 0 : floorItemsCount);
+        document.getElementById('hiddenCount').innerText = hiddenCount > 0 ? `(${hiddenCount} hidden on floor)` : '';
+
+        // Apply search filter
         const search = searchInput.value.toLowerCase().trim();
         if (search) {
             docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
         }
 
+        // Apply branch filter from dropdown
         const filterVal = branchFilter.value;
         if (filterVal !== 'all') {
             docs = docs.filter(d => d.branch === filterVal);
         }
 
+        // Sort
         docs.sort((a, b) => {
             if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
             return (a.itemName || '').localeCompare(b.itemName || '');
         });
 
         if (docs.length === 0) {
-            document.getElementById('warehouseList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No warehouse items found.</p>';
+            document.getElementById('warehouseList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No warehouse items found. Check your filters or move items from invoices.</p>';
             return;
         }
 
@@ -290,6 +307,7 @@
 
     // ==================== Stats ====================
     function updateStats() {
+        // Stats based on currently displayed items (respecting showAll)
         const displayDocs = (() => {
             let docs = inventoryData;
             if (!showAll) {
@@ -413,7 +431,6 @@
     let moveItemData = {};
 
     window.openMoveFloorModal = function(id, itemName, branch, stock, unitPrice) {
-        // Check permissions
         if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
             // allowed
         } else if (currentUserRole === 'abuja_rep' && branch === 'Abuja') {
@@ -545,7 +562,7 @@
     document.getElementById('searchItem').addEventListener('input', renderWarehouse);
     document.getElementById('filterBranch').addEventListener('change', renderWarehouse);
 
-    console.log('NEVAMAK Warehouse Management loaded with "Show All" toggle.');
+    console.log('NEVAMAK Warehouse Management loaded with "Show All" toggle and all items visible.');
 </script>
 </body>
 </html>
