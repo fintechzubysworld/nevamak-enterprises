@@ -319,6 +319,7 @@
         return null;
     }
 
+    // Upload to Drive and return a public thumbnail URL
     async function uploadToDrive(file) {
         console.log('📤 Uploading to Drive:', file.name);
         let token = getDriveToken();
@@ -352,12 +353,10 @@
             }
 
             const data = await response.json();
-            const fileInfo = await fetch(`https://www.googleapis.com/drive/v3/files/${data.id}?fields=webContentLink`, {
-                headers: { 'Authorization': `Bearer ${token}` },
-            });
-            const fileData = await fileInfo.json();
-            console.log('✅ Upload successful, link:', fileData.webContentLink);
-            return fileData.webContentLink || `https://drive.google.com/thumbnail?id=${data.id}`;
+            console.log('✅ Upload successful, file ID:', data.id);
+            // Return thumbnail URL (works in img tags without auth)
+            const thumbnailUrl = `https://drive.google.com/thumbnail?id=${data.id}&sz=w200`;
+            return thumbnailUrl;
         } catch (err) {
             console.error('Upload error:', err);
             if (err.message.includes('401') || err.message.includes('403')) {
@@ -512,6 +511,7 @@
         profileMessage.innerText = 'Uploading...';
         try {
             const url = await uploadToDrive(file);
+            console.log('📌 Saving profile URL:', url);
             await db.collection('users').doc(currentUserId).update({
                 profilePic: url,
             });
@@ -564,7 +564,7 @@
             const onlineClass = u.online ? 'true' : 'false';
             const unread = getUnreadCount(u.uid);
             const avatarHtml = u.profilePic ?
-                `<img src="${u.profilePic}" style="width:100%;height:100%;object-fit:cover;" />` :
+                `<img src="${u.profilePic}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.innerHTML='<span>${u.email.charAt(0).toUpperCase()}</span>'"/>` :
                 `<span>${u.email.charAt(0).toUpperCase()}</span>`;
             html += `<div class="user-item ${isActive ? 'active' : ''}" data-userid="${u.uid}" onclick="switchChat('${u.uid}')">
                         <span class="online online-${onlineClass}"></span>
@@ -962,7 +962,7 @@
         });
     }
 
-    console.log('NEVAMAK Chat loaded. Check console for errors.');
+    console.log('NEVAMAK Chat loaded. Profile pictures will use Drive thumbnails.');
 </script>
 </body>
 </html>
