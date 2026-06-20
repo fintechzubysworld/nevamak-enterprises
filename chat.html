@@ -174,7 +174,7 @@
     </div>
 </div>
 
-<!-- Profile Modal (reuse from chat) -->
+<!-- Profile Modal -->
 <div id="profileModal" class="modal profile-modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('profileModal')">&times;</span>
@@ -215,12 +215,11 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    // ==================== EmailJS Config (free account) ====================
-    // Sign up at https://www.emailjs.com/ and get your Public Key, Service ID, Template ID
-    const EMAILJS_PUBLIC_KEY = 'YOUR_EMAILJS_PUBLIC_KEY';  // <-- REPLACE
-    const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';          // <-- REPLACE
-    const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';        // <-- REPLACE
-    emailjs.init(EMAILJS_PUBLIC_KEY); // Initialize EmailJS
+    // ==================== EmailJS Config ====================
+    const EMAILJS_PUBLIC_KEY = 'uwDz5T65dSTM4RRJ3';
+    const EMAILJS_SERVICE_ID = 'service_mpqnvxf';
+    const EMAILJS_TEMPLATE_ID = 'template_hjum2aa';
+    emailjs.init(EMAILJS_PUBLIC_KEY);
 
     // ==================== Google Drive Config ====================
     const DRIVE_FOLDER_ID = '1TjtzQiwAVLQ7ZPyDlBBNOq-xsbATAFwS';
@@ -235,7 +234,7 @@
     let currentUserId = "";
     let currentUserEmail = "";
     let currentFolder = 'inbox';
-    let allUsers = []; // for internal recipient list
+    let allUsers = [];
     let currentViewEmailId = null;
     let currentProfilePic = null;
 
@@ -398,7 +397,6 @@
         await loadProfilePicture();
         await loadUsers();
         switchFolder('inbox');
-        // Compose internal user dropdown
         populateInternalUsers();
     });
 
@@ -595,7 +593,6 @@
         if (!doc.exists) return;
         const email = doc.data();
         currentViewEmailId = emailId;
-        // Mark as read
         if (!email.read && currentFolder === 'inbox') {
             await doc.ref.update({ read: true });
         }
@@ -635,7 +632,6 @@
     };
 
     window.replyEmail = function() {
-        // Open compose with To pre-filled
         const doc = db.collection('emails').doc(currentViewEmailId);
         doc.get().then(snap => {
             const email = snap.data();
@@ -660,7 +656,6 @@
         composeModal.style.display = 'flex';
     }
 
-    // File attachment preview
     attachBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', function(e) {
         if (this.files.length > 0) {
@@ -699,7 +694,6 @@
         pendingFile = null;
     }
 
-    // Compose internal user selection
     composeInternal.addEventListener('change', function() {
         if (this.value) {
             const existing = composeTo.value.split(',').map(s => s.trim()).filter(s => s);
@@ -711,7 +705,6 @@
         }
     });
 
-    // Submit compose (Send)
     composeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const toRaw = composeTo.value.trim();
@@ -749,9 +742,7 @@
 
         try {
             await db.collection('emails').add(emailData);
-            // If external, send via EmailJS
             if (isExternal) {
-                // EmailJS requires a template with placeholders: to_email, subject, message, attachment_url
                 const templateParams = {
                     to_email: toList.join(', '),
                     subject: subject,
@@ -781,7 +772,6 @@
         }
     });
 
-    // Save Draft
     window.saveDraft = async function() {
         const toRaw = composeTo.value.trim();
         const subject = composeSubject.value.trim();
@@ -824,12 +814,10 @@
         }
     };
 
-    // ==================== Refresh ====================
     window.refreshFolder = function() {
         loadFolder(currentFolder);
     };
 
-    // ==================== Modal helpers ====================
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
         profileSaveBtn.disabled = true;
@@ -843,7 +831,6 @@
         }
     };
 
-    // ==================== Drive status init ====================
     if (typeof google !== 'undefined' && google.accounts) {
         initDriveClient();
     } else {
@@ -856,8 +843,7 @@
         });
     }
 
-    console.log('NEVAMAK Email Client loaded.');
-    console.log('⚠️ Remember to set your EmailJS Public Key, Service ID, and Template ID in the code.');
+    console.log('NEVAMAK Email Client loaded with EmailJS configuration.');
 </script>
 </body>
 </html>
