@@ -74,6 +74,7 @@
         .profile-modal .btn-upload { background: #27ae60; color: white; border: none; padding: 8px 20px; border-radius: 40px; cursor: pointer; }
         .profile-modal .btn-save { background: #0a3d62; color: white; border: none; padding: 10px 24px; border-radius: 40px; cursor: pointer; font-weight: bold; }
         .profile-modal .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+        .file-input-label { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -188,21 +189,18 @@
     let accessToken = null;
     let isDriveSignedIn = false;
     let driveInitialized = false;
-    let pendingFileUpload = null; // file to upload after drive sign-in
-
-    // ==================== State ====================
+    let pendingFileUpload = null;
     let currentUser = null;
     let currentUserId = "";
     let currentUserEmail = "";
     let currentChatId = "global";
-    let currentChatDisplay = "Global Chat";
     let allUsers = [];
     let unsubscribeMessages = null;
     let unsubscribeTyping = null;
     let typingTimeout = null;
     let currentProfilePic = null;
 
-    // ==================== DOM ====================
+    // ==================== DOM refs ====================
     const messagesContainer = document.getElementById('messagesContainer');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
@@ -233,16 +231,21 @@
 
     // ==================== Google Drive OAuth ====================
     function initDriveClient() {
+        console.log('🔄 Initializing Drive client...');
         if (typeof google === 'undefined' || !google.accounts) {
             console.warn('Google Identity Services not loaded – retrying in 1s');
             setTimeout(initDriveClient, 1000);
             return;
         }
-        if (driveInitialized) return;
+        if (driveInitialized) {
+            console.log('✅ Drive client already initialized');
+            return;
+        }
         tokenClient = google.accounts.oauth2.initTokenClient({
             client_id: CLIENT_ID,
             scope: SCOPES,
             callback: (tokenResponse) => {
+                console.log('🔑 Token callback:', tokenResponse);
                 if (tokenResponse.error) {
                     console.error('Drive token error:', tokenResponse);
                     driveStatusText.innerText = '🔴 Drive Error';
@@ -256,22 +259,23 @@
                 driveStatusText.innerText = '✅ Drive';
                 driveSignInBtn.style.display = 'none';
                 driveInitialized = true;
-                // If there was a pending file upload, process it now
+                console.log('✅ Drive token obtained successfully');
                 if (pendingFileUpload) {
                     const file = pendingFileUpload;
                     pendingFileUpload = null;
                     uploadAndSendFile(file);
                 }
-                // Update profile modal drive status if open
                 if (profileModal.style.display === 'flex') {
                     profileDriveStatus.innerText = '✅ Connected';
                 }
             },
         });
         driveInitialized = true;
+        console.log('✅ Drive client initialized');
     }
 
     function signInToDrive() {
+        console.log('🔑 Signing in to Drive...');
         if (!tokenClient) {
             initDriveClient();
             if (!tokenClient) {
@@ -293,7 +297,6 @@
             return accessToken;
         }
         if (accessToken) return accessToken;
-        // Try silent refresh if token client exists
         if (tokenClient && !isDriveSignedIn) {
             tokenClient.requestAccessToken({
                 prompt: 'none',
@@ -316,11 +319,10 @@
         return null;
     }
 
-    // ==================== Upload to Drive ====================
     async function uploadToDrive(file) {
+        console.log('📤 Uploading to Drive:', file.name);
         let token = getDriveToken();
         if (!token) {
-            // Try to get token silently
             token = getDriveToken();
             if (!token) {
                 driveStatusText.innerText = '🔐 Drive';
@@ -328,7 +330,6 @@
                 throw new Error('Not signed in to Google Drive. Please click "Sign in" in the chat header.');
             }
         }
-
         try {
             const base64 = await readFileAsBase64(file);
             const metadata = {
@@ -351,13 +352,14 @@
             }
 
             const data = await response.json();
-            // Get the shareable link
             const fileInfo = await fetch(`https://www.googleapis.com/drive/v3/files/${data.id}?fields=webContentLink`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             const fileData = await fileInfo.json();
+            console.log('✅ Upload successful, link:', fileData.webContentLink);
             return fileData.webContentLink || `https://drive.google.com/thumbnail?id=${data.id}`;
         } catch (err) {
+            console.error('Upload error:', err);
             if (err.message.includes('401') || err.message.includes('403')) {
                 localStorage.removeItem('drive_access_token');
                 localStorage.removeItem('drive_token_expiry');
@@ -380,13 +382,11 @@
         });
     }
 
-    // ==================== Upload and send file ====================
     async function uploadAndSendFile(file) {
         try {
             const fileUrl = await uploadToDrive(file);
             const fileName = file.name;
             const fileType = file.type;
-            // Now send message with file link
             const text = messageInput.value.trim();
             const chatId = currentChatId === 'global' ? 'global' : [currentUserId, currentChatId].sort().join('_');
             const senderName = currentUserEmail.split('@')[0];
@@ -406,7 +406,9 @@
             messageInput.value = '';
             messageInput.style.height = 'auto';
             clearTyping();
+            console.log('✅ File message sent.');
         } catch (err) {
+            console.error('Upload and send error:', err);
             alert('File upload failed: ' + err.message);
         }
     }
@@ -420,14 +422,12 @@
         currentUser = user;
         currentUserId = user.uid;
         currentUserEmail = user.email;
+        console.log('👤 User signed in:', currentUserEmail);
 
-        // Init Drive client
         initDriveClient();
         getDriveToken();
 
-        // Load profile picture
         await loadProfilePicture();
-
         await loadUsers();
         await updatePresence(true);
         switchChat('global');
@@ -450,29 +450,26 @@
                 avatarText.style.display = 'none';
                 avatarImg.style.display = 'block';
                 avatarImg.src = data.profilePic;
+                console.log('✅ Profile picture loaded:', data.profilePic);
             } else {
                 avatarText.style.display = 'block';
                 avatarImg.style.display = 'none';
                 avatarText.innerText = currentUserEmail.charAt(0).toUpperCase();
+                console.log('ℹ️ No profile picture found.');
             }
         } catch (err) {
             console.warn('Load profile pic error:', err);
         }
     }
 
-    // ==================== Profile Modal ====================
     function openProfileModal() {
-        // Populate info
         profileName.innerText = currentUserEmail.split('@')[0] || 'User';
         profileEmail.innerText = currentUserEmail;
-        // Get role
         db.collection('users').doc(currentUserId).get().then(doc => {
             const data = doc.data();
             profileRole.innerText = data?.role || 'User';
         });
-        // Drive status
         profileDriveStatus.innerText = isDriveSignedIn ? '✅ Connected' : '🔐 Not connected';
-        // Preview current picture
         if (currentProfilePic) {
             previewImg.style.display = 'block';
             previewText.style.display = 'none';
@@ -486,13 +483,12 @@
         profileSaveBtn.disabled = true;
         profileMessage.innerText = '';
         profileModal.style.display = 'flex';
+        console.log('📝 Profile modal opened.');
     }
 
-    // Profile file input change
     profileFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
-        // Preview
         const reader = new FileReader();
         reader.onload = (ev) => {
             previewImg.style.display = 'block';
@@ -502,11 +498,10 @@
             profileMessage.innerText = '';
         };
         reader.readAsDataURL(file);
-        // Store the file for later upload
-        profileFileInput._file = file;
+        this._file = file;
+        console.log('📸 Profile photo selected:', file.name);
     });
 
-    // Save profile picture
     document.getElementById('profileSaveBtn').addEventListener('click', async function() {
         const file = profileFileInput._file;
         if (!file) {
@@ -517,24 +512,22 @@
         profileMessage.innerText = 'Uploading...';
         try {
             const url = await uploadToDrive(file);
-            // Update Firestore
             await db.collection('users').doc(currentUserId).update({
                 profilePic: url,
             });
             currentProfilePic = url;
-            // Update UI
             avatarText.style.display = 'none';
             avatarImg.style.display = 'block';
             avatarImg.src = url;
-            // Update preview
             previewImg.src = url;
             profileMessage.innerText = '✅ Profile picture updated!';
-            // Refresh user list
             loadUsers();
             setTimeout(() => closeModal('profileModal'), 1500);
+            console.log('✅ Profile picture saved.');
         } catch (err) {
             profileMessage.innerText = '❌ Error: ' + err.message;
             profileSaveBtn.disabled = false;
+            console.error('Profile save error:', err);
         }
     });
 
@@ -735,23 +728,19 @@
         return div;
     }
 
-    // ==================== Send Message (with file handling) ====================
+    // ==================== Send Message ====================
     async function sendMessage() {
         const text = messageInput.value.trim();
         const hasFile = fileInput.files.length > 0;
         if (!text && !hasFile) return;
 
-        // If there's a file, handle it separately
         if (hasFile) {
             const file = fileInput.files[0];
-            fileInput.value = ''; // clear
-            // Check drive sign-in
+            fileInput.value = '';
             if (!isDriveSignedIn && !getDriveToken()) {
-                // Store file and prompt sign-in
                 pendingFileUpload = file;
                 driveStatusText.innerText = '🔐 Drive';
                 driveSignInBtn.style.display = 'inline';
-                // Show the sign-in prompt in the drive status
                 alert('Please sign in to Google Drive first. Click "Sign in" in the chat header.');
                 return;
             }
@@ -763,7 +752,6 @@
             return;
         }
 
-        // Text-only message
         const chatId = currentChatId === 'global' ? 'global' : [currentUserId, currentChatId].sort().join('_');
         const senderName = currentUserEmail.split('@')[0];
         const msgData = {
@@ -781,6 +769,7 @@
 
         try {
             await db.collection('messages').add(msgData);
+            console.log('📨 Message sent.');
         } catch (err) {
             console.error('Send error:', err);
             alert('Failed to send message: ' + err.message);
@@ -813,7 +802,7 @@
     });
     document.addEventListener('click', () => emojiPicker.classList.remove('show'));
 
-    // ==================== Typing Indicator ====================
+    // ==================== Typing ====================
     messageInput.addEventListener('input', () => {
         if (currentChatId === 'global') return;
         const chatId = [currentUserId, currentChatId].sort().join('_');
@@ -858,7 +847,6 @@
         }
     }
 
-    // ==================== Mark Chat Read ====================
     async function markChatRead(chatId) {
         if (chatId === 'global') return;
         const composite = [currentUserId, chatId].sort().join('_');
@@ -884,7 +872,6 @@
         }
     }
 
-    // ==================== View File Modal ====================
     function viewFile(url, type) {
         const modal = document.getElementById('fileModal');
         const img = document.getElementById('fileModalImage');
@@ -905,14 +892,13 @@
         }
         modal.style.display = 'flex';
     }
-    window.viewFile = viewFile;
 
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
         profileSaveBtn.disabled = true;
         profileMessage.innerText = '';
     }
-    window.closeModal = closeModal;
+
     window.onclick = function(event) {
         if (event.target.classList.contains('modal')) {
             event.target.style.display = 'none';
@@ -933,7 +919,7 @@
         renderUserList(allUsers);
     }
 
-    // ==================== Send on Enter ====================
+    // ==================== Event listeners ====================
     messageInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -941,7 +927,6 @@
         }
     });
 
-    // ==================== Search Users ====================
     userSearch.addEventListener('input', () => {
         const q = userSearch.value.toLowerCase();
         document.querySelectorAll('.user-item[data-userid]').forEach(el => {
@@ -956,20 +941,15 @@
         });
     });
 
-    // ==================== Send Button ====================
     sendBtn.addEventListener('click', sendMessage);
-
-    // ==================== Auto-resize Textarea ====================
     messageInput.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = this.scrollHeight + 'px';
     });
 
-    // ==================== Drive Sign-in Button ====================
     driveSignInBtn.addEventListener('click', signInToDrive);
 
     // ==================== Init ====================
-    // Ensure Drive client is initialized when Google loads
     if (typeof google !== 'undefined' && google.accounts) {
         initDriveClient();
     } else {
@@ -982,7 +962,7 @@
         });
     }
 
-    console.log('NEVAMAK Chat loaded with Profile Modal and File Attachment fixes.');
+    console.log('NEVAMAK Chat loaded. Check console for errors.');
 </script>
 </body>
 </html>
