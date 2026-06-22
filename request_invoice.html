@@ -8,7 +8,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <!-- SheetJS for Excel/CSV parsing -->
+    <!-- SheetJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
@@ -173,7 +173,7 @@
     }
     reqContainer.addEventListener("input", updateReqPreview);
 
-    // ==================== Import from File ====================
+    // ==================== Import from File (Robust) ====================
     const fileInput = document.getElementById('fileInput');
     const importBtn = document.getElementById('importBtn');
     const importPreview = document.getElementById('importPreview');
@@ -206,11 +206,63 @@
                 try {
                     const data = new Uint8Array(ev.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
+
+                    // Check if headers are empty (e.g., __EMPTY)
                     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const json = XLSX.utils.sheet_to_json(firstSheet);
+                    let json = XLSX.utils.sheet_to_json(firstSheet);
+                    let headers = Object.keys(json[0] || {});
+
+                    // If all headers are like "__EMPTY" or empty strings, re-read without header
+                    const isEmptyHeader = (h) => h === '' || h.startsWith('__EMPTY');
+                    const allEmpty = headers.every(isEmptyHeader);
+
+                    if (allEmpty) {
+                        // Read as array of arrays, first row is data
+                        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                        if (rows.length === 0) {
+                            alert('No data found.');
+                            return;
+                        }
+                        // Assume first row is data (no header)
+                        const dataRows = rows;
+                        // Try to infer columns: col0 = item, col1 = quantity, col2 = price (if exists)
+                        const inferred = dataRows.map(row => {
+                            const name = String(row[0] || '').trim();
+                            const qty = parseFloat(row[1]) || 0;
+                            const price = parseFloat(row[2]) || 0;
+                            return { itemName: name, quantity: qty, estimatedPrice: price };
+                        }).filter(it => it.itemName && it.quantity > 0);
+                        if (inferred.length > 0) {
+                            importedItems = inferred;
+                            showImportPreview();
+                            return;
+                        }
+                        // If that fails, fallback to trying to detect columns by type
+                        const firstRow = rows[0];
+                        let itemIdx = 0, qtyIdx = 1, priceIdx = 2;
+                        // If first row has numbers in col2, we might need to swap
+                        // But we'll just use the default; if user has different order, they can use header row.
+                        alert('Auto‑detected columns: Item=col1, Quantity=col2, Price=col3. If your data is different, please add a header row.');
+                        const parsed = rows.map(row => ({
+                            itemName: String(row[itemIdx] || '').trim(),
+                            quantity: parseFloat(row[qtyIdx]) || 0,
+                            estimatedPrice: parseFloat(row[priceIdx]) || 0
+                        })).filter(it => it.itemName && it.quantity > 0);
+                        if (parsed.length > 0) {
+                            importedItems = parsed;
+                            showImportPreview();
+                            return;
+                        }
+                        alert('No valid items found. Ensure columns are: Item, Quantity, Price.');
+                        return;
+                    }
+
+                    // Normal case: headers exist
+                    json = XLSX.utils.sheet_to_json(firstSheet);
                     parseImportData(json);
+
                 } catch (err) {
-                    alert('Error reading spreadsheet: ' + err.message);
+                    alert('Error reading file: ' + err.message);
                 }
             };
             reader.readAsArrayBuffer(file);
@@ -226,7 +278,6 @@
             return;
         }
 
-        // Detect columns (case-insensitive)
         const headers = Object.keys(data[0]);
         const findColumn = (variations) => {
             for (const h of headers) {
@@ -277,8 +328,10 @@
             alert('No valid items found in file.');
             return;
         }
+        showImportPreview();
+    }
 
-        // Show preview
+    function showImportPreview() {
         let html = '<table><tr><th>Item</th><th>Qty</th><th>Est. Price</th></tr>';
         importedItems.forEach(it => {
             html += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.estimatedPrice.toFixed(2)}</td></tr>`;
@@ -291,9 +344,7 @@
 
     applyImportBtn.addEventListener('click', function() {
         if (importedItems.length === 0) return;
-        // Clear existing items
         reqContainer.innerHTML = '';
-        // Add imported items
         importedItems.forEach(it => {
             const div = document.createElement('div');
             div.className = 'item-row';
@@ -360,7 +411,7 @@
         }
     });
 
-    // ==================== Load Your Requests ====================
+    // ==================== Load Requests ====================
     function loadRequests() {
         db.collection('invoiceRequests')
             .where('requestedBy', '==', currentUser.email)
