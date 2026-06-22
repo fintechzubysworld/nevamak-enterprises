@@ -128,7 +128,8 @@
     let currentUser = null;
     let currentUserRole = '';
     let currentUserEmail = '';
-    let floorData = [];
+    let rawFloorData = []; // store all items from Firestore
+    let unsubscribeFloor = null; // listener reference
     let returnItemData = {};
 
     // ==================== Auth ====================
@@ -140,13 +141,34 @@
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
         }
-        loadFloorInventory();
-        loadStats();
-        document.getElementById('applyFiltersBtn').addEventListener('click', loadFloorInventory);
+        // Attach listener ONCE
+        listenToShopFloor();
+        // Filter buttons
+        document.getElementById('applyFiltersBtn').addEventListener('click', renderFloorInventory);
         document.getElementById('clearFiltersBtn').addEventListener('click', clearFilters);
+        // Search on Enter key
+        document.getElementById('searchItem').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') renderFloorInventory();
+        });
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+
+    // ==================== Listen to Firestore once ====================
+    function listenToShopFloor() {
+        if (unsubscribeFloor) {
+            unsubscribeFloor();
+            unsubscribeFloor = null;
+        }
+        unsubscribeFloor = db.collection('shopFloor').onSnapshot((snapshot) => {
+            rawFloorData = [];
+            snapshot.forEach(doc => rawFloorData.push({ id: doc.id, ...doc.data() }));
+            renderFloorInventory();
+        }, (error) => {
+            console.error('Shop floor listener error:', error);
+            document.getElementById('floorList').innerHTML = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
+        });
+    }
 
     // ==================== Clear Filters ====================
     function clearFilters() {
@@ -155,17 +177,18 @@
         document.getElementById('filterCategory').value = 'all';
         document.getElementById('filterDateFrom').value = '';
         document.getElementById('filterDateTo').value = '';
-        loadFloorInventory();
+        renderFloorInventory();
     }
 
-    // ==================== Load Shop Floor Data ====================
-    function loadFloorInventory() {
+    // ==================== Render (with filters applied) ====================
+    function renderFloorInventory() {
         const searchInput = document.getElementById('searchItem');
         const branchFilter = document.getElementById('filterBranch');
         const categoryFilter = document.getElementById('filterCategory');
         const dateFrom = document.getElementById('filterDateFrom').value;
         const dateTo = document.getElementById('filterDateTo').value;
 
+        // Role-based branch filtering
         let allowedBranches = [];
         if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
             allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
@@ -177,116 +200,100 @@
             allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
         }
 
-        db.collection('shopFloor').onSnapshot((snapshot) => {
-            let docs = [];
-            snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+        let docs = rawFloorData.filter(d => allowedBranches.includes(d.branch));
 
-            // Role-based branch filtering
-            docs = docs.filter(d => allowedBranches.includes(d.branch));
+        // Search by item name
+        const search = searchInput.value.toLowerCase().trim();
+        if (search) {
+            docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+        }
 
-            // Search by item name
-            const search = searchInput.value.toLowerCase().trim();
-            if (search) {
-                docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
-            }
+        // Filter by branch
+        const branchVal = branchFilter.value;
+        if (branchVal !== 'all') {
+            docs = docs.filter(d => d.branch === branchVal);
+        }
 
-            // Filter by branch
-            const branchVal = branchFilter.value;
-            if (branchVal !== 'all') {
-                docs = docs.filter(d => d.branch === branchVal);
-            }
+        // Filter by category
+        const categoryVal = categoryFilter.value;
+        if (categoryVal !== 'all') {
+            docs = docs.filter(d => (d.category || 'Other') === categoryVal);
+        }
 
-            // Filter by category
-            const categoryVal = categoryFilter.value;
-            if (categoryVal !== 'all') {
-                docs = docs.filter(d => (d.category || 'Other') === categoryVal);
-            }
-
-            // Filter by date range (lastUpdated)
-            if (dateFrom) {
-                const fromDate = new Date(dateFrom);
-                fromDate.setHours(0,0,0,0);
-                docs = docs.filter(d => {
-                    if (!d.lastUpdated) return false;
-                    const updated = d.lastUpdated.toDate();
-                    return updated >= fromDate;
-                });
-            }
-            if (dateTo) {
-                const toDate = new Date(dateTo);
-                toDate.setHours(23,59,59,999);
-                docs = docs.filter(d => {
-                    if (!d.lastUpdated) return false;
-                    const updated = d.lastUpdated.toDate();
-                    return updated <= toDate;
-                });
-            }
-
-            docs.sort((a, b) => {
-                if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
-                return (a.itemName || '').localeCompare(b.itemName || '');
+        // Filter by date range (lastUpdated)
+        if (dateFrom) {
+            const fromDate = new Date(dateFrom);
+            fromDate.setHours(0,0,0,0);
+            docs = docs.filter(d => {
+                if (!d.lastUpdated) return false;
+                const updated = d.lastUpdated.toDate();
+                return updated >= fromDate;
             });
-
-            floorData = docs;
-
-            if (docs.length === 0) {
-                document.getElementById('floorList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No items on shop floor.</p>';
-                updateStats([]);
-                return;
-            }
-
-            const canReturn = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender' ||
-                               currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep');
-
-            let html = `<table id="floorTable">
-                <tr>
-                    <th>Item</th>
-                    <th>Category</th>
-                    <th>Branch</th>
-                    <th>Stock</th>
-                    <th>Unit Price</th>
-                    <th>Location</th>
-                    <th>Last Updated</th>
-                    ${canReturn ? '<th>Actions</th>' : ''}
-                </tr>`;
-            docs.forEach(d => {
-                const category = d.category || 'Other';
-                const location = d.location || 'Floor';
-                const lastUpdated = d.lastUpdated ? new Date(d.lastUpdated.toDate()).toLocaleString() : 'N/A';
-                html += `<tr>
-                    <td><strong>${d.itemName}</strong></td>
-                    <td>${category}</td>
-                    <td>${d.branch}</td>
-                    <td>${d.stock}</td>
-                    <td>₦${(d.unitPrice || 0).toLocaleString()}</td>
-                    <td>${location}</td>
-                    <td>${lastUpdated}</td>
-                    ${canReturn ? `
-                    <td>
-                        <button class="btn-sm btn-return" onclick="openReturnModal('${d.id}','${d.itemName}','${d.branch}',${d.stock},${d.unitPrice},'${category}')">↩️ Return to Warehouse</button>
-                    </td>` : ''}
-                </tr>`;
+        }
+        if (dateTo) {
+            const toDate = new Date(dateTo);
+            toDate.setHours(23,59,59,999);
+            docs = docs.filter(d => {
+                if (!d.lastUpdated) return false;
+                const updated = d.lastUpdated.toDate();
+                return updated <= toDate;
             });
-            html += '</table>';
-            document.getElementById('floorList').innerHTML = html;
-            updateStats(docs);
-        }, (error) => {
-            console.error('Shop floor listener error:', error);
-            if (error.code === 'permission-denied') {
-                document.getElementById('floorList').innerHTML = `
-                    <p style="color:red; text-align:center; padding:20px;">
-                        ⚠️ Permission denied. Please ensure Firestore rules allow read access to 'shopFloor'.
-                    </p>
-                `;
-            } else {
-                document.getElementById('floorList').innerHTML = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
-            }
+        }
+
+        docs.sort((a, b) => {
+            if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
+            return (a.itemName || '').localeCompare(b.itemName || '');
         });
+
+        // Store filtered data for stats
+        const filteredDocs = docs;
+
+        if (docs.length === 0) {
+            document.getElementById('floorList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No items found on shop floor.</p>';
+            updateStats([]);
+            return;
+        }
+
+        const canReturn = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender' ||
+                           currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep');
+
+        let html = `<table id="floorTable">
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Branch</th>
+                <th>Stock</th>
+                <th>Unit Price</th>
+                <th>Location</th>
+                <th>Last Updated</th>
+                ${canReturn ? '<th>Actions</th>' : ''}
+            </tr>`;
+        docs.forEach(d => {
+            const category = d.category || 'Other';
+            const location = d.location || 'Floor';
+            const lastUpdated = d.lastUpdated ? new Date(d.lastUpdated.toDate()).toLocaleString() : 'N/A';
+            html += `<tr>
+                <td><strong>${d.itemName}</strong></td>
+                <td>${category}</td>
+                <td>${d.branch}</td>
+                <td>${d.stock}</td>
+                <td>₦${(d.unitPrice || 0).toLocaleString()}</td>
+                <td>${location}</td>
+                <td>${lastUpdated}</td>
+                ${canReturn ? `
+                <td>
+                    <button class="btn-sm btn-return" onclick="openReturnModal('${d.id}','${d.itemName}','${d.branch}',${d.stock},${d.unitPrice},'${category}')">↩️ Return to Warehouse</button>
+                </td>` : ''}
+            </tr>`;
+        });
+        html += '</table>';
+        document.getElementById('floorList').innerHTML = html;
+        updateStats(filteredDocs);
     }
 
     // ==================== Stats ====================
     function updateStats(docs) {
-        if (!docs) docs = floorData;
+        if (!docs) docs = [];
         let totalItems = docs.length;
         let totalStock = docs.reduce((sum, d) => sum + (d.stock || 0), 0);
         let branches = new Set(docs.map(d => d.branch));
@@ -384,7 +391,7 @@
 
             alert(`✅ Returned ${qty} x ${returnItemData.itemName} to warehouse.`);
             closeModal('returnWarehouseModal');
-            // Refresh will happen via listener
+            // Listener will auto-refresh
         } catch (error) {
             console.error('Return to warehouse error:', error);
             document.getElementById('returnMessage').innerText = 'Error: ' + error.message;
@@ -420,8 +427,7 @@
         link.click();
     }
 
-    // ==================== Init ====================
-    console.log('NEVAMAK Shop Floor loaded with search filters.');
+    console.log('NEVAMAK Shop Floor loaded – search fixed.');
 </script>
 </body>
 </html>
