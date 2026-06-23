@@ -42,7 +42,6 @@
         .email-item .details .subject { font-size: 0.85rem; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .email-item .details .preview { font-size: 0.8rem; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .email-item .date { font-size: 0.7rem; color: #888; flex-shrink: 0; }
-        .email-item .attachment-icon { color: #888; font-size: 0.8rem; margin-left: 4px; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.8rem; }
@@ -73,6 +72,8 @@
         .drive-status button { background: none; border: none; color: #0a3d62; cursor: pointer; text-decoration: underline; font-size: 0.7rem; }
         .profile-avatar { width: 28px; height: 28px; border-radius: 50%; background: #3c6382; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; overflow: hidden; flex-shrink: 0; }
         .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 0.9rem; color: #721c24; }
+        .permission-error a { color: #0a3d62; }
         @media (max-width: 768px) { .sidebar { width: 100%; max-height: 150px; flex-shrink: 0; } .email-layout { flex-direction: column; } .sidebar .nav-item { display: inline-block; } }
     </style>
 </head>
@@ -93,7 +94,6 @@
     </header>
 
     <div class="email-layout">
-        <!-- Sidebar -->
         <div class="sidebar">
             <h3>📁 Folders</h3>
             <div class="nav-item active" data-folder="inbox" onclick="switchFolder('inbox')">
@@ -108,7 +108,6 @@
             </div>
         </div>
 
-        <!-- Main area -->
         <div class="main">
             <div class="email-header">
                 <span id="folderTitle">Inbox</span>
@@ -158,6 +157,7 @@
                 <button type="submit" class="btn-primary">📤 Send</button>
             </div>
             <div id="composeMessage" style="color:red; margin-top:8px;"></div>
+            <div id="permissionInfo" style="display:none;" class="permission-error"></div>
         </form>
     </div>
 </div>
@@ -250,6 +250,7 @@
     const composeBody = document.getElementById('composeBody');
     const composeExternal = document.getElementById('composeExternal');
     const composeMessage = document.getElementById('composeMessage');
+    const permissionInfo = document.getElementById('permissionInfo');
     const attachBtn = document.getElementById('attachBtn');
     const fileInput = document.getElementById('fileInput');
     const filePreviewArea = document.getElementById('filePreviewArea');
@@ -288,6 +289,7 @@
             scope: SCOPES,
             callback: (tokenResponse) => {
                 if (tokenResponse.error) {
+                    console.error('Drive token error:', tokenResponse);
                     driveStatusText.innerText = '🔴 Drive Error';
                     driveSignInBtn.style.display = 'inline';
                     return;
@@ -326,23 +328,9 @@
             return accessToken;
         }
         if (accessToken) return accessToken;
-        if (tokenClient && !isDriveSignedIn) {
-            tokenClient.requestAccessToken({
-                prompt: 'none',
-                callback: (resp) => {
-                    if (resp.error) {
-                        driveStatusText.innerText = '🔐 Drive';
-                        driveSignInBtn.style.display = 'inline';
-                        return;
-                    }
-                    accessToken = resp.access_token;
-                    isDriveSignedIn = true;
-                    localStorage.setItem('drive_access_token', accessToken);
-                    localStorage.setItem('drive_token_expiry', Date.now() + 3600 * 1000);
-                    driveStatusText.innerText = '✅ Drive';
-                    driveSignInBtn.style.display = 'none';
-                }
-            });
+        if (!isDriveSignedIn) {
+            driveStatusText.innerText = '🔐 Drive';
+            driveSignInBtn.style.display = 'inline';
         }
         return null;
     }
@@ -518,9 +506,9 @@
         if (folder === 'inbox') {
             query = query.where('to', 'array-contains', currentUserEmail).where('isDraft', '==', false);
         } else if (folder === 'sent') {
-            query = query.where('from', '==', currentUserEmail).where('isDraft', '==', false);
+            query = query.where('fromEmail', '==', currentUserEmail).where('isDraft', '==', false);
         } else if (folder === 'drafts') {
-            query = query.where('from', '==', currentUserEmail).where('isDraft', '==', true);
+            query = query.where('fromEmail', '==', currentUserEmail).where('isDraft', '==', true);
         } else {
             return;
         }
@@ -547,7 +535,7 @@
         }
         let html = '';
         emails.forEach(email => {
-            const from = email.from || 'Unknown';
+            const from = email.from || email.fromEmail || 'Unknown';
             const to = email.to || [];
             const subject = email.subject || '(no subject)';
             const body = email.body || '';
@@ -596,7 +584,7 @@
         if (!email.read && currentFolder === 'inbox') {
             await doc.ref.update({ read: true });
         }
-        const from = email.from || 'Unknown';
+        const from = email.from || email.fromEmail || 'Unknown';
         const to = (email.to || []).join(', ');
         const subject = email.subject || '(no subject)';
         const body = email.body || '';
@@ -636,7 +624,7 @@
         doc.get().then(snap => {
             const email = snap.data();
             if (email) {
-                composeTo.value = email.from;
+                composeTo.value = email.from || email.fromEmail || '';
                 composeSubject.value = 'Re: ' + (email.subject || '');
                 closeModal('viewEmailModal');
                 openCompose();
@@ -652,6 +640,7 @@
         composeBody.value = '';
         composeExternal.checked = false;
         composeMessage.innerText = '';
+        permissionInfo.style.display = 'none';
         clearFilePreview();
         composeModal.style.display = 'flex';
     }
@@ -705,6 +694,63 @@
         }
     });
 
+    // ==================== Save Draft (with local fallback) ====================
+    window.saveDraft = async function() {
+        const toRaw = composeTo.value.trim();
+        const subject = composeSubject.value.trim();
+        const body = composeBody.value.trim();
+        if (!toRaw && !subject && !body) { composeMessage.innerText = 'Nothing to save.'; return; }
+        const toList = toRaw.split(',').map(s => s.trim()).filter(s => s);
+        let attachmentUrl = null, attachmentName = null;
+        if (pendingFile) {
+            try {
+                const { viewUrl } = await uploadToDrive(pendingFile);
+                attachmentUrl = viewUrl;
+                attachmentName = pendingFile.name;
+            } catch (err) {
+                composeMessage.innerText = 'Attachment upload failed: ' + err.message;
+                return;
+            }
+        }
+        const draftData = {
+            from: currentUserEmail,
+            fromEmail: currentUserEmail,
+            to: toList,
+            subject: subject,
+            body: body,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false,
+            isDraft: true,
+            attachments: attachmentUrl ? [{ name: attachmentName, url: attachmentUrl }] : [],
+            isExternal: false
+        };
+
+        try {
+            await db.collection('emails').add(draftData);
+            composeMessage.innerText = '💾 Draft saved successfully!';
+            clearFilePreview();
+            composeTo.value = '';
+            composeSubject.value = '';
+            composeBody.value = '';
+            setTimeout(() => closeModal('composeModal'), 1200);
+            loadFolder(currentFolder);
+        } catch (err) {
+            console.error('Draft save error:', err);
+            if (err.code === 'permission-denied' || err.message.includes('permission')) {
+                // Save locally as fallback
+                const localDrafts = JSON.parse(localStorage.getItem('localDrafts') || '[]');
+                draftData.localTimestamp = Date.now();
+                localDrafts.push(draftData);
+                localStorage.setItem('localDrafts', JSON.stringify(localDrafts));
+                composeMessage.innerText = '⚠️ Draft saved locally (permission denied). Please update Firestore rules.';
+                showPermissionHelp();
+            } else {
+                composeMessage.innerText = '❌ Error saving draft: ' + err.message;
+            }
+        }
+    };
+
+    // ==================== Send Email (with permission handling) ====================
     composeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const toRaw = composeTo.value.trim();
@@ -730,6 +776,7 @@
 
         const emailData = {
             from: currentUserEmail,
+            fromEmail: currentUserEmail,
             to: toList,
             subject: subject,
             body: body,
@@ -768,69 +815,56 @@
             setTimeout(() => closeModal('composeModal'), 1500);
             loadFolder(currentFolder);
         } catch (err) {
-            composeMessage.innerText = '❌ Error: ' + err.message;
+            console.error('Send error:', err);
+            if (err.code === 'permission-denied' || err.message.includes('permission')) {
+                composeMessage.innerText = '❌ Cannot send – permission denied. Please update Firestore rules.';
+                showPermissionHelp();
+            } else {
+                composeMessage.innerText = '❌ Error: ' + err.message;
+            }
         }
     });
 
-    window.saveDraft = async function() {
-        const toRaw = composeTo.value.trim();
-        const subject = composeSubject.value.trim();
-        const body = composeBody.value.trim();
-        if (!toRaw && !subject && !body) { composeMessage.innerText = 'Nothing to save.'; return; }
-        const toList = toRaw.split(',').map(s => s.trim()).filter(s => s);
-        let attachmentUrl = null, attachmentName = null;
-        if (pendingFile) {
-            try {
-                const { viewUrl } = await uploadToDrive(pendingFile);
-                attachmentUrl = viewUrl;
-                attachmentName = pendingFile.name;
-            } catch (err) {
-                composeMessage.innerText = 'Attachment upload failed: ' + err.message;
-                return;
-            }
-        }
-        const draftData = {
-            from: currentUserEmail,
-            to: toList,
-            subject: subject,
-            body: body,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            read: false,
-            isDraft: true,
-            attachments: attachmentUrl ? [{ name: attachmentName, url: attachmentUrl }] : [],
-            isExternal: false
-        };
-        try {
-            await db.collection('emails').add(draftData);
-            composeMessage.innerText = '💾 Draft saved!';
-            clearFilePreview();
-            composeTo.value = '';
-            composeSubject.value = '';
-            composeBody.value = '';
-            setTimeout(() => closeModal('composeModal'), 1200);
-            loadFolder(currentFolder);
-        } catch (err) {
-            composeMessage.innerText = '❌ Error saving draft: ' + err.message;
-        }
-    };
+    function showPermissionHelp() {
+        permissionInfo.innerHTML = `
+            <p><strong>⚠️ Firestore permission error.</strong> To fix:</p>
+            <ol>
+                <li>Go to <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank">Firestore Rules</a></li>
+                <li>Add this rule for <code>emails</code>:</li>
+                <pre style="background:#f0f0f0;padding:8px;border-radius:8px;font-size:0.8rem;">
+match /emails/{document} {
+  allow read, write: if request.auth != null;
+}
+                </pre>
+                <li>Click <strong>Publish</strong> and try again.</li>
+            </ol>
+            <p><em>Your draft has been saved locally. It will sync when permissions are fixed.</em></p>
+        `;
+        permissionInfo.style.display = 'block';
+    }
 
+    // ==================== Refresh ====================
     window.refreshFolder = function() {
         loadFolder(currentFolder);
     };
 
+    // ==================== Modal helpers ====================
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
         profileSaveBtn.disabled = true;
         profileMessage.innerText = '';
+        permissionInfo.style.display = 'none';
     }
     window.onclick = function(event) {
         if (event.target.classList.contains('modal')) {
             event.target.style.display = 'none';
             profileSaveBtn.disabled = true;
             profileMessage.innerText = '';
+            permissionInfo.style.display = 'none';
         }
     };
 
+    // ==================== Init ====================
     if (typeof google !== 'undefined' && google.accounts) {
         initDriveClient();
     } else {
@@ -843,7 +877,7 @@
         });
     }
 
-    console.log('NEVAMAK Email Client loaded with EmailJS configuration.');
+    console.log('NEVAMAK Email Client loaded with permission handling.');
 </script>
 </body>
 </html>
