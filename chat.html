@@ -73,7 +73,8 @@
         .profile-avatar { width: 28px; height: 28px; border-radius: 50%; background: #3c6382; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; overflow: hidden; flex-shrink: 0; }
         .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 0.9rem; color: #721c24; }
-        .permission-error a { color: #0a3d62; }
+        .permission-error a { color: #0a3d62; font-weight: 600; }
+        .permission-error pre { background: #f0f0f0; padding: 8px; border-radius: 8px; font-size: 0.8rem; overflow-x: auto; margin: 8px 0; }
         @media (max-width: 768px) { .sidebar { width: 100%; max-height: 150px; flex-shrink: 0; } .email-layout { flex-direction: column; } .sidebar .nav-item { display: inline-block; } }
     </style>
 </head>
@@ -237,6 +238,7 @@
     let allUsers = [];
     let currentViewEmailId = null;
     let currentProfilePic = null;
+    let unsubscribeFolder = null;
 
     // ==================== DOM refs ====================
     const emailList = document.getElementById('emailList');
@@ -278,7 +280,6 @@
     const profileDriveStatus = document.getElementById('profileDriveStatus');
 
     let pendingFile = null;
-    let unsubscribeFolder = null;
 
     // ==================== Google Drive OAuth ====================
     function initDriveClient() {
@@ -500,6 +501,7 @@
         loadFolder(folder);
     }
 
+    // ==================== Load Folder with detailed error handling ====================
     async function loadFolder(folder) {
         if (unsubscribeFolder) { unsubscribeFolder(); unsubscribeFolder = null; }
         let query = db.collection('emails');
@@ -524,7 +526,27 @@
             updateBadge(emails, folder);
         }, (error) => {
             console.error('Folder load error:', error);
-            emailList.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">Error loading emails.</div>';
+            // Show detailed error with instructions
+            let errorHtml = `
+                <div style="text-align:center; padding:40px;">
+                    <p style="color:#e74c3c; font-size:1.1rem;">⚠️ Error loading emails</p>
+                    <p style="color:#888;">${error.message}</p>
+            `;
+            if (error.code === 'permission-denied' || error.message.includes('permission')) {
+                errorHtml += `
+                    <div class="permission-error" style="text-align:left; margin-top:12px;">
+                        <p><strong>🔐 Firestore permission error.</strong></p>
+                        <p>To fix this, add the following rule to your Firestore database:</p>
+                        <pre>match /emails/{document} {
+                          allow read, write: if request.auth != null;
+                        }</pre>
+                        <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">Click here to open Firestore Rules</a></p>
+                        <p style="margin-top:8px;">After adding the rule, click <strong>Publish</strong> and refresh this page.</p>
+                    </div>
+                `;
+            }
+            errorHtml += '</div>';
+            emailList.innerHTML = errorHtml;
         });
     }
 
@@ -694,7 +716,7 @@
         }
     });
 
-    // ==================== Save Draft (with local fallback) ====================
+    // ==================== Save Draft ====================
     window.saveDraft = async function() {
         const toRaw = composeTo.value.trim();
         const subject = composeSubject.value.trim();
@@ -737,20 +759,20 @@
         } catch (err) {
             console.error('Draft save error:', err);
             if (err.code === 'permission-denied' || err.message.includes('permission')) {
-                // Save locally as fallback
+                composeMessage.innerText = '⚠️ Draft saved locally (permission denied). Fix Firestore rules.';
+                showPermissionHelp();
+                // Save locally
                 const localDrafts = JSON.parse(localStorage.getItem('localDrafts') || '[]');
                 draftData.localTimestamp = Date.now();
                 localDrafts.push(draftData);
                 localStorage.setItem('localDrafts', JSON.stringify(localDrafts));
-                composeMessage.innerText = '⚠️ Draft saved locally (permission denied). Please update Firestore rules.';
-                showPermissionHelp();
             } else {
                 composeMessage.innerText = '❌ Error saving draft: ' + err.message;
             }
         }
     };
 
-    // ==================== Send Email (with permission handling) ====================
+    // ==================== Send Email ====================
     composeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const toRaw = composeTo.value.trim();
@@ -827,17 +849,13 @@
 
     function showPermissionHelp() {
         permissionInfo.innerHTML = `
-            <p><strong>⚠️ Firestore permission error.</strong> To fix:</p>
-            <ol>
-                <li>Go to <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank">Firestore Rules</a></li>
-                <li>Add this rule for <code>emails</code>:</li>
-                <pre style="background:#f0f0f0;padding:8px;border-radius:8px;font-size:0.8rem;">
-match /emails/{document} {
-  allow read, write: if request.auth != null;
-}
-                </pre>
-                <li>Click <strong>Publish</strong> and try again.</li>
-            </ol>
+            <p><strong>⚠️ Firestore permission error.</strong></p>
+            <p>To fix this, add the following rule to your Firestore database:</p>
+            <pre>match /emails/{document} {
+              allow read, write: if request.auth != null;
+            }</pre>
+            <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">🔗 Click here to open Firestore Rules</a></p>
+            <p style="margin-top:8px;">After adding the rule, click <strong>Publish</strong> and try again.</p>
             <p><em>Your draft has been saved locally. It will sync when permissions are fixed.</em></p>
         `;
         permissionInfo.style.display = 'block';
@@ -877,7 +895,7 @@ match /emails/{document} {
         });
     }
 
-    console.log('NEVAMAK Email Client loaded with permission handling.');
+    console.log('NEVAMAK Email Client loaded with improved error handling.');
 </script>
 </body>
 </html>
