@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Super Admin Zone</title>
+    <!-- Firebase SDK (only for Firestore access) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <!-- No Auth SDK needed -->
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
@@ -40,13 +41,14 @@
         <div class="nav-links">
             <a href="index.html">🏠 Dashboard</a>
             <a href="warehouse.html">🏚️ Warehouse</a>
-            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout (Session)</button>
         </div>
     </header>
 
     <!-- Login Form -->
     <div id="loginArea" class="login-box">
         <h3 style="text-align:center;">Super Admin Login</h3>
+        <p style="font-size:0.9rem; color:#555; text-align:center;">Use the credentials below (this is a separate login, not Firebase).</p>
         <input type="email" id="superEmail" placeholder="Email" value="superadmin@nevamak.com">
         <input type="password" id="superPassword" placeholder="Password">
         <button id="superLoginBtn">Login</button>
@@ -75,7 +77,7 @@
 </div>
 
 <script>
-    // ==================== Firebase Config ====================
+    // ==================== Firebase Config (only for Firestore) ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -86,7 +88,7 @@
         measurementId: "G-MZ8NT6KK8N"
     };
     firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
+    // No Auth – we use hardcoded credentials
     const db = firebase.firestore();
 
     // ==================== Session Management ====================
@@ -101,25 +103,17 @@
     const superEmail = document.getElementById('superEmail');
     const superPassword = document.getElementById('superPassword');
 
-    // ==================== Auth ====================
-    // Ensure user is signed in to Firebase first
-    auth.onAuthStateChanged(user => {
-        if (!user) {
-            window.location.href = 'login.html';
-            return;
-        }
-        // If already super admin, show inventory
-        if (isSuperAdmin) {
-            loginArea.style.display = 'none';
-            inventoryArea.style.display = 'block';
-            loadInventory();
-        } else {
-            loginArea.style.display = 'block';
-            inventoryArea.style.display = 'none';
-        }
-    });
+    // ==================== Initial state ====================
+    if (isSuperAdmin) {
+        loginArea.style.display = 'none';
+        inventoryArea.style.display = 'block';
+        loadInventory();
+    } else {
+        loginArea.style.display = 'block';
+        inventoryArea.style.display = 'none';
+    }
 
-    // ==================== Super Admin Login ====================
+    // ==================== Super Admin Login (hardcoded) ====================
     loginBtn.addEventListener('click', function() {
         const email = superEmail.value.trim();
         const password = superPassword.value.trim();
@@ -140,13 +134,14 @@
         if (e.key === 'Enter') loginBtn.click();
     });
 
-    // ==================== Logout ====================
+    // ==================== Logout (clear session) ====================
     document.getElementById('logoutBtn').addEventListener('click', function() {
         sessionStorage.removeItem('superAdmin');
         isSuperAdmin = false;
-        auth.signOut().then(() => {
-            window.location.href = 'login.html';
-        });
+        loginArea.style.display = 'block';
+        inventoryArea.style.display = 'none';
+        loginError.innerText = '';
+        // Optionally redirect to home
     });
 
     // ==================== Load Inventory (with filters) ====================
@@ -241,7 +236,7 @@
         if (e.key === 'Enter') loadInventory();
     });
 
-    console.log('Super Admin Zone loaded with email login.');
+    console.log('Super Admin Zone loaded – no Firebase Auth used.');
 </script>
 </body>
 </html>
