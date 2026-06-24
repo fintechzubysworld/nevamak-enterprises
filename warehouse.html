@@ -24,6 +24,8 @@
         .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
         .filters button.export { background: #27ae60; }
         .filters button.clear { background: #e74c3c; }
+        .filters button.return-dispatch { background: #8e44ad; }
+        .filters button.delete-stock { background: #e74c3c; }
         .filters label { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; cursor: pointer; }
         .section-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
@@ -33,7 +35,7 @@
         .low-stock { background: #f8d7da; }
         .on-floor-tag { background: #8e44ad; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 700px; width: 95%; max-height: 90vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.8rem; }
         .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
         .btn-primary { background: #0a3d62; color: white; }
@@ -48,6 +50,8 @@
         .bulk-actions select { background: white; border: 1px solid #ccc; }
         .bulk-actions .btn-bulk { background: #0a3d62; color: white; cursor: pointer; }
         .bulk-actions .btn-bulk-floor { background: #8e44ad; color: white; cursor: pointer; }
+        .rd-table { width: 100%; border-collapse: collapse; }
+        .rd-table th, .rd-table td { padding: 6px 8px; border-bottom: 1px solid #ddd; }
         @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
     </style>
 </head>
@@ -99,6 +103,8 @@
             <span class="hidden-count" id="hiddenCount"></span>
         </label>
         <button id="addStockBtn" style="background:#27ae60; display: none;">➕ Add Stock</button>
+        <button id="returnDispatchBtn" class="return-dispatch" style="display:none;">🔄 Return/Dispatch</button>
+        <button id="deleteStockBtn" class="delete-stock" style="display:none;">🗑️ Delete Stock</button>
         <button class="export" onclick="exportCSV('warehouseTable')">📄 Export CSV</button>
         <button id="moveAllToFloorBtn" class="btn-floor" style="display:none;">🏪 Move All to Floor</button>
         <a href="shop_floor.html" style="background:#8e44ad; color:white; padding:8px 20px; border-radius:40px; text-decoration:none;">🏪 View Shop Floor</a>
@@ -172,6 +178,38 @@
     </div>
 </div>
 
+<!-- Modal: Return/Dispatch -->
+<div id="returnDispatchModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('returnDispatchModal')">&times;</span>
+        <h3>🔄 Return or Dispatch Items</h3>
+        <p>Select items and choose an action.</p>
+        <div style="max-height:300px; overflow-y:auto;">
+            <table class="rd-table" id="rdTable">
+                <tr>
+                    <th><input type="checkbox" id="selectAllRd" onchange="toggleAllRdCheckboxes(this.checked)"></th>
+                    <th>Item</th>
+                    <th>Branch</th>
+                    <th>Stock</th>
+                </tr>
+            </table>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            <select id="rdAction">
+                <option value="return">Return to Sender</option>
+                <option value="dispatch">Dispatch to Branch</option>
+            </select>
+            <select id="rdDestination" style="display:none;">
+                <option value="Abuja">Abuja</option>
+                <option value="Portharcourt">Port Harcourt</option>
+                <option value="Lagos">Lagos</option>
+            </select>
+            <button id="executeRdAction" class="btn-primary">Execute</button>
+        </div>
+        <div id="rdMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
 <!-- Bulk Confirm Modal -->
 <div id="bulkConfirmModal" class="modal">
     <div class="modal-content">
@@ -225,6 +263,8 @@
         if (canManage) {
             document.getElementById('addStockBtn').style.display = 'inline-block';
             document.getElementById('bulkActions').classList.add('show');
+            document.getElementById('returnDispatchBtn').style.display = 'inline-block';
+            document.getElementById('deleteStockBtn').style.display = 'inline-block';
         }
         if (canMove) {
             document.getElementById('moveAllToFloorBtn').style.display = 'inline-block';
@@ -250,6 +290,21 @@
             }
         });
         document.getElementById('bulkTargetBranch').style.display = 'none';
+        // Return/Dispatch
+        document.getElementById('returnDispatchBtn').addEventListener('click', openReturnDispatchModal);
+        document.getElementById('rdAction').addEventListener('change', function() {
+            const dest = document.getElementById('rdDestination');
+            if (this.value === 'dispatch') {
+                dest.style.display = 'inline-block';
+            } else {
+                dest.style.display = 'none';
+            }
+        });
+        document.getElementById('executeRdAction').addEventListener('click', executeReturnDispatch);
+        // Delete Stock button
+        document.getElementById('deleteStockBtn').addEventListener('click', function() {
+            window.location.href = 'superadmin_zone.html';
+        });
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
@@ -327,42 +382,17 @@
 
         document.getElementById('hiddenCount').innerText = floorItemsCount > 0 ? `(${floorItemsCount} hidden on floor)` : '';
 
-        // Search by item name
         const search = searchInput.value.toLowerCase().trim();
-        if (search) {
-            docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
-        }
-
-        // Filter by branch
-        const branchVal = branchFilter.value;
-        if (branchVal !== 'all') {
-            docs = docs.filter(d => d.branch === branchVal);
-        }
-
-        // Filter by category
-        const categoryVal = categoryFilter.value;
-        if (categoryVal !== 'all') {
-            docs = docs.filter(d => (d.category || 'Other') === categoryVal);
-        }
-
-        // Filter by date range (lastUpdated)
+        if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+        const branchVal = branchFilter.value; if (branchVal !== 'all') docs = docs.filter(d => d.branch === branchVal);
+        const categoryVal = categoryFilter.value; if (categoryVal !== 'all') docs = docs.filter(d => (d.category || 'Other') === categoryVal);
         if (dateFrom) {
-            const fromDate = new Date(dateFrom);
-            fromDate.setHours(0,0,0,0);
-            docs = docs.filter(d => {
-                if (!d.lastUpdated) return false;
-                const updated = d.lastUpdated.toDate();
-                return updated >= fromDate;
-            });
+            const fromDate = new Date(dateFrom); fromDate.setHours(0,0,0,0);
+            docs = docs.filter(d => { if (!d.lastUpdated) return false; return d.lastUpdated.toDate() >= fromDate; });
         }
         if (dateTo) {
-            const toDate = new Date(dateTo);
-            toDate.setHours(23,59,59,999);
-            docs = docs.filter(d => {
-                if (!d.lastUpdated) return false;
-                const updated = d.lastUpdated.toDate();
-                return updated <= toDate;
-            });
+            const toDate = new Date(dateTo); toDate.setHours(23,59,59,999);
+            docs = docs.filter(d => { if (!d.lastUpdated) return false; return d.lastUpdated.toDate() <= toDate; });
         }
 
         docs.sort((a, b) => {
@@ -404,10 +434,7 @@
             const category = d.category || 'Other';
             html += `<tr class="${rowClass}">
                 ${showCheckbox ? `<td><input type="checkbox" class="itemCheckbox" data-id="${d.id}" ${checked} onchange="toggleItemSelection('${d.id}')"></td>` : ''}
-                <td>
-                    <strong>${d.itemName}</strong>
-                    ${isOnFloor ? '<span class="on-floor-tag">On Floor</span>' : ''}
-                </td>
+                <td><strong>${d.itemName}</strong> ${isOnFloor ? '<span class="on-floor-tag">On Floor</span>' : ''}</td>
                 <td>${category}</td>
                 <td>${d.branch}</td>
                 <td>${d.stock}</td>
@@ -430,102 +457,46 @@
 
     // ==================== Selection helpers ====================
     function toggleItemSelection(id) {
-        if (selectedItems.has(id)) {
-            selectedItems.delete(id);
-        } else {
-            selectedItems.add(id);
-        }
+        if (selectedItems.has(id)) selectedItems.delete(id); else selectedItems.add(id);
         renderWarehouse();
     }
-
     function toggleAllCheckboxes(checked) {
-        const checkboxes = document.querySelectorAll('.itemCheckbox');
-        checkboxes.forEach(cb => {
+        document.querySelectorAll('.itemCheckbox').forEach(cb => {
             const id = cb.dataset.id;
-            if (checked) {
-                selectedItems.add(id);
-            } else {
-                selectedItems.delete(id);
-            }
+            if (checked) selectedItems.add(id); else selectedItems.delete(id);
         });
         renderWarehouse();
     }
-
-    function clearSelection() {
-        selectedItems.clear();
-        renderWarehouse();
-    }
-
+    function clearSelection() { selectedItems.clear(); renderWarehouse(); }
     function updateSelectedCount() {
         document.getElementById('selectedCount').innerText = `${selectedItems.size} items selected`;
     }
 
     // ==================== Stats ====================
     function updateStats() {
-        // We recompute based on currently displayed items (respecting filters)
-        // But stats should reflect the filtered view.
-        // We'll compute from the visible docs (after filters).
-        // However, renderWarehouse already filters docs; we can pass them.
-        // To avoid duplicate filtering, we'll just recompute from inventoryData with same filters.
-        // For simplicity, we'll just show totals of the visible set.
+        // compute based on visible items after filters
         const searchInput = document.getElementById('searchItem');
         const branchFilter = document.getElementById('filterBranch');
         const categoryFilter = document.getElementById('filterCategory');
         const dateFrom = document.getElementById('filterDateFrom').value;
         const dateTo = document.getElementById('filterDateTo').value;
-
         let allowedBranches = [];
-        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
-            allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
-        } else if (currentUserRole === 'abuja_rep') {
-            allowedBranches = ['Abuja'];
-        } else if (currentUserRole === 'ph_rep') {
-            allowedBranches = ['Portharcourt'];
-        } else {
-            allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
-        }
-
+        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+        else if (currentUserRole === 'abuja_rep') allowedBranches = ['Abuja'];
+        else if (currentUserRole === 'ph_rep') allowedBranches = ['Portharcourt'];
+        else allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
         let docs = inventoryData.filter(d => allowedBranches.includes(d.branch));
-
-        if (!showAll) {
-            docs = docs.filter(d => {
-                const key = d.itemName + '|' + d.branch;
-                return (floorData[key] || 0) === 0;
-            });
-        }
-
-        const search = searchInput.value.toLowerCase().trim();
-        if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
-
-        const branchVal = branchFilter.value;
-        if (branchVal !== 'all') docs = docs.filter(d => d.branch === branchVal);
-
-        const categoryVal = categoryFilter.value;
-        if (categoryVal !== 'all') docs = docs.filter(d => (d.category || 'Other') === categoryVal);
-
-        if (dateFrom) {
-            const fromDate = new Date(dateFrom);
-            fromDate.setHours(0,0,0,0);
-            docs = docs.filter(d => {
-                if (!d.lastUpdated) return false;
-                return d.lastUpdated.toDate() >= fromDate;
-            });
-        }
-        if (dateTo) {
-            const toDate = new Date(dateTo);
-            toDate.setHours(23,59,59,999);
-            docs = docs.filter(d => {
-                if (!d.lastUpdated) return false;
-                return d.lastUpdated.toDate() <= toDate;
-            });
-        }
-
+        if (!showAll) docs = docs.filter(d => { const key = d.itemName + '|' + d.branch; return (floorData[key] || 0) === 0; });
+        const search = searchInput.value.toLowerCase().trim(); if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+        const branchVal = branchFilter.value; if (branchVal !== 'all') docs = docs.filter(d => d.branch === branchVal);
+        const categoryVal = categoryFilter.value; if (categoryVal !== 'all') docs = docs.filter(d => (d.category || 'Other') === categoryVal);
+        if (dateFrom) { const fromDate = new Date(dateFrom); fromDate.setHours(0,0,0,0); docs = docs.filter(d => { if (!d.lastUpdated) return false; return d.lastUpdated.toDate() >= fromDate; }); }
+        if (dateTo) { const toDate = new Date(dateTo); toDate.setHours(23,59,59,999); docs = docs.filter(d => { if (!d.lastUpdated) return false; return d.lastUpdated.toDate() <= toDate; }); }
         let totalItems = docs.length;
         let totalStock = docs.reduce((sum, d) => sum + (d.stock || 0), 0);
         let lowStock = docs.filter(d => d.stock <= LOW_STOCK_THRESHOLD).length;
         let branches = new Set(docs.map(d => d.branch));
         let totalStockValue = docs.reduce((sum, d) => sum + ((d.stock || 0) * (d.unitPrice || 0)), 0);
-
         document.getElementById('totalItems').innerText = totalItems;
         document.getElementById('totalStock').innerText = totalStock;
         document.getElementById('lowStockCount').innerText = lowStock;
@@ -535,10 +506,7 @@
 
     // ==================== Admin Actions ====================
     document.getElementById('addStockBtn').addEventListener('click', () => {
-        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
-            alert('Only admin and Lagos sender can add stock.');
-            return;
-        }
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) { alert('Only admin and Lagos sender can add stock.'); return; }
         document.getElementById('modalTitle').innerText = 'Add New Stock';
         document.getElementById('modalItemName').value = '';
         document.getElementById('modalCategory').value = 'Other';
@@ -552,10 +520,7 @@
     });
 
     window.openAdjustModal = function(id, itemName, branch, stock, unitPrice, category) {
-        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
-            alert('Only admin and Lagos sender can adjust stock.');
-            return;
-        }
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) { alert('Only admin and Lagos sender can adjust stock.'); return; }
         document.getElementById('modalTitle').innerText = 'Adjust Stock';
         document.getElementById('modalItemName').value = itemName;
         document.getElementById('modalItemName').disabled = true;
@@ -578,27 +543,11 @@
         const qty = parseInt(document.getElementById('modalQty').value);
         const price = parseFloat(document.getElementById('modalPrice').value);
         const action = document.getElementById('modalAction').value;
-
-        if (!itemName || isNaN(qty) || qty < 0) {
-            alert('Please enter a valid item name and quantity.');
-            return;
-        }
-        if (isNaN(price) || price < 0) {
-            alert('Please enter a valid unit price.');
-            return;
-        }
-
+        if (!itemName || isNaN(qty) || qty < 0) { alert('Please enter a valid item name and quantity.'); return; }
+        if (isNaN(price) || price < 0) { alert('Please enter a valid unit price.'); return; }
         try {
             if (mode === 'add') {
-                await db.collection('inventory').add({
-                    itemName,
-                    category,
-                    branch,
-                    stock: qty,
-                    unitPrice: price,
-                    location: 'Shelf A',
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                await db.collection('inventory').add({ itemName, category, branch, stock: qty, unitPrice: price, location: 'Shelf A', lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
                 alert('Stock added successfully.');
             } else if (mode === 'adjust') {
                 const docId = document.getElementById('stockModal').dataset.docId;
@@ -607,29 +556,16 @@
                 if (action === 'add') newStock = currentStock + qty;
                 else if (action === 'subtract') newStock = currentStock - qty;
                 else if (action === 'set') newStock = qty;
-                if (newStock < 0) {
-                    alert('Cannot set stock below 0.');
-                    return;
-                }
-                await db.collection('inventory').doc(docId).update({
-                    category,
-                    stock: newStock,
-                    unitPrice: price,
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                if (newStock < 0) { alert('Cannot set stock below 0.'); return; }
+                await db.collection('inventory').doc(docId).update({ category, stock: newStock, unitPrice: price, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
                 alert('Stock adjusted successfully.');
             }
             closeModal('stockModal');
-        } catch (error) {
-            alert('Error: ' + error.message);
-        }
+        } catch (error) { alert('Error: ' + error.message); }
     });
 
     window.deleteInventoryItem = async function(id) {
-        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
-            alert('Only admin and Lagos sender can delete items.');
-            return;
-        }
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) { alert('Only admin and Lagos sender can delete items.'); return; }
         if (confirm('Delete this inventory item permanently?')) {
             await db.collection('inventory').doc(id).delete();
             alert('Item deleted.');
@@ -638,30 +574,15 @@
 
     // ==================== Move to Floor (single) ====================
     let moveItemData = {};
-
     window.openMoveFloorModal = function(id, itemName, branch, stock, unitPrice) {
-        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
-            // allowed
-        } else if (currentUserRole === 'abuja_rep' && branch === 'Abuja') {
-            // allowed
-        } else if (currentUserRole === 'ph_rep' && branch === 'Portharcourt') {
-            // allowed
-        } else {
-            alert('You do not have permission to move items from this branch.');
-            return;
-        }
-
+        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') { /* allowed */ }
+        else if (currentUserRole === 'abuja_rep' && branch === 'Abuja') { /* allowed */ }
+        else if (currentUserRole === 'ph_rep' && branch === 'Portharcourt') { /* allowed */ }
+        else { alert('You do not have permission to move items from this branch.'); return; }
         const key = itemName + '|' + branch;
         const floorStock = floorData[key] || 0;
-        if (floorStock > 0) {
-            alert('This item is already on the shop floor.');
-            return;
-        }
-
-        if (stock <= 0) {
-            alert('This item has no stock to move.');
-            return;
-        }
+        if (floorStock > 0) { alert('This item is already on the shop floor.'); return; }
+        if (stock <= 0) { alert('This item has no stock to move.'); return; }
         moveItemData = { id, itemName, branch, stock, unitPrice };
         document.getElementById('moveItemName').innerText = itemName;
         document.getElementById('moveCurrentStock').innerText = stock;
@@ -676,55 +597,19 @@
     document.getElementById('moveConfirmBtn').addEventListener('click', async () => {
         const qty = parseInt(document.getElementById('moveQuantity').value);
         const location = document.getElementById('moveLocation').value.trim() || 'Floor Shelf A';
-        if (!qty || qty <= 0) {
-            document.getElementById('moveMessage').innerText = 'Please enter a valid quantity.';
-            return;
-        }
-        if (qty > moveItemData.stock) {
-            document.getElementById('moveMessage').innerText = 'Insufficient stock in warehouse.';
-            return;
-        }
-
+        if (!qty || qty <= 0) { document.getElementById('moveMessage').innerText = 'Please enter a valid quantity.'; return; }
+        if (qty > moveItemData.stock) { document.getElementById('moveMessage').innerText = 'Insufficient stock in warehouse.'; return; }
         try {
             const warehouseRef = db.collection('inventory').doc(moveItemData.id);
-            await warehouseRef.update({
-                stock: firebase.firestore.FieldValue.increment(-qty),
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            const floorRef = db.collection('shopFloor')
-                .where('itemName', '==', moveItemData.itemName)
-                .where('branch', '==', moveItemData.branch);
+            await warehouseRef.update({ stock: firebase.firestore.FieldValue.increment(-qty), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+            const floorRef = db.collection('shopFloor').where('itemName', '==', moveItemData.itemName).where('branch', '==', moveItemData.branch);
             const snap = await floorRef.get();
             if (snap.empty) {
-                await db.collection('shopFloor').add({
-                    itemName: moveItemData.itemName,
-                    branch: moveItemData.branch,
-                    stock: qty,
-                    unitPrice: moveItemData.unitPrice,
-                    location: location,
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                await db.collection('shopFloor').add({ itemName: moveItemData.itemName, branch: moveItemData.branch, stock: qty, unitPrice: moveItemData.unitPrice, location: location, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
             } else {
-                snap.forEach(doc => {
-                    doc.ref.update({
-                        stock: firebase.firestore.FieldValue.increment(qty),
-                        location: location,
-                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                });
+                snap.forEach(doc => { doc.ref.update({ stock: firebase.firestore.FieldValue.increment(qty), location: location, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }); });
             }
-
-            await db.collection('activityLog').add({
-                actionType: 'move_to_floor',
-                itemName: moveItemData.itemName,
-                branch: moveItemData.branch,
-                qty: qty,
-                details: `Moved ${qty} x ${moveItemData.itemName} from warehouse to shop floor (${location})`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUserEmail
-            });
-
+            await db.collection('activityLog').add({ actionType: 'move_to_floor', itemName: moveItemData.itemName, branch: moveItemData.branch, qty: qty, details: `Moved ${qty} x ${moveItemData.itemName} from warehouse to shop floor (${location})`, timestamp: firebase.firestore.FieldValue.serverTimestamp(), user: currentUserEmail });
             alert(`✅ Moved ${qty} x ${moveItemData.itemName} to shop floor.`);
             closeModal('moveFloorModal');
         } catch (error) {
@@ -735,18 +620,12 @@
 
     // ==================== Bulk Actions ====================
     async function executeBulkAction() {
-        if (selectedItems.size === 0) {
-            alert('Please select at least one item.');
-            return;
-        }
+        if (selectedItems.size === 0) { alert('Please select at least one item.'); return; }
         const actionType = document.getElementById('bulkActionType').value;
         const targetBranch = document.getElementById('bulkTargetBranch').value;
         let confirmMessage = '';
-        if (actionType === 'branch') {
-            confirmMessage = `Move ${selectedItems.size} selected items to ${targetBranch} warehouse?`;
-        } else {
-            confirmMessage = `Move ${selectedItems.size} selected items to shop floor (${targetBranch} branch)?`;
-        }
+        if (actionType === 'branch') confirmMessage = `Move ${selectedItems.size} selected items to ${targetBranch} warehouse?`;
+        else confirmMessage = `Move ${selectedItems.size} selected items to shop floor (${targetBranch} branch)?`;
         document.getElementById('bulkConfirmMessage').innerText = confirmMessage;
         document.getElementById('bulkConfirmResult').innerText = '';
         document.getElementById('bulkConfirmModal').style.display = 'flex';
@@ -760,192 +639,182 @@
         const targetBranch = modal.dataset.targetBranch;
         const resultDiv = document.getElementById('bulkConfirmResult');
         resultDiv.innerText = 'Processing...';
-
         try {
             const itemsToMove = [];
-            selectedItems.forEach(id => {
-                const item = inventoryData.find(d => d.id === id);
-                if (item) itemsToMove.push(item);
-            });
-
-            if (itemsToMove.length === 0) {
-                resultDiv.innerText = 'No valid items selected.';
-                return;
-            }
-
+            selectedItems.forEach(id => { const item = inventoryData.find(d => d.id === id); if (item) itemsToMove.push(item); });
+            if (itemsToMove.length === 0) { resultDiv.innerText = 'No valid items selected.'; return; }
             if (actionType === 'branch') {
                 for (const item of itemsToMove) {
                     const curRef = db.collection('inventory').doc(item.id);
-                    await curRef.update({
-                        stock: firebase.firestore.FieldValue.increment(-item.stock),
-                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    const targetRef = db.collection('inventory')
-                        .where('itemName', '==', item.itemName)
-                        .where('branch', '==', targetBranch);
+                    await curRef.update({ stock: firebase.firestore.FieldValue.increment(-item.stock), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                    const targetRef = db.collection('inventory').where('itemName', '==', item.itemName).where('branch', '==', targetBranch);
                     const snap = await targetRef.get();
                     if (snap.empty) {
-                        await db.collection('inventory').add({
-                            itemName: item.itemName,
-                            category: item.category || 'Other',
-                            branch: targetBranch,
-                            stock: item.stock,
-                            unitPrice: item.unitPrice,
-                            location: 'Shelf A',
-                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                        await db.collection('inventory').add({ itemName: item.itemName, category: item.category || 'Other', branch: targetBranch, stock: item.stock, unitPrice: item.unitPrice, location: 'Shelf A', lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
                     } else {
-                        snap.forEach(doc => {
-                            doc.ref.update({
-                                stock: firebase.firestore.FieldValue.increment(item.stock),
-                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        });
+                        snap.forEach(doc => { doc.ref.update({ stock: firebase.firestore.FieldValue.increment(item.stock), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }); });
                     }
                 }
                 resultDiv.innerText = `✅ Moved ${itemsToMove.length} items to ${targetBranch} warehouse.`;
             } else {
                 for (const item of itemsToMove) {
                     const curRef = db.collection('inventory').doc(item.id);
-                    await curRef.update({
-                        stock: firebase.firestore.FieldValue.increment(-item.stock),
-                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    const floorRef = db.collection('shopFloor')
-                        .where('itemName', '==', item.itemName)
-                        .where('branch', '==', targetBranch);
+                    await curRef.update({ stock: firebase.firestore.FieldValue.increment(-item.stock), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                    const floorRef = db.collection('shopFloor').where('itemName', '==', item.itemName).where('branch', '==', targetBranch);
                     const snap = await floorRef.get();
                     if (snap.empty) {
-                        await db.collection('shopFloor').add({
-                            itemName: item.itemName,
-                            branch: targetBranch,
-                            stock: item.stock,
-                            unitPrice: item.unitPrice,
-                            location: 'Floor Shelf A',
-                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                        await db.collection('shopFloor').add({ itemName: item.itemName, branch: targetBranch, stock: item.stock, unitPrice: item.unitPrice, location: 'Floor Shelf A', lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
                     } else {
-                        snap.forEach(doc => {
-                            doc.ref.update({
-                                stock: firebase.firestore.FieldValue.increment(item.stock),
-                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        });
+                        snap.forEach(doc => { doc.ref.update({ stock: firebase.firestore.FieldValue.increment(item.stock), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }); });
                     }
                 }
                 resultDiv.innerText = `✅ Moved ${itemsToMove.length} items to shop floor (${targetBranch}).`;
             }
-
-            await db.collection('activityLog').add({
-                actionType: 'bulk_move',
-                action: actionType,
-                targetBranch: targetBranch,
-                itemCount: itemsToMove.length,
-                details: `Bulk moved ${itemsToMove.length} items to ${actionType === 'branch' ? 'warehouse' : 'shop floor'} (${targetBranch})`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUserEmail
-            });
-
-            setTimeout(() => {
-                selectedItems.clear();
-                closeModal('bulkConfirmModal');
-                renderWarehouse();
-            }, 1500);
-        } catch (err) {
-            resultDiv.innerText = '❌ Error: ' + err.message;
-        }
+            await db.collection('activityLog').add({ actionType: 'bulk_move', action: actionType, targetBranch: targetBranch, itemCount: itemsToMove.length, details: `Bulk moved ${itemsToMove.length} items to ${actionType === 'branch' ? 'warehouse' : 'shop floor'} (${targetBranch})`, timestamp: firebase.firestore.FieldValue.serverTimestamp(), user: currentUserEmail });
+            setTimeout(() => { selectedItems.clear(); closeModal('bulkConfirmModal'); renderWarehouse(); }, 1500);
+        } catch (err) { resultDiv.innerText = '❌ Error: ' + err.message; }
     });
 
     // ==================== Move All to Floor ====================
     async function moveAllToFloor() {
         const searchInput = document.getElementById('searchItem');
         const branchFilter = document.getElementById('filterBranch');
-
         let targetBranch = branchFilter.value;
         if (targetBranch === 'all') {
-            if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
-                targetBranch = null;
-            } else if (currentUserRole === 'abuja_rep') {
-                targetBranch = 'Abuja';
-            } else if (currentUserRole === 'ph_rep') {
-                targetBranch = 'Portharcourt';
-            }
+            if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') targetBranch = null;
+            else if (currentUserRole === 'abuja_rep') targetBranch = 'Abuja';
+            else if (currentUserRole === 'ph_rep') targetBranch = 'Portharcourt';
         }
-
         let docs = inventoryData;
         let allowedBranches = [];
-        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') {
-            allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
-        } else if (currentUserRole === 'abuja_rep') {
-            allowedBranches = ['Abuja'];
-        } else if (currentUserRole === 'ph_rep') {
-            allowedBranches = ['Portharcourt'];
-        }
+        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+        else if (currentUserRole === 'abuja_rep') allowedBranches = ['Abuja'];
+        else if (currentUserRole === 'ph_rep') allowedBranches = ['Portharcourt'];
         docs = docs.filter(d => allowedBranches.includes(d.branch));
-
-        if (targetBranch && targetBranch !== 'all') {
-            docs = docs.filter(d => d.branch === targetBranch);
-        }
-
-        const search = searchInput.value.toLowerCase().trim();
-        if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
-
-        const itemsToMove = docs.filter(d => {
-            const key = d.itemName + '|' + d.branch;
-            return (floorData[key] || 0) === 0 && d.stock > 0;
-        });
-
-        if (itemsToMove.length === 0) {
-            alert('No items available to move to floor.');
-            return;
-        }
-
+        if (targetBranch && targetBranch !== 'all') docs = docs.filter(d => d.branch === targetBranch);
+        const search = searchInput.value.toLowerCase().trim(); if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+        const itemsToMove = docs.filter(d => { const key = d.itemName + '|' + d.branch; return (floorData[key] || 0) === 0 && d.stock > 0; });
+        if (itemsToMove.length === 0) { alert('No items available to move to floor.'); return; }
         const branchDisplay = targetBranch || 'all branches';
         if (!confirm(`Move all ${itemsToMove.length} items to shop floor (${branchDisplay})?`)) return;
-
         try {
             for (const item of itemsToMove) {
                 const curRef = db.collection('inventory').doc(item.id);
-                await curRef.update({
-                    stock: firebase.firestore.FieldValue.increment(-item.stock),
-                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                const floorRef = db.collection('shopFloor')
-                    .where('itemName', '==', item.itemName)
-                    .where('branch', '==', item.branch);
+                await curRef.update({ stock: firebase.firestore.FieldValue.increment(-item.stock), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                const floorRef = db.collection('shopFloor').where('itemName', '==', item.itemName).where('branch', '==', item.branch);
                 const snap = await floorRef.get();
                 if (snap.empty) {
-                    await db.collection('shopFloor').add({
+                    await db.collection('shopFloor').add({ itemName: item.itemName, branch: item.branch, stock: item.stock, unitPrice: item.unitPrice, location: 'Floor Shelf A', lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                } else {
+                    snap.forEach(doc => { doc.ref.update({ stock: firebase.firestore.FieldValue.increment(item.stock), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }); });
+                }
+            }
+            await db.collection('activityLog').add({ actionType: 'move_all_to_floor', branch: targetBranch || 'all', itemCount: itemsToMove.length, details: `Moved all ${itemsToMove.length} items to shop floor.`, timestamp: firebase.firestore.FieldValue.serverTimestamp(), user: currentUserEmail });
+            alert(`✅ Moved ${itemsToMove.length} items to shop floor.`);
+            renderWarehouse();
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    // ==================== Return/Dispatch Modal ====================
+    function openReturnDispatchModal() {
+        // Populate the modal table with inventory items (filtered by visible items)
+        const table = document.getElementById('rdTable');
+        // Clear existing rows (keep header)
+        while (table.rows.length > 1) table.deleteRow(1);
+        // Use the filtered visible items (same as renderWarehouse)
+        const searchInput = document.getElementById('searchItem');
+        const branchFilter = document.getElementById('filterBranch');
+        const categoryFilter = document.getElementById('filterCategory');
+        const dateFrom = document.getElementById('filterDateFrom').value;
+        const dateTo = document.getElementById('filterDateTo').value;
+        let allowedBranches = [];
+        if (currentUserRole === 'admin' || currentUserRole === 'lagos_sender') allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+        else if (currentUserRole === 'abuja_rep') allowedBranches = ['Abuja'];
+        else if (currentUserRole === 'ph_rep') allowedBranches = ['Portharcourt'];
+        else allowedBranches = ['Abuja', 'Portharcourt', 'Lagos'];
+        let docs = inventoryData.filter(d => allowedBranches.includes(d.branch));
+        if (!showAll) docs = docs.filter(d => { const key = d.itemName + '|' + d.branch; return (floorData[key] || 0) === 0; });
+        const search = searchInput.value.toLowerCase().trim(); if (search) docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+        const branchVal = branchFilter.value; if (branchVal !== 'all') docs = docs.filter(d => d.branch === branchVal);
+        const categoryVal = categoryFilter.value; if (categoryVal !== 'all') docs = docs.filter(d => (d.category || 'Other') === categoryVal);
+        if (dateFrom) { const fromDate = new Date(dateFrom); fromDate.setHours(0,0,0,0); docs = docs.filter(d => { if (!d.lastUpdated) return false; return d.lastUpdated.toDate() >= fromDate; }); }
+        if (dateTo) { const toDate = new Date(dateTo); toDate.setHours(23,59,59,999); docs = docs.filter(d => { if (!d.lastUpdated) return false; return d.lastUpdated.toDate() <= toDate; }); }
+        // Sort
+        docs.sort((a, b) => a.itemName.localeCompare(b.itemName));
+        // Add rows
+        docs.forEach(d => {
+            const row = table.insertRow();
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'rdCheckbox';
+            cb.dataset.id = d.id;
+            row.insertCell().appendChild(cb);
+            row.insertCell().innerText = d.itemName;
+            row.insertCell().innerText = d.branch;
+            row.insertCell().innerText = d.stock;
+        });
+        document.getElementById('rdMessage').innerText = '';
+        document.getElementById('returnDispatchModal').style.display = 'flex';
+    }
+
+    function toggleAllRdCheckboxes(checked) {
+        document.querySelectorAll('.rdCheckbox').forEach(cb => cb.checked = checked);
+    }
+
+    async function executeReturnDispatch() {
+        const checkboxes = document.querySelectorAll('.rdCheckbox:checked');
+        if (checkboxes.length === 0) { document.getElementById('rdMessage').innerText = 'Select at least one item.'; return; }
+        const action = document.getElementById('rdAction').value;
+        const destination = document.getElementById('rdDestination').value;
+        const items = [];
+        checkboxes.forEach(cb => {
+            const id = cb.dataset.id;
+            const item = inventoryData.find(d => d.id === id);
+            if (item) items.push(item);
+        });
+        if (items.length === 0) { document.getElementById('rdMessage').innerText = 'No valid items selected.'; return; }
+        // Confirm
+        let msg = '';
+        if (action === 'return') msg = `Return ${items.length} items to sender?`;
+        else msg = `Dispatch ${items.length} items to ${destination}?`;
+        if (!confirm(msg)) return;
+        // Execute
+        try {
+            for (const item of items) {
+                if (action === 'return') {
+                    // Decrement stock (remove all stock of this item)
+                    const ref = db.collection('inventory').doc(item.id);
+                    await ref.update({ stock: firebase.firestore.FieldValue.increment(-item.stock), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                    await db.collection('activityLog').add({
+                        actionType: 'return_to_sender',
                         itemName: item.itemName,
                         branch: item.branch,
-                        stock: item.stock,
-                        unitPrice: item.unitPrice,
-                        location: 'Floor Shelf A',
-                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        qty: item.stock,
+                        details: `Returned ${item.stock} x ${item.itemName} to sender`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        user: currentUserEmail
                     });
-                } else {
-                    snap.forEach(doc => {
-                        doc.ref.update({
-                            stock: firebase.firestore.FieldValue.increment(item.stock),
-                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                } else { // dispatch
+                    // Move to destination branch (change branch field)
+                    const ref = db.collection('inventory').doc(item.id);
+                    await ref.update({ branch: destination, lastUpdated: firebase.firestore.FieldValue.serverTimestamp() });
+                    await db.collection('activityLog').add({
+                        actionType: 'dispatch_to_branch',
+                        itemName: item.itemName,
+                        fromBranch: item.branch,
+                        toBranch: destination,
+                        qty: item.stock,
+                        details: `Dispatched ${item.stock} x ${item.itemName} from ${item.branch} to ${destination}`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        user: currentUserEmail
                     });
                 }
             }
-
-            await db.collection('activityLog').add({
-                actionType: 'move_all_to_floor',
-                branch: targetBranch || 'all',
-                itemCount: itemsToMove.length,
-                details: `Moved all ${itemsToMove.length} items to shop floor.`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUserEmail
-            });
-
-            alert(`✅ Moved ${itemsToMove.length} items to shop floor.`);
+            alert(`✅ ${action === 'return' ? 'Returned' : 'Dispatched'} ${items.length} items.`);
+            closeModal('returnDispatchModal');
             renderWarehouse();
         } catch (err) {
-            alert('Error: ' + err.message);
+            document.getElementById('rdMessage').innerText = 'Error: ' + err.message;
         }
     }
 
@@ -980,7 +849,11 @@
         link.click();
     }
 
-    console.log('NEVAMAK Warehouse Management loaded with advanced filters.');
+    // Search and filter listeners
+    document.getElementById('searchItem').addEventListener('input', renderWarehouse);
+    document.getElementById('filterBranch').addEventListener('change', renderWarehouse);
+
+    console.log('NEVAMAK Warehouse Management loaded with Return/Dispatch and Delete features.');
 </script>
 </body>
 </html>
