@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Super Admin Zone</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1200px; margin: auto; }
+        header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .login-box { max-width: 400px; margin: 40px auto; background: white; padding: 24px; border-radius: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .login-box input, .login-box button { width: 100%; padding: 10px; margin: 6px 0; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; }
+        .login-box button { background: #0a3d62; color: white; border: none; cursor: pointer; font-weight: bold; }
+        .login-box .error { color: #e74c3c; margin-top: 8px; }
+        .section-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+        .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
+        .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
+        .super-badge { background: #e74c3c; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; }
+        @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🛡️ Super Admin Zone <span class="super-badge">🔐 Protected</span></h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="warehouse.html">🏚️ Warehouse</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+        </div>
+    </header>
+
+    <!-- Login Form -->
+    <div id="loginArea" class="login-box">
+        <h3 style="text-align:center;">Super Admin Login</h3>
+        <input type="text" id="superUsername" placeholder="Username" value="superadmin">
+        <input type="password" id="superPassword" placeholder="Password">
+        <button id="superLoginBtn">Login</button>
+        <div id="loginError" class="error"></div>
+        <div style="margin-top:12px; font-size:0.8rem; color:#888; text-align:center;">Default: superadmin / supro123</div>
+    </div>
+
+    <!-- Inventory Management (visible after login) -->
+    <div id="inventoryArea" style="display:none;">
+        <div class="filters">
+            <input type="text" id="searchItem" placeholder="🔍 Search by item...">
+            <select id="filterBranch">
+                <option value="all">All Branches</option>
+                <option value="Abuja">Abuja</option>
+                <option value="Portharcourt">Port Harcourt</option>
+                <option value="Lagos">Lagos</option>
+            </select>
+            <button id="applyFilters">🔍 Search</button>
+            <button id="clearFilters" class="clear" style="background:#e74c3c;">✖ Clear</button>
+            <button id="refreshBtn" style="background:#27ae60;">🔄 Refresh</button>
+        </div>
+        <div class="section-card">
+            <div id="inventoryList">Loading inventory...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ==================== Session Management ====================
+    let isSuperAdmin = sessionStorage.getItem('superAdmin') === 'true';
+
+    // DOM refs
+    const loginArea = document.getElementById('loginArea');
+    const inventoryArea = document.getElementById('inventoryArea');
+    const loginBtn = document.getElementById('superLoginBtn');
+    const loginError = document.getElementById('loginError');
+    const inventoryList = document.getElementById('inventoryList');
+
+    // ==================== Auth ====================
+    // Ensure user is signed in to Firebase first
+    auth.onAuthStateChanged(user => {
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+        // If already super admin, show inventory
+        if (isSuperAdmin) {
+            loginArea.style.display = 'none';
+            inventoryArea.style.display = 'block';
+            loadInventory();
+        } else {
+            loginArea.style.display = 'block';
+            inventoryArea.style.display = 'none';
+        }
+    });
+
+    // ==================== Super Admin Login ====================
+    loginBtn.addEventListener('click', function() {
+        const username = document.getElementById('superUsername').value.trim();
+        const password = document.getElementById('superPassword').value.trim();
+        if (username === 'superadmin' && password === 'supro123') {
+            isSuperAdmin = true;
+            sessionStorage.setItem('superAdmin', 'true');
+            loginArea.style.display = 'none';
+            inventoryArea.style.display = 'block';
+            loginError.innerText = '';
+            loadInventory();
+        } else {
+            loginError.innerText = '❌ Invalid username or password.';
+        }
+    });
+
+    // Allow Enter key on password field
+    document.getElementById('superPassword').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') loginBtn.click();
+    });
+
+    // ==================== Logout ====================
+    document.getElementById('logoutBtn').addEventListener('click', function() {
+        sessionStorage.removeItem('superAdmin');
+        isSuperAdmin = false;
+        auth.signOut().then(() => {
+            window.location.href = 'login.html';
+        });
+    });
+
+    // ==================== Load Inventory (with filters) ====================
+    function loadInventory() {
+        const searchInput = document.getElementById('searchItem');
+        const branchFilter = document.getElementById('filterBranch');
+
+        db.collection('inventory').onSnapshot((snapshot) => {
+            let docs = [];
+            snapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+
+            // Apply search
+            const search = searchInput.value.toLowerCase().trim();
+            if (search) {
+                docs = docs.filter(d => (d.itemName || '').toLowerCase().includes(search));
+            }
+            // Apply branch filter
+            const branchVal = branchFilter.value;
+            if (branchVal !== 'all') {
+                docs = docs.filter(d => d.branch === branchVal);
+            }
+            // Sort by branch then item name
+            docs.sort((a, b) => {
+                if (a.branch !== b.branch) return a.branch.localeCompare(b.branch);
+                return (a.itemName || '').localeCompare(b.itemName || '');
+            });
+
+            if (docs.length === 0) {
+                inventoryList.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No inventory items found.</p>';
+                return;
+            }
+
+            let html = `<table>
+                <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Branch</th>
+                    <th>Stock</th>
+                    <th>Unit Price</th>
+                    <th>Location</th>
+                    <th>Last Updated</th>
+                    <th>Action</th>
+                </tr>`;
+            docs.forEach(d => {
+                const category = d.category || 'Other';
+                const lastUpdated = d.lastUpdated ? new Date(d.lastUpdated.toDate()).toLocaleString() : 'N/A';
+                html += `<tr>
+                    <td><strong>${d.itemName}</strong></td>
+                    <td>${category}</td>
+                    <td>${d.branch}</td>
+                    <td>${d.stock}</td>
+                    <td>₦${(d.unitPrice || 0).toLocaleString()}</td>
+                    <td>${d.location || 'N/A'}</td>
+                    <td>${lastUpdated}</td>
+                    <td>
+                        <button class="btn-sm btn-danger" onclick="deleteItem('${d.id}')">🗑️ Delete</button>
+                    </td>
+                </tr>`;
+            });
+            html += '</table>';
+            inventoryList.innerHTML = html;
+        }, (error) => {
+            inventoryList.innerHTML = `<p style="color:red;">Error loading inventory: ${error.message}</p>`;
+        });
+    }
+
+    // ==================== Delete Item ====================
+    window.deleteItem = async function(id) {
+        if (!isSuperAdmin) {
+            alert('You are not authorised.');
+            return;
+        }
+        if (!confirm('⚠️ Permanently delete this inventory item? This action cannot be undone.')) return;
+        try {
+            await db.collection('inventory').doc(id).delete();
+            alert('✅ Item deleted successfully.');
+            loadInventory(); // refresh
+        } catch (err) {
+            alert('❌ Error deleting: ' + err.message);
+        }
+    };
+
+    // ==================== Filter listeners ====================
+    document.getElementById('applyFilters').addEventListener('click', loadInventory);
+    document.getElementById('clearFilters').addEventListener('click', function() {
+        document.getElementById('searchItem').value = '';
+        document.getElementById('filterBranch').value = 'all';
+        loadInventory();
+    });
+    document.getElementById('refreshBtn').addEventListener('click', loadInventory);
+    document.getElementById('searchItem').addEventListener('keyup', function(e) {
+        if (e.key === 'Enter') loadInventory();
+    });
+
+    console.log('Super Admin Zone loaded.');
+</script>
+</body>
+</html>
