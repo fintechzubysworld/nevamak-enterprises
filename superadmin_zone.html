@@ -47,11 +47,11 @@
     <!-- Login Form -->
     <div id="loginArea" class="login-box">
         <h3 style="text-align:center;">Super Admin Login</h3>
-        <input type="text" id="superUsername" placeholder="Username" value="superadmin">
+        <input type="email" id="superEmail" placeholder="Email" value="superadmin@nevamak.com">
         <input type="password" id="superPassword" placeholder="Password">
         <button id="superLoginBtn">Login</button>
         <div id="loginError" class="error"></div>
-        <div style="margin-top:12px; font-size:0.8rem; color:#888; text-align:center;">Default: superadmin / supro123</div>
+        <div style="margin-top:12px; font-size:0.8rem; color:#888; text-align:center;">Default: superadmin@nevamak.com / supro123</div>
     </div>
 
     <!-- Inventory Management (visible after login) -->
@@ -98,6 +98,8 @@
     const loginBtn = document.getElementById('superLoginBtn');
     const loginError = document.getElementById('loginError');
     const inventoryList = document.getElementById('inventoryList');
+    const superEmail = document.getElementById('superEmail');
+    const superPassword = document.getElementById('superPassword');
 
     // ==================== Auth ====================
     // Ensure user is signed in to Firebase first
@@ -119,9 +121,9 @@
 
     // ==================== Super Admin Login ====================
     loginBtn.addEventListener('click', function() {
-        const username = document.getElementById('superUsername').value.trim();
-        const password = document.getElementById('superPassword').value.trim();
-        if (username === 'superadmin' && password === 'supro123') {
+        const email = superEmail.value.trim();
+        const password = superPassword.value.trim();
+        if (email === 'superadmin@nevamak.com' && password === 'supro123') {
             isSuperAdmin = true;
             sessionStorage.setItem('superAdmin', 'true');
             loginArea.style.display = 'none';
@@ -129,12 +131,12 @@
             loginError.innerText = '';
             loadInventory();
         } else {
-            loginError.innerText = '❌ Invalid username or password.';
+            loginError.innerText = '❌ Invalid email or password.';
         }
     });
 
     // Allow Enter key on password field
-    document.getElementById('superPassword').addEventListener('keydown', function(e) {
+    superPassword.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') loginBtn.click();
     });
 
@@ -239,7 +241,7 @@
         if (e.key === 'Enter') loadInventory();
     });
 
-    console.log('Super Admin Zone loaded.');
+    console.log('Super Admin Zone loaded with email login.');
 </script>
 </body>
 </html>
