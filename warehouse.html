@@ -67,6 +67,7 @@
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
+
     <!-- Stats -->
     <div class="stats-grid" id="statsGrid">
         <div class="stat-card"><h4>Total Items</h4><div class="num" id="totalItems">-</div></div>
@@ -75,7 +76,6 @@
         <div class="stat-card"><h4>Branches</h4><div class="num" id="branchCount">-</div></div>
         <div class="stat-card"><h4>Total Stock Value (₦)</h4><div class="num" id="totalStockValue">-</div></div>
     </div>
-    
 
     <!-- Filters -->
     <div class="filters">
@@ -86,7 +86,6 @@
             <option value="Portharcourt">Port Harcourt</option>
             <option value="Lagos">Lagos</option>
         </select>
-        
         <select id="filterCategory">
             <option value="all">All Categories</option>
             <option value="Pot">Pot</option>
@@ -264,8 +263,11 @@
         if (canManage) {
             document.getElementById('addStockBtn').style.display = 'inline-block';
             document.getElementById('bulkActions').classList.add('show');
-            document.getElementById('returnDispatchBtn').style.display = 'inline-block';
             document.getElementById('deleteStockBtn').style.display = 'inline-block';
+        }
+        // Show Return/Dispatch to both manage and move (branch reps)
+        if (canManage || canMove) {
+            document.getElementById('returnDispatchBtn').style.display = 'inline-block';
         }
         if (canMove) {
             document.getElementById('moveAllToFloorBtn').style.display = 'inline-block';
@@ -302,7 +304,7 @@
             }
         });
         document.getElementById('executeRdAction').addEventListener('click', executeReturnDispatch);
-        // Delete Stock button
+        // Delete Stock button - redirect to superadmin_zone.html
         document.getElementById('deleteStockBtn').addEventListener('click', function() {
             window.location.href = 'superadmin_zone.html';
         });
@@ -850,12 +852,11 @@
         link.click();
     }
 
-    
     // Search and filter listeners
     document.getElementById('searchItem').addEventListener('input', renderWarehouse);
     document.getElementById('filterBranch').addEventListener('change', renderWarehouse);
 
-    console.log('NEVAMAK Warehouse Management loaded with Return/Dispatch and Delete features.');
+    console.log('NEVAMAK Warehouse Management loaded with Return/Dispatch for branch reps.');
 </script>
 </body>
 </html>
