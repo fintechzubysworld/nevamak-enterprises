@@ -20,6 +20,8 @@
         .info { color: #27ae60; text-align: center; margin-top: 12px; font-size: 0.85rem; }
         .setup-btn { background: #e67e22; }
         .setup-btn:hover { background: #d35400; }
+        .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
+        .help-text code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -31,10 +33,17 @@
     <button id="loginBtn">Sign In</button>
     <div id="message" class="error"></div>
     <div id="setupAdminContainer" style="display:none;">
+        <button id="setupAdminBtn" class="setup-btn">🔧 Create Default Admin</button>
+        <div class="info">admin@nevamak.com / admin123</div>
+    </div>
+    <div class="help-text">
+        Default admin: <code>admin@nevamak.com</code> / <code>admin123</code><br>
+        If you see a 400 error, click <strong>"Create Default Admin"</strong> first.
     </div>
 </div>
 
 <script>
+    // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -48,58 +57,143 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    // ==================== Check if admin exists ====================
     async function checkAdminExists() {
         try {
-            const snap = await db.collection('users').where('role','==','admin').limit(1).get();
+            const snap = await db.collection('users').where('role', '==', 'admin').limit(1).get();
             document.getElementById('setupAdminContainer').style.display = snap.empty ? 'block' : 'none';
-        } catch(e) { document.getElementById('setupAdminContainer').style.display = 'block'; }
+        } catch (err) {
+            console.warn('Could not check admin:', err);
+            document.getElementById('setupAdminContainer').style.display = 'block';
+        }
     }
     checkAdminExists();
 
+    // ==================== Create Default Admin ====================
     document.getElementById('setupAdminBtn')?.addEventListener('click', async () => {
         const adminEmail = 'admin@nevamak.com';
         const adminPassword = 'admin123';
         try {
             let uid;
             try {
-                const uc = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
-                uid = uc.user.uid;
-            } catch(err) {
+                const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
+                uid = userCred.user.uid;
+                console.log('Admin user created');
+            } catch (err) {
                 if (err.code === 'auth/email-already-in-use') {
-                    const u = await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
-                    uid = u.user.uid;
+                    // Sign in to get UID
+                    const user = await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+                    uid = user.user.uid;
                     await auth.signOut();
-                } else throw err;
+                    console.log('Admin user already exists, got UID');
+                } else {
+                    throw err;
+                }
             }
-            await db.collection('users').doc(uid).set({ email: adminEmail, role: 'admin', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-            alert('✅ Admin ready! Sign in with admin@nevamak.com / admin123');
+            // Create Firestore doc
+            await db.collection('users').doc(uid).set({
+                email: adminEmail,
+                role: 'admin',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert('✅ Admin account is ready!\nEmail: admin@nevamak.com\nPassword: admin123\nPlease sign in.');
             document.getElementById('setupAdminContainer').style.display = 'none';
-        } catch(err) { alert('Error: ' + err.message); }
+        } catch (err) {
+            console.error('Setup error:', err);
+            alert('Error creating admin: ' + err.message);
+        }
     });
 
+    // ==================== Login ====================
     document.getElementById('loginBtn').addEventListener('click', async () => {
         const email = document.getElementById('email').value.trim();
         const password = document.getElementById('password').value;
-        const msg = document.getElementById('message');
-        msg.innerText = '';
+        const messageDiv = document.getElementById('message');
+        messageDiv.innerText = '';
+
+        if (!email || !password) {
+            messageDiv.innerText = 'Please enter email and password.';
+            return;
+        }
+
         try {
-            const uc = await auth.signInWithEmailAndPassword(email, password);
-            const uid = uc.user.uid;
-            let userDoc = await db.collection('users').doc(uid).get();
-            if (!userDoc.exists && email === 'admin@nevamak.com') {
-                await db.collection('users').doc(uid).set({ email, role: 'admin', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-                userDoc = await db.collection('users').doc(uid).get();
+            const userCred = await auth.signInWithEmailAndPassword(email, password);
+            const uid = userCred.user.uid;
+            // Check Firestore role
+            const userDoc = await db.collection('users').doc(uid).get();
+            if (!userDoc.exists) {
+                // If admin email, auto-create doc
+                if (email === 'admin@nevamak.com') {
+                    await db.collection('users').doc(uid).set({
+                        email: email,
+                        role: 'admin',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    // Re-fetch
+                    const newDoc = await db.collection('users').doc(uid).get();
+                    if (newDoc.exists) {
+                        const role = newDoc.data().role;
+                        redirectUser(role);
+                        return;
+                    }
+                }
+                await auth.signOut();
+                messageDiv.innerText = 'User role not found. Please ask admin to create your account.';
+                return;
             }
-            if (!userDoc.exists) throw new Error('User role not found. Ask admin to create account.');
-            // All users go to dashboard
-            window.location.href = 'index.html';
-        } catch(err) { msg.innerText = err.message; }
+            const role = userDoc.data().role;
+            redirectUser(role);
+        } catch (err) {
+            console.error('Login error:', err);
+            // Provide user-friendly message
+            let msg = err.message;
+            if (err.code === 'auth/user-not-found') {
+                msg = 'User not found. Please check your email or create an account.';
+            } else if (err.code === 'auth/wrong-password') {
+                msg = 'Incorrect password. Please try again.';
+            } else if (err.code === 'auth/invalid-email') {
+                msg = 'Invalid email format.';
+            } else if (err.code === 'auth/too-many-requests') {
+                msg = 'Too many failed attempts. Please try again later.';
+            } else if (err.code === 'auth/configuration-not-found') {
+                msg = 'Authentication not enabled. Please contact admin.';
+            }
+            messageDiv.innerText = '❌ ' + msg;
+        }
     });
 
+    // ==================== Redirect helper ====================
+    function redirectUser(role) {
+        if (role === 'admin' || role === 'lagos_sender') {
+            window.location.href = 'index.html';
+        } else if (role === 'abuja_rep') {
+            window.location.href = 'receive_abuja.html';
+        } else if (role === 'ph_rep') {
+            window.location.href = 'receive_ph.html';
+        } else {
+            alert('Unknown role: ' + role);
+        }
+    }
+
+    // ==================== Auto-redirect if already logged in ====================
     auth.onAuthStateChanged(async (user) => {
         if (user) {
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            if (userDoc.exists) window.location.href = 'index.html';
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (userDoc.exists) {
+                    const role = userDoc.data().role;
+                    redirectUser(role);
+                }
+            } catch (err) {
+                console.warn('Auto-redirect error:', err);
+            }
+        }
+    });
+
+    // ==================== Allow Enter key on password field ====================
+    document.getElementById('password').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('loginBtn').click();
         }
     });
 </script>
