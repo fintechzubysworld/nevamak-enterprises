@@ -75,6 +75,8 @@
         .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 0.9rem; color: #721c24; }
         .permission-error a { color: #0a3d62; font-weight: 600; }
         .permission-error pre { background: #f0f0f0; padding: 8px; border-radius: 8px; font-size: 0.8rem; overflow-x: auto; margin: 8px 0; }
+        .emailjs-error { background: #fff3cd; border-left: 4px solid #f39c12; padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 0.9rem; color: #856404; }
+        .emailjs-error pre { background: #f0f0f0; padding: 8px; border-radius: 8px; font-size: 0.8rem; overflow-x: auto; margin: 8px 0; }
         @media (max-width: 768px) { .sidebar { width: 100%; max-height: 150px; flex-shrink: 0; } .email-layout { flex-direction: column; } .sidebar .nav-item { display: inline-block; } }
     </style>
 </head>
@@ -159,6 +161,7 @@
             </div>
             <div id="composeMessage" style="color:red; margin-top:8px;"></div>
             <div id="permissionInfo" style="display:none;" class="permission-error"></div>
+            <div id="emailjsInfo" style="display:none;" class="emailjs-error"></div>
         </form>
     </div>
 </div>
@@ -239,6 +242,7 @@
     let currentViewEmailId = null;
     let currentProfilePic = null;
     let unsubscribeFolder = null;
+    let pendingFile = null;
 
     // ==================== DOM refs ====================
     const emailList = document.getElementById('emailList');
@@ -253,6 +257,7 @@
     const composeExternal = document.getElementById('composeExternal');
     const composeMessage = document.getElementById('composeMessage');
     const permissionInfo = document.getElementById('permissionInfo');
+    const emailjsInfo = document.getElementById('emailjsInfo');
     const attachBtn = document.getElementById('attachBtn');
     const fileInput = document.getElementById('fileInput');
     const filePreviewArea = document.getElementById('filePreviewArea');
@@ -278,8 +283,6 @@
     const profileEmail = document.getElementById('profileEmail');
     const profileRole = document.getElementById('profileRole');
     const profileDriveStatus = document.getElementById('profileDriveStatus');
-
-    let pendingFile = null;
 
     // ==================== Google Drive OAuth ====================
     function initDriveClient() {
@@ -501,7 +504,6 @@
         loadFolder(folder);
     }
 
-    // ==================== Load Folder with detailed error handling ====================
     async function loadFolder(folder) {
         if (unsubscribeFolder) { unsubscribeFolder(); unsubscribeFolder = null; }
         let query = db.collection('emails');
@@ -526,7 +528,6 @@
             updateBadge(emails, folder);
         }, (error) => {
             console.error('Folder load error:', error);
-            // Show detailed error with instructions
             let errorHtml = `
                 <div style="text-align:center; padding:40px;">
                     <p style="color:#e74c3c; font-size:1.1rem;">⚠️ Error loading emails</p>
@@ -663,6 +664,7 @@
         composeExternal.checked = false;
         composeMessage.innerText = '';
         permissionInfo.style.display = 'none';
+        emailjsInfo.style.display = 'none';
         clearFilePreview();
         composeModal.style.display = 'flex';
     }
@@ -761,7 +763,6 @@
             if (err.code === 'permission-denied' || err.message.includes('permission')) {
                 composeMessage.innerText = '⚠️ Draft saved locally (permission denied). Fix Firestore rules.';
                 showPermissionHelp();
-                // Save locally
                 const localDrafts = JSON.parse(localStorage.getItem('localDrafts') || '[]');
                 draftData.localTimestamp = Date.now();
                 localDrafts.push(draftData);
@@ -772,7 +773,7 @@
         }
     };
 
-    // ==================== Send Email ====================
+    // ==================== Send Email (with EmailJS fix) ====================
     composeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const toRaw = composeTo.value.trim();
@@ -811,24 +812,45 @@
 
         try {
             await db.collection('emails').add(emailData);
+
             if (isExternal) {
+                // Use standard EmailJS parameters that work with most templates
                 const templateParams = {
                     to_email: toList.join(', '),
                     subject: subject,
                     message: body,
                     attachment_url: attachmentUrl || '',
                     from_name: currentUserEmail,
+                    // Also include common variants for compatibility
+                    to: toList.join(', '),
+                    subject: subject,
+                    message: body,
+                    from: currentUserEmail,
+                    attachment: attachmentUrl || '',
                 };
+
                 try {
-                    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+                    const response = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+                    console.log('EmailJS success:', response);
                     composeMessage.innerText = '✅ Email sent internally and externally!';
                 } catch (emailjsErr) {
-                    console.error('EmailJS error:', emailjsErr);
-                    composeMessage.innerText = '⚠️ Sent internally but external email failed: ' + emailjsErr.message;
+                    console.error('EmailJS error details:', emailjsErr);
+                    console.error('EmailJS error text:', emailjsErr.text);
+                    console.error('EmailJS status:', emailjsErr.status);
+
+                    // Show detailed error
+                    let errorMsg = `EmailJS error: ${emailjsErr.text || emailjsErr.message || 'Unknown error'}`;
+                    if (emailjsErr.status === 422) {
+                        errorMsg += '\n\n⚠️ Template parameter mismatch. Check your EmailJS template parameters.';
+                        showEmailJSError();
+                    }
+                    composeMessage.innerText = `⚠️ Sent internally but external email failed. Check EmailJS.`;
+                    console.error('External email failed, but internal email was sent.');
                 }
             } else {
                 composeMessage.innerText = '✅ Email sent successfully!';
             }
+
             clearFilePreview();
             composeTo.value = '';
             composeSubject.value = '';
@@ -861,6 +883,25 @@
         permissionInfo.style.display = 'block';
     }
 
+    function showEmailJSError() {
+        emailjsInfo.innerHTML = `
+            <p><strong>⚠️ EmailJS Error (422).</strong></p>
+            <p>The template parameters don't match what your EmailJS template expects.</p>
+            <p><strong>Fix this in EmailJS Dashboard:</strong></p>
+            <ol>
+                <li>Go to <a href="https://dashboard.emailjs.com/admin/templates" target="_blank">EmailJS Templates</a></li>
+                <li>Open template <code>${EMAILJS_TEMPLATE_ID}</code></li>
+                <li>Make sure your template uses these parameter names (or update the code):<br>
+                    <code>{{to_email}}</code>, <code>{{subject}}</code>, <code>{{message}}</code>, <code>{{attachment_url}}</code>, <code>{{from_name}}</code>
+                </li>
+                <li>Save the template and try again</li>
+            </ol>
+            <p><strong>Or update the code to match your template's parameter names.</strong></p>
+            <p style="margin-top:8px; font-size:0.8rem; color:#888;">Check the browser console (F12) for the full error details.</p>
+        `;
+        emailjsInfo.style.display = 'block';
+    }
+
     // ==================== Refresh ====================
     window.refreshFolder = function() {
         loadFolder(currentFolder);
@@ -872,6 +913,7 @@
         profileSaveBtn.disabled = true;
         profileMessage.innerText = '';
         permissionInfo.style.display = 'none';
+        emailjsInfo.style.display = 'none';
     }
     window.onclick = function(event) {
         if (event.target.classList.contains('modal')) {
@@ -879,6 +921,7 @@
             profileSaveBtn.disabled = true;
             profileMessage.innerText = '';
             permissionInfo.style.display = 'none';
+            emailjsInfo.style.display = 'none';
         }
     };
 
@@ -895,7 +938,7 @@
         });
     }
 
-    console.log('NEVAMAK Email Client loaded with improved error handling.');
+    console.log('NEVAMAK Email Client loaded with EmailJS fixes.');
 </script>
 </body>
 </html>
