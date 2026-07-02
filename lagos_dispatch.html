@@ -7,8 +7,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <!-- SheetJS for Excel import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        /* (styles remain the same as before) */
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f4f7fc; margin: 0; padding: 12px; }
         .container { max-width: 900px; margin: auto; }
@@ -20,6 +21,7 @@
         .btn-success { background: #27ae60; color: white; }
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
         .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
         .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
@@ -45,9 +47,11 @@
         .status-delivered { background: #d4edda; color: #155724; }
         .status-partial { background: #fff3cd; color: #856404; }
         .status-rejected { background: #f8d7da; color: #721c24; }
+        .status-cancelled { background: #f5c6cb; color: #721c24; }
         .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
         .cost-cell { font-family: monospace; font-weight: bold; }
         .scroll { overflow-x: auto; }
+        .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; display: none; }
         @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
     </style>
 </head>
@@ -66,6 +70,7 @@
         <div class="stat-card"><h4>Dispatched</h4><div class="num" id="dispatchedCount">-</div></div>
         <div class="stat-card"><h4>Delivered</h4><div class="num" id="deliveredCount">-</div></div>
         <div class="stat-card"><h4>Drafts</h4><div class="num" id="draftCount">-</div></div>
+        <div class="stat-card"><h4>Cancelled</h4><div class="num" id="cancelledCount">-</div></div>
         <div class="stat-card"><h4>Total Goods (₦)</h4><div class="num" id="totalGoods">-</div></div>
     </div>
 
@@ -113,7 +118,7 @@
                 <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
                 <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
             </div>
-            <div id="importPreviewContainer" class="import-preview" style="display:none;"></div>
+            <div id="importPreviewContainer" class="import-preview"></div>
             <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
             <textarea id="dispatchNotes" placeholder="Additional notes"></textarea>
             <div style="display:flex; gap:12px; flex-wrap:wrap;">
@@ -133,6 +138,7 @@
                 <option value="Delivered">Delivered</option>
                 <option value="Partially Delivered">Partial</option>
                 <option value="Rejected">Rejected</option>
+                <option value="Cancelled">Cancelled</option>
                 <option value="Draft">Draft</option>
             </select>
         </div>
@@ -230,6 +236,7 @@
     let currentUser = null;
     let currentUserRole = '';
 
+    // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
@@ -443,13 +450,11 @@
         }
     });
 
-    // ==================== Save Shipment (with confirmation) ====================
+    // ==================== Save Shipment ====================
     async function saveShipment(status) {
-        // Confirmation dialog
         if (!confirm(`Are you sure you want to ${status === 'Draft' ? 'save this draft' : 'dispatch this shipment'}?`)) {
             return;
         }
-
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
         const supplierId = document.getElementById("supplierSelect").value;
@@ -475,8 +480,6 @@
             });
         });
         if (!items.length || !senderName) return alert("Fill all fields");
-        if (status === 'Draft' && !confirm('Save as draft?')) return;
-
         await db.collection("shipments").add({
             senderName,
             destinationBranch: destBranch,
@@ -493,7 +496,6 @@
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
         });
-
         await db.collection('activityLog').add({
             actionType: status === 'Draft' ? 'draft' : 'dispatch',
             shipmentId: 'new',
@@ -502,7 +504,6 @@
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             user: currentUser.email
         });
-
         alert(`${status} created`);
         document.getElementById("dispatchForm").reset();
         itemsContainer.innerHTML = '';
@@ -521,6 +522,71 @@
         saveShipment('Draft');
     });
 
+    // ==================== Cancel Shipment ====================
+    window.cancelShipment = async function(id) {
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
+            alert('You do not have permission to cancel shipments.');
+            return;
+        }
+        if (!confirm('⚠️ Are you sure you want to cancel this shipment? This action can be reversed by re-dispatching.')) {
+            return;
+        }
+        try {
+            await db.collection('shipments').doc(id).update({
+                status: 'Cancelled',
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await db.collection('activityLog').add({
+                actionType: 'cancel',
+                shipmentId: id,
+                branch: 'Lagos',
+                details: `Shipment ${id} cancelled by ${currentUser.email}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUser.email
+            });
+            alert('✅ Shipment cancelled.');
+            loadShipments();
+            loadStats();
+        } catch (err) {
+            alert('Error cancelling shipment: ' + err.message);
+        }
+    };
+
+    // ==================== Delete Shipment ====================
+    window.deleteShipment = async function(id) {
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
+            alert('You do not have permission to delete shipments.');
+            return;
+        }
+        // Check current status – only allow deletion of Draft or Cancelled
+        const doc = await db.collection('shipments').doc(id).get();
+        if (!doc.exists) { alert('Shipment not found.'); return; }
+        const status = doc.data().status;
+        if (status !== 'Draft' && status !== 'Cancelled') {
+            alert('Only Draft or Cancelled shipments can be deleted.');
+            return;
+        }
+        if (!confirm('⚠️ Are you sure you want to permanently delete this shipment? This action cannot be undone.')) {
+            return;
+        }
+        try {
+            await db.collection('shipments').doc(id).delete();
+            await db.collection('activityLog').add({
+                actionType: 'delete',
+                shipmentId: id,
+                branch: 'Lagos',
+                details: `Shipment ${id} deleted by ${currentUser.email}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUser.email
+            });
+            alert('✅ Shipment deleted.');
+            loadShipments();
+            loadStats();
+        } catch (err) {
+            alert('Error deleting shipment: ' + err.message);
+        }
+    };
+
     // ==================== Load Shipments ====================
     function loadShipments() {
         const searchInput = document.getElementById('searchShipment');
@@ -535,6 +601,9 @@
                 const supplierName = d.supplierId ? 'Supplier' : '-';
                 const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
                 const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
+                const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered');
+                const canDelete = (d.status === 'Draft' || d.status === 'Cancelled');
+                const isAdmin = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
                 html += `<tr>
                     <td><strong>${doc.id.slice(0,6)}</strong></td>
                     <td><span class="badge">${d.destinationBranch}</span></td>
@@ -546,6 +615,8 @@
                     <td>
                         <button class="btn-sm btn-primary" onclick="viewShipment('${doc.id}')">👁️ View</button>
                         ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${doc.id}')">✏️ Edit</button>` : ''}
+                        ${isAdmin && canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${doc.id}')">❌ Cancel</button>` : ''}
+                        ${isAdmin && canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${doc.id}')">🗑️ Delete</button>` : ''}
                     </td>
                 </tr>`;
             });
@@ -572,6 +643,9 @@
                 const supplierName = d.supplierId ? 'Supplier' : '-';
                 const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
                 const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
+                const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered');
+                const canDelete = (d.status === 'Draft' || d.status === 'Cancelled');
+                const isAdmin = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
                 html += `<tr>
                     <td><strong>${id.slice(0,6)}</strong></td>
                     <td><span class="badge">${d.destinationBranch}</span></td>
@@ -583,6 +657,8 @@
                     <td>
                         <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️ View</button>
                         ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️ Edit</button>` : ''}
+                        ${isAdmin && canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${id}')">❌ Cancel</button>` : ''}
+                        ${isAdmin && canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${id}')">🗑️ Delete</button>` : ''}
                     </td>
                 </tr>`;
             });
@@ -788,19 +864,21 @@
     // ==================== Stats ====================
     function loadStats() {
         db.collection("shipments").onSnapshot(snap => {
-            let total = 0, dispatched = 0, delivered = 0, drafts = 0, goods = 0;
+            let total = 0, dispatched = 0, delivered = 0, drafts = 0, cancelled = 0, goods = 0;
             snap.forEach(doc => {
                 const d = doc.data();
                 total++;
                 if (d.status === 'Dispatched') dispatched++;
                 else if (d.status === 'Delivered') delivered++;
                 else if (d.status === 'Draft') drafts++;
+                else if (d.status === 'Cancelled') cancelled++;
                 if (d.items) d.items.forEach(i => goods += i.totalItemCost || 0);
             });
             document.getElementById('totalShipments').innerText = total;
             document.getElementById('dispatchedCount').innerText = dispatched;
             document.getElementById('deliveredCount').innerText = delivered;
             document.getElementById('draftCount').innerText = drafts;
+            document.getElementById('cancelledCount').innerText = cancelled;
             document.getElementById('totalGoods').innerText = '₦' + goods.toLocaleString();
         });
     }
