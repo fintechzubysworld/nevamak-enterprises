@@ -3,108 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>NEVAMAK – Request Invoice</title>
+    <title>NEVAMAK – Invoice Repository</title>
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
+    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        /* (styles remain the same as before) */
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
-        .container { max-width: 900px; margin: auto; }
-        .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        h2 { margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
-        input, select, textarea { width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
-        button { padding: 12px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 6px 0; }
+        .container { max-width: 1100px; margin: auto; }
+        header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+        .tab-btn { background: #ccc; color: #333; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; }
+        .tab-btn.active { background: #0a3d62; color: white; }
+        .tab-content { display: none; background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .tab-content.active { display: block; }
+        .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { font-size: 1.3rem; margin-top: 0; color: #0a3d62; }
+        h3 { font-size: 1.1rem; color: #2c3e50; margin: 12px 0 8px; }
+        input, select, textarea { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; margin: 4px 0; }
+        button { padding: 10px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 4px 0; }
         .btn-primary { background: #0a3d62; color: white; }
         .btn-success { background: #27ae60; color: white; }
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
         .btn-info { background: #3498db; color: white; }
-        .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
-        .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
-        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center; }
         .item-row input { flex: 1; margin: 0; }
-        .removeItem { background: #e74c3c; color: white; width: auto; padding: 10px 16px; border-radius: 40px; border: none; cursor: pointer; }
-        .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; }
+        .removeItem { background: #e74c3c; color: white; width: auto; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; word-wrap: break-word; }
         .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .flex-row > * { flex: 1; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
+        th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.85rem; word-wrap: break-word; }
         th { background: #f8f9fa; }
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; }
-        .status-pending { background: #ffeaa7; color: #b85c00; }
-        .status-approved { background: #d4edda; color: #155724; }
-        .status-rejected { background: #f8d7da; color: #721c24; }
-        .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
-        .cost-cell { font-family: monospace; font-weight: bold; }
+        .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .scroll { overflow-x: auto; }
-        .import-area { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .import-area input[type="file"] { display: none; }
-        .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; display: none; }
-        .import-preview.show { display: block; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.8rem; }
+        .invoice-preview { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; margin-top: 12px; }
+        .invoice-preview table { width: 100%; border-collapse: collapse; }
+        .invoice-preview th, .invoice-preview td { border: 1px solid #ddd; padding: 8px; }
+        .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; }
+        .moved-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .search-hint { font-size: 0.8rem; color: #888; margin-left: 8px; }
         @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="nav">
-        <a href="index.html">🏠 Dashboard</a>
-        <a href="chat.html">💬 Chat</a>
-        <a href="reports.html">📊 Reports</a>
-        <a href="warehouse.html">🏚️ Warehouse</a>
-        <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
-    </div>
-
-    <div class="card">
-        <h2>📄 Request Invoice from Sender</h2>
-        <p>Fill in the items you need. The sender will review and send you a dispatch with final prices.</p>
-        <form id="requestForm">
-            <div class="flex-row">
-                <input type="text" id="requestSenderName" placeholder="Your Name" required>
-                <select id="requestBranch" required>
-                    <option value="Abuja">Abuja</option>
-                    <option value="Portharcourt">Port Harcourt</option>
-                </select>
-            </div>
-            <input type="text" id="requestNotes" placeholder="Additional notes or special instructions">
-            <label>Items:</label>
-            <div id="requestItemsContainer">
-                <div class="item-row">
-                    <input type="text" placeholder="Item name" class="reqItemName">
-                    <input type="number" placeholder="Quantity" class="reqItemQty">
-                    <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
-                    <button type="button" class="removeItem">✖</button>
-                </div>
-            </div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button type="button" id="addReqItemBtn" class="btn-success">+ Add product</button>
-                <button type="button" id="importBtn" class="btn-info">📂 Import from file</button>
-                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv,.json">
-            </div>
-            <div class="import-preview" id="importPreview">
-                <p><strong>Imported items:</strong> <span id="importCount">0</span></p>
-                <div id="importItemList"></div>
-                <div style="display:flex; gap:8px; margin-top:8px;">
-                    <button type="button" id="applyImportBtn" class="btn-success">✅ Apply</button>
-                    <button type="button" id="cancelImportBtn" class="btn-danger">❌ Cancel</button>
-                </div>
-            </div>
-            <div class="cost-summary" id="reqCostPreview">Estimated total: ₦0</div>
-            <button type="submit" class="btn-primary">📤 Submit Request</button>
-        </form>
-    </div>
-
-    <div class="card">
-        <h2>📋 Your Requests</h2>
-        <div class="scroll">
-            <table id="requestsTable">
-                <thead><tr><th>Date</th><th>Branch</th><th>Items</th><th>Est. Total</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody><tr><td colspan="6">Loading...</td></tr></tbody>
-            </table>
+    <header>
+        <h1>🧾 Invoice Repository</h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="chat.html">💬 Chat</a>
+            <a href="reports.html">📊 Reports</a>
+            <a href="warehouse.html">🏚️ Warehouse</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
+    </header>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="create">✏️ Create Invoice</button>
+        <button class="tab-btn" data-tab="list">📋 Saved Invoices</button>
+    </div>
+
+    <!-- Create Invoice Tab -->
+    <div id="tab-create" class="tab-content active">
+        <div class="card">
+            <h2>New Invoice</h2>
+            <form id="invoiceForm">
+                <div class="flex-row">
+                    <input type="text" id="invoiceNumber" placeholder="Invoice # (auto)" readonly>
+                    <input type="date" id="invoiceDate" required>
+                </div>
+                <div class="flex-row">
+                    <input type="text" id="customerName" placeholder="Customer / Recipient" required>
+                    <input type="text" id="customerEmail" placeholder="Customer Email">
+                </div>
+                <div class="flex-row">
+                    <select id="invoiceBranch" required>
+                        <option value="Abuja">Abuja</option>
+                        <option value="Portharcourt">Port Harcourt</option>
+                        <option value="Lagos">Lagos</option>
+                    </select>
+                    <input type="text" id="invoiceNotes" placeholder="Notes (optional)">
+                </div>
+                <label>Items:</label>
+                <div id="invoiceItemsContainer">
+                    <div class="item-row">
+                        <input type="text" placeholder="Item name" class="itemName">
+                        <input type="number" placeholder="Qty" class="itemQty" value="1">
+                        <input type="number" placeholder="Price/unit" class="itemPrice" value="0">
+                        <button type="button" class="removeItem">✖</button>
+                    </div>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" id="addItemBtn" class="btn-success">+ Add Product</button>
+                    <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv,.json" style="display:none;">
+                </div>
+                <div id="importPreviewContainer" class="import-preview" style="display:none;"></div>
+                <div class="cost-summary" id="invoiceCostPreview">Total: ₦0</div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <button type="submit" class="btn-primary" style="flex:2;">💾 Save Invoice</button>
+                    <button type="button" id="previewInvoiceBtn" class="btn-warning" style="flex:1;">👁️ Preview</button>
+                    <button type="button" id="generatePDFBtn" class="btn-info" style="flex:1;">📄 PDF</button>
+                    <button type="button" id="generateCSVBtn" class="btn-success" style="flex:1;">📊 CSV</button>
+                </div>
+                <div id="invoicePreviewContainer" class="invoice-preview" style="display:none;"></div>
+                <div id="formMessage" style="color:red; margin-top:8px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Saved Invoices Tab -->
+    <div id="tab-list" class="tab-content">
+        <div class="card">
+            <h2>Saved Invoices</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <input type="text" id="searchInvoices" placeholder="🔍 Search by #, customer, or item..." style="flex:1;">
+                <button id="refreshInvoicesBtn" class="btn-primary">🔄 Refresh</button>
+            </div>
+            <div class="scroll" id="invoicesList">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Send Modal -->
+<div id="sendModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('sendModal')">&times;</span>
+        <h3>📤 Send Invoice</h3>
+        <p><strong>Invoice #:</strong> <span id="sendInvoiceNumber"></span></p>
+        <p><strong>Total:</strong> ₦<span id="sendInvoiceTotal"></span></p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
+            <button onclick="sendViaEmail()" class="btn-primary" style="flex:1;">📧 Email</button>
+            <button onclick="sendViaChat()" class="btn-info" style="flex:1;">💬 Chat</button>
+            <button onclick="sendViaWhatsApp()" class="btn-success" style="flex:1;">📱 WhatsApp</button>
+        </div>
+        <div id="sendMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
+<!-- Move to Warehouse Modal -->
+<div id="moveWarehouseModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('moveWarehouseModal')">&times;</span>
+        <h3>🏚️ Move Invoice Items to Warehouse</h3>
+        <p><strong>Invoice #:</strong> <span id="moveInvoiceNumber"></span></p>
+        <p><strong>Customer:</strong> <span id="moveCustomer"></span></p>
+        <p><strong>Date:</strong> <span id="moveDate"></span></p>
+        <p><strong>Branch:</strong> 
+            <select id="moveBranchSelect">
+                <option value="Abuja">Abuja</option>
+                <option value="Portharcourt">Port Harcourt</option>
+                <option value="Lagos">Lagos</option>
+            </select>
+        </p>
+        <div id="moveItemsList"></div>
+        <div style="display:flex; gap:12px; margin-top:16px;">
+            <button id="confirmMoveBtn" class="btn-success" style="flex:2;">✅ Move All to Warehouse</button>
+            <button onclick="closeModal('moveWarehouseModal')" class="btn-danger" style="flex:1;">Cancel</button>
+        </div>
+        <div id="moveMessage" style="color:red; margin-top:8px;"></div>
     </div>
 </div>
 
@@ -122,322 +195,798 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+    const storage = firebase.storage();
 
+    // ==================== State ====================
     let currentUser = null;
     let currentUserRole = '';
+    let currentUserEmail = '';
+    let sendInvoiceId = null;
+    let importedItems = [];
+    let moveInvoiceId = null;
+
+    // ==================== DOM ====================
+    const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
+    const addItemBtn = document.getElementById('addItemBtn');
+    const importExcelBtn = document.getElementById('importExcelBtn');
+    const excelFileInput = document.getElementById('excelFileInput');
+    const invoiceForm = document.getElementById('invoiceForm');
+    const invoicePreviewContainer = document.getElementById('invoicePreviewContainer');
+    const formMessage = document.getElementById('formMessage');
+    const invoicesList = document.getElementById('invoicesList');
+    const searchInvoices = document.getElementById('searchInvoices');
+    const refreshBtn = document.getElementById('refreshInvoicesBtn');
+    const importPreviewContainer = document.getElementById('importPreviewContainer');
+    const invoiceBranch = document.getElementById('invoiceBranch');
+    const moveBranchSelect = document.getElementById('moveBranchSelect');
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
+        currentUserEmail = user.email;
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
+            if (currentUserRole === 'abuja_rep') {
+                invoiceBranch.value = 'Abuja';
+                invoiceBranch.disabled = true;
+            } else if (currentUserRole === 'ph_rep') {
+                invoiceBranch.value = 'Portharcourt';
+                invoiceBranch.disabled = true;
+            } else {
+                invoiceBranch.disabled = false;
+            }
         }
-        if (!['abuja_rep', 'ph_rep'].includes(currentUserRole)) {
-            alert('Only branch representatives can request invoices.');
-            window.location.href = 'index.html';
-            return;
-        }
-        document.getElementById('requestSenderName').value = user.email.split('@')[0] + ' (' + currentUserRole + ')';
-        loadRequests();
+        document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+        document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+        loadInvoices();
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+            });
+        });
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
     // ==================== Items Management ====================
-    const reqContainer = document.getElementById("requestItemsContainer");
-    document.getElementById("addReqItemBtn").addEventListener("click", () => {
-        const div = document.createElement("div");
-        div.className = "item-row";
+    function addItemRow(itemName = '', qty = 1, price = 0) {
+        const div = document.createElement('div');
+        div.className = 'item-row';
         div.innerHTML = `
-            <input type="text" placeholder="Item name" class="reqItemName">
-            <input type="number" placeholder="Quantity" class="reqItemQty">
-            <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
+            <input type="text" placeholder="Item name" class="itemName" value="${itemName}">
+            <input type="number" placeholder="Qty" class="itemQty" value="${qty}">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${price}">
             <button type="button" class="removeItem">✖</button>
         `;
-        reqContainer.appendChild(div);
-        div.querySelector(".removeItem").onclick = () => div.remove();
-        updateReqPreview();
-    });
+        invoiceItemsContainer.appendChild(div);
+        div.querySelector('.removeItem').onclick = () => {
+            div.remove();
+            updateCostPreview();
+        };
+        updateCostPreview();
+    }
 
-    function updateReqPreview() {
+    addItemBtn.addEventListener('click', () => addItemRow());
+
+    function updateCostPreview() {
         let total = 0;
-        document.querySelectorAll("#requestItemsContainer .item-row").forEach(r => {
-            const qty = parseInt(r.querySelector(".reqItemQty")?.value || 0);
-            const price = parseFloat(r.querySelector(".reqItemPrice")?.value || 0);
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const qty = parseInt(row.querySelector('.itemQty')?.value || 0);
+            const price = parseFloat(row.querySelector('.itemPrice')?.value || 0);
             total += qty * price;
         });
-        document.getElementById("reqCostPreview").innerHTML = `Estimated total: ₦${total.toLocaleString()}`;
+        document.getElementById('invoiceCostPreview').innerHTML = `Total: ₦${total.toLocaleString()}`;
     }
-    reqContainer.addEventListener("input", updateReqPreview);
+    invoiceItemsContainer.addEventListener('input', updateCostPreview);
 
-    // ==================== Import from File ====================
-    const fileInput = document.getElementById('fileInput');
-    const importBtn = document.getElementById('importBtn');
-    const importPreview = document.getElementById('importPreview');
-    const importCount = document.getElementById('importCount');
-    const importItemList = document.getElementById('importItemList');
-    const applyImportBtn = document.getElementById('applyImportBtn');
-    const cancelImportBtn = document.getElementById('cancelImportBtn');
-    let importedItems = [];
+    // ==================== Import Excel (Robust) ====================
+    importExcelBtn.addEventListener('click', () => excelFileInput.click());
 
-    importBtn.addEventListener('click', () => fileInput.click());
-
-    fileInput.addEventListener('change', function(e) {
+    excelFileInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        const fileName = file.name.toLowerCase();
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        formMessage.innerText = '';
 
-        if (fileName.endsWith('.json')) {
-            reader.onload = (ev) => {
-                try {
-                    const data = JSON.parse(ev.target.result);
-                    parseImportData(data);
-                } catch (err) {
-                    alert('Invalid JSON file: ' + err.message);
-                }
-            };
-            reader.readAsText(file);
-        } else if (fileName.endsWith('.csv') || fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-            reader.onload = (ev) => {
-                try {
-                    const data = new Uint8Array(ev.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    let json = XLSX.utils.sheet_to_json(firstSheet);
-                    let headers = Object.keys(json[0] || {});
-                    const isEmptyHeader = (h) => h === '' || h.startsWith('__EMPTY');
-                    const allEmpty = headers.every(isEmptyHeader);
-                    if (allEmpty) {
-                        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                        if (rows.length === 0) { alert('No data found.'); return; }
-                        const inferred = rows.map(row => {
-                            const name = String(row[0] || '').trim();
-                            const qty = parseFloat(row[1]) || 0;
-                            const price = parseFloat(row[2]) || 0;
-                            return { itemName: name, quantity: qty, estimatedPrice: price };
-                        }).filter(it => it.itemName && it.quantity > 0);
-                        if (inferred.length > 0) {
-                            importedItems = inferred;
-                            showImportPreview();
-                            return;
+        const reader = new FileReader();
+        reader.onload = function(loadEvent) {
+            try {
+                const data = new Uint8Array(loadEvent.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                // First, try to read with headers
+                let json = XLSX.utils.sheet_to_json(firstSheet);
+                let headers = Object.keys(json[0] || {});
+
+                // Check if headers look like data (not column names)
+                const looksLikeData = (headers) => {
+                    // If any header is empty or looks like numeric, treat as data
+                    if (headers.length === 0) return true;
+                    // If any header contains only digits, it's likely data
+                    for (const h of headers) {
+                        if (h.trim() === '' || /^\d+$/.test(h.trim())) return true;
+                    }
+                    // If the first header is not a common column name, we might be in trouble
+                    const commonCols = ['item', 'product', 'name', 'description', 'quantity', 'qty', 'price', 'unit price', 'total'];
+                    let matchCount = 0;
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const c of commonCols) {
+                            if (hLower.includes(c)) matchCount++;
                         }
-                        const firstRow = rows[0];
-                        let itemIdx = 0, qtyIdx = 1, priceIdx = 2;
-                        alert('Auto‑detected columns: Item=col1, Quantity=col2, Price=col3. If your data is different, please add a header row.');
-                        const parsed = rows.map(row => ({
-                            itemName: String(row[itemIdx] || '').trim(),
-                            quantity: parseFloat(row[qtyIdx]) || 0,
-                            estimatedPrice: parseFloat(row[priceIdx]) || 0
-                        })).filter(it => it.itemName && it.quantity > 0);
-                        if (parsed.length > 0) {
-                            importedItems = parsed;
-                            showImportPreview();
-                            return;
-                        }
-                        alert('No valid items found. Ensure columns are: Item, Quantity, Price.');
+                    }
+                    // If at least 2 common names match, assume headers; otherwise treat as data
+                    return matchCount < 2;
+                };
+
+                let rows = [];
+                if (looksLikeData(headers)) {
+                    // Read without headers
+                    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    if (rawRows.length === 0) {
+                        formMessage.innerText = '⚠️ The Excel file is empty.';
                         return;
                     }
-                    json = XLSX.utils.sheet_to_json(firstSheet);
-                    parseImportData(json);
-                } catch (err) {
-                    alert('Error reading file: ' + err.message);
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        } else {
-            alert('Unsupported file format. Please use .xlsx, .xls, .csv, or .json.');
-        }
-        fileInput.value = '';
-    });
+                    // Map columns: col0 = item, col1 = quantity, col2 = price
+                    // Also handle CSV with headers but we forced no headers
+                    rows = rawRows.map(row => {
+                        // Normalize numbers: remove commas
+                        const clean = (val) => {
+                            if (typeof val === 'string') {
+                                // Remove commas and spaces
+                                return val.replace(/,/g, '').trim();
+                            }
+                            return val;
+                        };
+                        const name = String(row[0] || '').trim();
+                        const qty = parseFloat(clean(row[1])) || 0;
+                        const price = parseFloat(clean(row[2])) || 0;
+                        return { itemName: name, quantity: qty, unitPrice: price };
+                    }).filter(it => it.itemName && it.quantity > 0);
+                } else {
+                    // Normal header detection
+                    const findColumn = (variations) => {
+                        for (const h of headers) {
+                            const hLower = h.toLowerCase().trim();
+                            for (const v of variations) {
+                                if (hLower === v.toLowerCase().trim()) return h;
+                            }
+                        }
+                        for (const h of headers) {
+                            const hLower = h.toLowerCase().trim();
+                            for (const v of variations) {
+                                if (hLower.includes(v.toLowerCase().trim()) || v.toLowerCase().trim().includes(hLower)) {
+                                    return h;
+                                }
+                            }
+                        }
+                        return null;
+                    };
+                    const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'description of goods', 'goods', 'name', 'particulars', 'details']);
+                    const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered']);
+                    const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit']);
 
-    function parseImportData(data) {
-        if (!data || !Array.isArray(data) || data.length === 0) {
-            alert('No data found in file.');
-            return;
-        }
-        const headers = Object.keys(data[0]);
-        const findColumn = (variations) => {
-            for (const h of headers) {
-                const hLower = h.toLowerCase().trim();
-                for (const v of variations) {
-                    if (hLower === v.toLowerCase().trim()) return h;
-                }
-            }
-            for (const h of headers) {
-                const hLower = h.toLowerCase().trim();
-                for (const v of variations) {
-                    if (hLower.includes(v.toLowerCase().trim()) || v.toLowerCase().trim().includes(hLower)) {
-                        return h;
+                    if (!itemCol || !qtyCol || !priceCol) {
+                        formMessage.innerText = `⚠️ Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`;
+                        return;
                     }
+                    rows = json.map(row => {
+                        const clean = (val) => {
+                            if (typeof val === 'string') {
+                                return val.replace(/,/g, '').trim();
+                            }
+                            return val;
+                        };
+                        const name = String(row[itemCol] || '').trim();
+                        const qty = parseFloat(clean(row[qtyCol])) || 0;
+                        const price = parseFloat(clean(row[priceCol])) || 0;
+                        return { itemName: name, quantity: qty, unitPrice: price };
+                    }).filter(it => it.itemName && it.quantity > 0);
                 }
-            }
-            return null;
-        };
-        const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'description of goods', 'goods', 'name', 'particulars', 'details']);
-        const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered']);
-        const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit', 'estimated price']);
-        if (!itemCol || !qtyCol) {
-            alert('Could not find required columns: "Item" and "Quantity". Found: ' + headers.join(', '));
-            return;
-        }
-        importedItems = [];
-        data.forEach(row => {
-            const name = String(row[itemCol] || '').trim();
-            const qty = parseFloat(row[qtyCol]) || 0;
-            const price = parseFloat(row[priceCol]) || 0;
-            if (name && qty > 0) {
-                importedItems.push({ itemName: name, quantity: qty, estimatedPrice: price });
-            }
-        });
-        if (importedItems.length === 0) {
-            alert('No valid items found in file.');
-            return;
-        }
-        showImportPreview();
-    }
 
-    function showImportPreview() {
-        let html = '<table><tr><th>Item</th><th>Qty</th><th>Est. Price</th></tr>';
-        importedItems.forEach(it => {
-            html += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.estimatedPrice.toFixed(2)}</td></tr>`;
-        });
-        html += '</table>';
-        importItemList.innerHTML = html;
-        importCount.innerText = importedItems.length;
-        importPreview.classList.add('show');
-    }
+                if (rows.length === 0) {
+                    formMessage.innerText = '⚠️ No valid items found. Ensure columns contain data.';
+                    return;
+                }
 
-    applyImportBtn.addEventListener('click', function() {
-        if (importedItems.length === 0) return;
-        reqContainer.innerHTML = '';
-        importedItems.forEach(it => {
-            const div = document.createElement('div');
-            div.className = 'item-row';
-            div.innerHTML = `
-                <input type="text" placeholder="Item name" class="reqItemName" value="${it.itemName}">
-                <input type="number" placeholder="Quantity" class="reqItemQty" value="${it.quantity}">
-                <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice" value="${it.estimatedPrice}">
-                <button type="button" class="removeItem">✖</button>
-            `;
-            reqContainer.appendChild(div);
-            div.querySelector(".removeItem").onclick = () => div.remove();
-        });
-        updateReqPreview();
-        importPreview.classList.remove('show');
-        importedItems = [];
-    });
-
-    cancelImportBtn.addEventListener('click', function() {
-        importPreview.classList.remove('show');
-        importedItems = [];
-        fileInput.value = '';
-    });
-
-    // ==================== Submit Request (with confirmation) ====================
-    document.getElementById("requestForm").addEventListener("submit", async (e) => {
-        e.preventDefault();
-
-        // Confirmation dialog
-        if (!confirm('Are you sure you want to submit this invoice request?')) {
-            return;
-        }
-
-        const senderName = document.getElementById("requestSenderName").value.trim();
-        const branch = document.getElementById("requestBranch").value;
-        const notes = document.getElementById("requestNotes").value.trim();
-        const items = [];
-        document.querySelectorAll("#requestItemsContainer .item-row").forEach(row => {
-            const name = row.querySelector(".reqItemName").value.trim();
-            const qty = parseInt(row.querySelector(".reqItemQty").value);
-            const price = parseFloat(row.querySelector(".reqItemPrice").value) || 0;
-            if (name && qty > 0) {
-                items.push({ itemName: name, quantity: qty, estimatedPrice: price });
-            }
-        });
-        if (!items.length || !senderName) return alert("Fill all fields and add at least one item.");
-
-        try {
-            await db.collection('invoiceRequests').add({
-                senderName,
-                branch,
-                items,
-                notes,
-                status: 'pending',
-                requestedBy: currentUser.email,
-                requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert('Request submitted successfully!');
-            document.getElementById("requestForm").reset();
-            reqContainer.innerHTML = `<div class="item-row">
-                <input type="text" placeholder="Item name" class="reqItemName">
-                <input type="number" placeholder="Quantity" class="reqItemQty">
-                <input type="number" placeholder="Est. Price/unit (₦)" class="reqItemPrice">
-                <button type="button" class="removeItem">✖</button>
-            </div>`;
-            updateReqPreview();
-            loadRequests();
-        } catch (err) {
-            alert('Error submitting request: ' + err.message);
-        }
-    });
-
-    // ==================== Load Your Requests ====================
-    function loadRequests() {
-        db.collection('invoiceRequests')
-            .where('requestedBy', '==', currentUser.email)
-            .orderBy('requestedAt', 'desc')
-            .onSnapshot((snap) => {
-                let html = '';
-                snap.forEach(doc => {
-                    const d = doc.data();
-                    const total = d.items.reduce((sum, it) => sum + (it.quantity * (it.estimatedPrice || 0)), 0);
-                    const itemsShort = d.items.map(it => `${it.itemName}(${it.quantity})`).join(", ").substring(0,40);
-                    const statusClass = `status-${d.status}`;
-                    html += `<tr>
-                        <td>${d.requestedAt ? new Date(d.requestedAt.toDate()).toLocaleDateString() : ''}</td>
-                        <td>${d.branch}</td>
-                        <td>${itemsShort}</td>
-                        <td class="cost-cell">₦${total.toLocaleString()}</td>
-                        <td><span class="status-badge ${statusClass}">${d.status}</span></td>
-                        <td>
-                            ${d.status === 'pending' ? `<button class="btn-sm btn-danger" onclick="cancelRequest('${doc.id}')">Cancel</button>` : ''}
-                            ${d.status === 'approved' ? `<button class="btn-sm btn-success" onclick="viewApproved('${doc.id}')">View Dispatch</button>` : ''}
-                        </td>
-                    </tr>`;
+                importedItems = rows;
+                let previewHtml = `<p><strong>✅ Imported ${rows.length} items:</strong></p>
+                    <table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>`;
+                rows.forEach(it => {
+                    previewHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
                 });
-                document.querySelector("#requestsTable tbody").innerHTML = html || "<tr><td colspan='6'>No requests</td></tr>";
-            });
-    }
+                previewHtml += `</table>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button onclick="applyImportedItems()" class="btn-success">✅ Apply Items</button>
+                        <button onclick="clearImportPreview()" class="btn-danger">❌ Cancel</button>
+                    </div>`;
+                importPreviewContainer.innerHTML = previewHtml;
+                importPreviewContainer.style.display = 'block';
+                formMessage.innerText = '';
+                excelFileInput.value = '';
+            } catch (err) {
+                console.error('❌ Excel parsing error:', err);
+                formMessage.innerText = '❌ Error reading Excel file: ' + err.message;
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
 
-    window.cancelRequest = async function(id) {
-        if (!confirm('Cancel this request?')) return;
-        try {
-            await db.collection('invoiceRequests').doc(id).delete();
-            alert('Request cancelled.');
-            loadRequests();
-        } catch (err) {
-            alert('Error cancelling: ' + err.message);
-        }
+    window.applyImportedItems = function() {
+        if (importedItems.length === 0) return;
+        invoiceItemsContainer.innerHTML = '';
+        importedItems.forEach(it => {
+            addItemRow(it.itemName, it.quantity, it.unitPrice);
+        });
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        formMessage.style.color = 'green';
+        formMessage.innerText = `✅ Successfully imported ${importedItems.length} items.`;
+        importedItems = [];
+        updateCostPreview();
     };
 
-    window.viewApproved = async function(id) {
-        try {
-            const doc = await db.collection('invoiceRequests').doc(id).get();
-            if (!doc.exists) return;
-            const d = doc.data();
-            if (d.shipmentId) {
-                alert('Dispatch created: ' + d.shipmentId + '. Please go to your receiving page to receive it.');
-            } else {
-                alert('No dispatch linked yet.');
+    window.clearImportPreview = function() {
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        importedItems = [];
+        formMessage.innerText = '';
+    };
+
+    // ==================== Preview Invoice ====================
+    document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
+        const preview = generateInvoiceHTML();
+        invoicePreviewContainer.innerHTML = preview;
+        invoicePreviewContainer.style.display = 'block';
+    });
+
+    function generateInvoiceHTML() {
+        const invNum = document.getElementById('invoiceNumber').value;
+        const date = document.getElementById('invoiceDate').value;
+        const customer = document.getElementById('customerName').value.trim() || 'N/A';
+        const email = document.getElementById('customerEmail').value.trim() || 'N/A';
+        const notes = document.getElementById('invoiceNotes').value.trim() || '';
+        const branch = document.getElementById('invoiceBranch').value;
+        let itemsHtml = '';
+        let total = 0;
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            if (name && qty > 0) {
+                const subtotal = qty * price;
+                total += subtotal;
+                itemsHtml += `<tr><td>${name}</td><td>${qty}</td><td>₦${price.toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
             }
+        });
+        if (!itemsHtml) return '<p style="color:red;">Add at least one item.</p>';
+        const html = `
+            <h2>NEVAMAK Enterprises</h2>
+            <h3>Invoice</h3>
+            <p><strong>Invoice #:</strong> ${invNum}</p>
+            <p><strong>Date:</strong> ${date}</p>
+            <p><strong>Customer:</strong> ${customer}</p>
+            <p><strong>Branch:</strong> ${branch}</p>
+            ${email !== 'N/A' ? `<p><strong>Email:</strong> ${email}</p>` : ''}
+            <table>
+                <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+                ${itemsHtml}
+                <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+            </table>
+            ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+            <p><em>Generated by ${currentUserEmail}</em></p>
+        `;
+        return html;
+    }
+
+    // ==================== Save Invoice (with confirmation) ====================
+    invoiceForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        if (!confirm('Are you sure you want to save this invoice?')) {
+            return;
+        }
+
+        const invNum = document.getElementById('invoiceNumber').value;
+        const date = document.getElementById('invoiceDate').value;
+        const customer = document.getElementById('customerName').value.trim();
+        const email = document.getElementById('customerEmail').value.trim();
+        const notes = document.getElementById('invoiceNotes').value.trim();
+        const branch = document.getElementById('invoiceBranch').value;
+        const items = [];
+        let total = 0;
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            if (name && qty > 0 && price >= 0) {
+                const subtotal = qty * price;
+                total += subtotal;
+                items.push({ itemName: name, quantity: qty, unitPrice: price, total: subtotal });
+            }
+        });
+        if (!items.length) {
+            formMessage.innerText = 'Add at least one item.';
+            return;
+        }
+        try {
+            await db.collection('invoices').add({
+                invoiceNumber: invNum,
+                date: date,
+                customer: customer,
+                customerEmail: email || '',
+                notes: notes,
+                branch: branch,
+                items: items,
+                total: total,
+                movedToWarehouse: false,
+                createdBy: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            formMessage.style.color = 'green';
+            formMessage.innerText = '✅ Invoice saved successfully!';
+            document.getElementById('customerName').value = '';
+            document.getElementById('customerEmail').value = '';
+            document.getElementById('invoiceNotes').value = '';
+            invoiceItemsContainer.innerHTML = '';
+            addItemRow();
+            updateCostPreview();
+            document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+            document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+            loadInvoices();
+        } catch (err) {
+            formMessage.style.color = 'red';
+            formMessage.innerText = 'Error: ' + err.message;
+        }
+    });
+
+    // ==================== Generate PDF ====================
+    document.getElementById('generatePDFBtn').addEventListener('click', async () => {
+        const previewHTML = generateInvoiceHTML();
+        if (previewHTML.includes('Add at least one item')) {
+            alert('Add at least one item.');
+            return;
+        }
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = previewHTML;
+        tempDiv.style.padding = '20px';
+        tempDiv.style.fontFamily = 'sans-serif';
+        document.body.appendChild(tempDiv);
+        try {
+            const canvas = await html2canvas(tempDiv, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`Invoice_${document.getElementById('invoiceNumber').value}.pdf`);
+        } catch (err) {
+            alert('PDF generation error: ' + err.message);
+        } finally {
+            document.body.removeChild(tempDiv);
+        }
+    });
+
+    // ==================== Generate CSV ====================
+    document.getElementById('generateCSVBtn').addEventListener('click', () => {
+        const rows = [];
+        let total = 0;
+        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            if (name && qty > 0) {
+                const subtotal = qty * price;
+                total += subtotal;
+                rows.push([name, qty, price, subtotal]);
+            }
+        });
+        if (!rows.length) {
+            alert('Add at least one item.');
+            return;
+        }
+        const csvRows = [['Item', 'Quantity', 'Unit Price', 'Total']];
+        rows.forEach(row => csvRows.push(row));
+        csvRows.push(['', '', 'Grand Total', total]);
+        const csvContent = csvRows.map(row => row.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Invoice_${document.getElementById('invoiceNumber').value}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // ==================== Load Saved Invoices (with item search) ====================
+    function loadInvoices() {
+        const search = searchInvoices.value.toLowerCase().trim();
+        db.collection('invoices')
+            .orderBy('createdAt', 'desc')
+            .onSnapshot((snap) => {
+                let html = '';
+                if (snap.empty) {
+                    html = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
+                } else {
+                    html = '<table><tr><th>#</th><th>Date</th><th>Customer</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
+                        const total = d.total || 0;
+                        let match = false;
+                        if (search === '') {
+                            match = true;
+                        } else {
+                            if (d.invoiceNumber.toLowerCase().includes(search)) match = true;
+                            if (!match && d.customer.toLowerCase().includes(search)) match = true;
+                            if (!match && d.items && d.items.length > 0) {
+                                for (const item of d.items) {
+                                    if (item.itemName && item.itemName.toLowerCase().includes(search)) {
+                                        match = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (!match) return;
+                        const moved = d.movedToWarehouse || false;
+                        html += `<tr>
+                            <td><strong>${d.invoiceNumber}</strong></td>
+                            <td>${d.date}</td>
+                            <td>${d.customer}</td>
+                            <td>${d.branch || 'N/A'}</td>
+                            <td class="items-cell">${itemsShort}</td>
+                            <td class="cost-cell">₦${total.toLocaleString()}</td>
+                            <td>${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}</td>
+                            <td>
+                                <button class="btn-sm btn-primary" onclick="viewInvoice('${doc.id}')">👁️</button>
+                                <button class="btn-sm btn-success" onclick="downloadPDF('${doc.id}')">📄</button>
+                                <button class="btn-sm btn-warning" onclick="downloadCSV('${doc.id}')">📊</button>
+                                <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
+                                ${!moved ? `<button class="btn-sm btn-secondary" onclick="openMoveWarehouseModal('${doc.id}')" style="background:#8e44ad; color:white;">🏚️ Move</button>` : ''}
+                                <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                }
+                invoicesList.innerHTML = html;
+            }, (err) => {
+                console.error('Invoices load error:', err);
+                invoicesList.innerHTML = '<p style="color:red;">Error loading invoices: ' + err.message + '</p>';
+            });
+    }
+
+    refreshBtn.addEventListener('click', loadInvoices);
+    searchInvoices.addEventListener('input', loadInvoices);
+
+    // ==================== View Invoice ====================
+    window.viewInvoice = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            let itemsHtml = '';
+            let total = 0;
+            if (d.items) {
+                d.items.forEach(it => {
+                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
+                    total += subtotal;
+                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+                });
+            }
+            const html = `
+                <div style="font-family:sans-serif; padding:16px;">
+                    <h2>NEVAMAK Enterprises</h2>
+                    <h3>Invoice</h3>
+                    <p><strong>Invoice #:</strong> ${d.invoiceNumber}</p>
+                    <p><strong>Date:</strong> ${d.date}</p>
+                    <p><strong>Customer:</strong> ${d.customer}</p>
+                    <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
+                    ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
+                    <table style="width:100%; border-collapse:collapse;">
+                        <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                        ${itemsHtml}
+                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                    </table>
+                    ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                    <p><em>Created by ${d.createdBy}</em></p>
+                </div>
+            `;
+            const win = window.open('', '_blank', 'width=800,height=600');
+            win.document.write(html);
+            win.document.close();
         } catch (err) {
             alert('Error: ' + err.message);
         }
     };
+
+    // ==================== Download PDF from Saved Invoice ====================
+    window.downloadPDF = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            let itemsHtml = '';
+            let total = 0;
+            if (d.items) {
+                d.items.forEach(it => {
+                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
+                    total += subtotal;
+                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+                });
+            }
+            const html = `
+                <div id="pdfContent" style="padding:20px; font-family:sans-serif;">
+                    <h2>NEVAMAK Enterprises</h2>
+                    <h3>Invoice</h3>
+                    <p><strong>Invoice #:</strong> ${d.invoiceNumber}</p>
+                    <p><strong>Date:</strong> ${d.date}</p>
+                    <p><strong>Customer:</strong> ${d.customer}</p>
+                    <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
+                    ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
+                    <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                        <tr style="background:#f0f0f0;"><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                        ${itemsHtml}
+                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                    </table>
+                    ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                    <p><em>Created by ${d.createdBy}</em></p>
+                </div>
+            `;
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            document.body.appendChild(tempDiv);
+            const canvas = await html2canvas(tempDiv, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`Invoice_${d.invoiceNumber}.pdf`);
+            document.body.removeChild(tempDiv);
+        } catch (err) {
+            alert('PDF error: ' + err.message);
+        }
+    };
+
+    // ==================== Download CSV from Saved Invoice ====================
+    window.downloadCSV = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            const rows = [['Item', 'Quantity', 'Unit Price', 'Total']];
+            let total = 0;
+            if (d.items) {
+                d.items.forEach(it => {
+                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
+                    total += subtotal;
+                    rows.push([it.itemName, it.quantity, it.unitPrice, subtotal]);
+                });
+            }
+            rows.push(['', '', 'Grand Total', total]);
+            const csvContent = rows.map(row => row.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Invoice_${d.invoiceNumber}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert('CSV error: ' + err.message);
+        }
+    };
+
+    // ==================== Delete Invoice ====================
+    window.deleteInvoice = async function(id) {
+        if (!confirm('Delete this invoice permanently?')) return;
+        try {
+            await db.collection('invoices').doc(id).delete();
+            alert('Invoice deleted.');
+            loadInvoices();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // ==================== Send Modal ====================
+    window.openSendModal = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            sendInvoiceId = id;
+            document.getElementById('sendInvoiceNumber').innerText = d.invoiceNumber;
+            document.getElementById('sendInvoiceTotal').innerText = d.total.toLocaleString();
+            document.getElementById('sendModal').style.display = 'flex';
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+        document.getElementById('sendMessage').innerText = '';
+        document.getElementById('moveMessage').innerText = '';
+    }
+    window.closeModal = closeModal;
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+            document.getElementById('sendMessage').innerText = '';
+            document.getElementById('moveMessage').innerText = '';
+        }
+    };
+
+    // ==================== Send Methods ====================
+    window.sendViaEmail = async function() {
+        if (!sendInvoiceId) return;
+        try {
+            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
+            const d = doc.data();
+            const customerEmail = d.customerEmail || '';
+            if (!customerEmail) {
+                document.getElementById('sendMessage').innerText = 'Customer email not set.';
+                return;
+            }
+            const subject = `Invoice ${d.invoiceNumber} from NEVAMAK`;
+            const body = `Dear ${d.customer},\n\nPlease find attached invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)}.\n\nThank you for your business.\n\nNEVAMAK Enterprises`;
+            window.location.href = `mailto:${customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            closeModal('sendModal');
+        } catch (err) {
+            document.getElementById('sendMessage').innerText = 'Error: ' + err.message;
+        }
+    };
+
+    window.sendViaChat = async function() {
+        if (!sendInvoiceId) return;
+        try {
+            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
+            const d = doc.data();
+            const message = `Invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)} - ${d.customer}. Please check.`;
+            window.location.href = `chat.html?message=${encodeURIComponent(message)}`;
+            closeModal('sendModal');
+        } catch (err) {
+            document.getElementById('sendMessage').innerText = 'Error: ' + err.message;
+        }
+    };
+
+    window.sendViaWhatsApp = async function() {
+        if (!sendInvoiceId) return;
+        try {
+            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
+            const d = doc.data();
+            const message = `Invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)} - ${d.customer}. Please check.`;
+            const phone = prompt('Enter recipient WhatsApp number (with country code, e.g., 2348012345678):');
+            if (!phone) return;
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+            closeModal('sendModal');
+        } catch (err) {
+            document.getElementById('sendMessage').innerText = 'Error: ' + err.message;
+        }
+    };
+
+    // ==================== Move to Warehouse ====================
+    window.openMoveWarehouseModal = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            if (d.movedToWarehouse) {
+                alert('Items from this invoice have already been moved to warehouse.');
+                return;
+            }
+            moveInvoiceId = id;
+            document.getElementById('moveInvoiceNumber').innerText = d.invoiceNumber;
+            document.getElementById('moveCustomer').innerText = d.customer;
+            document.getElementById('moveDate').innerText = d.date;
+
+            const branch = d.branch || 'Lagos';
+            moveBranchSelect.value = branch;
+            if (currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep') {
+                moveBranchSelect.disabled = true;
+            } else {
+                moveBranchSelect.disabled = false;
+            }
+
+            let itemsHtml = '<table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>';
+            if (d.items && d.items.length > 0) {
+                d.items.forEach(it => {
+                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                });
+            } else {
+                itemsHtml += '<tr><td colspan="3">No items</td></tr>';
+            }
+            itemsHtml += '</table>';
+            document.getElementById('moveItemsList').innerHTML = itemsHtml;
+            document.getElementById('moveMessage').innerText = '';
+            document.getElementById('moveWarehouseModal').style.display = 'flex';
+        } catch (err) {
+            alert('Error loading invoice: ' + err.message);
+        }
+    };
+
+    document.getElementById('confirmMoveBtn').addEventListener('click', async () => {
+        if (!moveInvoiceId) return;
+        const targetBranch = moveBranchSelect.value;
+        if (!targetBranch) {
+            document.getElementById('moveMessage').innerText = 'Please select a branch.';
+            return;
+        }
+        try {
+            const doc = await db.collection('invoices').doc(moveInvoiceId).get();
+            if (!doc.exists) return alert('Invoice not found.');
+            const d = doc.data();
+            if (d.movedToWarehouse) {
+                alert('Already moved.');
+                closeModal('moveWarehouseModal');
+                loadInvoices();
+                return;
+            }
+            const items = d.items || [];
+            for (const item of items) {
+                const invRef = db.collection('inventory')
+                    .where('itemName', '==', item.itemName)
+                    .where('branch', '==', targetBranch);
+                const snap = await invRef.get();
+                if (snap.empty) {
+                    await db.collection('inventory').add({
+                        itemName: item.itemName,
+                        branch: targetBranch,
+                        stock: item.quantity,
+                        unitPrice: item.unitPrice,
+                        location: 'Shelf A',
+                        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } else {
+                    snap.forEach(doc => {
+                        doc.ref.update({
+                            stock: firebase.firestore.FieldValue.increment(item.quantity),
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    });
+                }
+            }
+
+            await db.collection('invoices').doc(moveInvoiceId).update({
+                movedToWarehouse: true,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection('activityLog').add({
+                actionType: 'invoice_moved_to_warehouse',
+                invoiceNumber: d.invoiceNumber,
+                branch: targetBranch,
+                details: `Moved ${items.length} items from invoice ${d.invoiceNumber} to warehouse (${targetBranch})`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            document.getElementById('moveMessage').innerText = '✅ All items moved to warehouse.';
+            setTimeout(() => {
+                closeModal('moveWarehouseModal');
+                loadInvoices();
+            }, 1500);
+        } catch (err) {
+            document.getElementById('moveMessage').innerText = 'Error: ' + err.message;
+        }
+    });
+
+    // ==================== Initialize ====================
+    addItemRow();
+    console.log('NEVAMAK Invoice Repository loaded with improved Excel import.');
 </script>
 </body>
 </html>
