@@ -7,22 +7,19 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <!-- SheetJS for Excel import -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
+        /* (styles remain the same as before) */
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f4f7fc; margin: 0; padding: 12px; }
         .container { max-width: 900px; margin: auto; }
         .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         h2 { margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
-        h3 { font-size: 1.1rem; color: #2c3e50; margin: 12px 0 8px; }
         input, select, textarea { width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
         button { padding: 12px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 6px 0; }
         .btn-primary { background: #0a3d62; color: white; }
         .btn-success { background: #27ae60; color: white; }
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
-        .btn-info { background: #3498db; color: white; }
         .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
         .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
@@ -51,9 +48,6 @@
         .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
         .cost-cell { font-family: monospace; font-weight: bold; }
         .scroll { overflow-x: auto; }
-        .inline-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .inline-add input { flex: 1; }
-        .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; }
         @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
     </style>
 </head>
@@ -348,7 +342,7 @@
     }
     itemsContainer.addEventListener("input", updatePreview);
 
-    // ==================== Import Excel (Dispatch) ====================
+    // ==================== Import Excel ====================
     const importExcelBtn = document.getElementById('importExcelBtn');
     const excelFileInput = document.getElementById('excelFileInput');
     const importPreviewContainer = document.getElementById('importPreviewContainer');
@@ -361,7 +355,6 @@
         if (!file) return;
         importPreviewContainer.style.display = 'none';
         importPreviewContainer.innerHTML = '';
-
         const reader = new FileReader();
         reader.onload = function(loadEvent) {
             try {
@@ -369,16 +362,7 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const json = XLSX.utils.sheet_to_json(firstSheet);
-
-                console.log('📊 Excel rows:', json.length);
-                console.log('📊 Headers:', Object.keys(json[0] || {}));
-
-                if (json.length === 0) {
-                    alert('The Excel file is empty.');
-                    return;
-                }
-
-                // Column detection (same as invoice repo)
+                if (json.length === 0) { alert('The Excel file is empty.'); return; }
                 const headers = Object.keys(json[0]);
                 const findColumn = (variations) => {
                     for (const h of headers) {
@@ -387,7 +371,6 @@
                             if (hLower === v.toLowerCase().trim()) return h;
                         }
                     }
-                    // partial match
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
@@ -398,26 +381,13 @@
                     }
                     return null;
                 };
-
-                const itemCol = findColumn([
-                    'item', 'product', 'product name', 'item name', 'description', 'description of goods',
-                    'goods', 'name', 'particulars', 'details'
-                ]);
-                const qtyCol = findColumn([
-                    'quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered'
-                ]);
-                const priceCol = findColumn([
-                    'unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit',
-                    'unit rate', 'cost per unit'
-                ]);
-
-                console.log('Detected columns:', { itemCol, qtyCol, priceCol });
-
+                const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'description of goods', 'goods', 'name', 'particulars', 'details']);
+                const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered']);
+                const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit']);
                 if (!itemCol || !qtyCol || !priceCol) {
                     alert(`Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`);
                     return;
                 }
-
                 const parsedItems = [];
                 json.forEach(row => {
                     const name = String(row[itemCol] || '').trim();
@@ -427,38 +397,23 @@
                         parsedItems.push({ itemName: name, quantity: qty, unitPrice: price });
                     }
                 });
-
-                if (parsedItems.length === 0) {
-                    alert('No valid items found.');
-                    return;
-                }
-
+                if (parsedItems.length === 0) { alert('No valid items found.'); return; }
                 importedItems = parsedItems;
-                // Show preview
-                let previewHtml = `<p><strong>✅ ${parsedItems.length} items imported:</strong></p>
-                    <table><tr><th>Item</th><th>Qty</th><th>Price</th></tr>`;
+                let previewHtml = `<p><strong>✅ ${parsedItems.length} items imported:</strong></p><table><tr><th>Item</th><th>Qty</th><th>Price</th></tr>`;
                 parsedItems.forEach(it => {
                     previewHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
                 });
-                previewHtml += `</table>
-                    <div style="display:flex; gap:8px; margin-top:8px;">
-                        <button onclick="applyImportedItems()" class="btn-success">✅ Apply</button>
-                        <button onclick="clearImportPreview()" class="btn-danger">❌ Cancel</button>
-                    </div>`;
+                previewHtml += `</table><div style="display:flex; gap:8px; margin-top:8px;"><button onclick="applyImportedItems()" class="btn-success">✅ Apply</button><button onclick="clearImportPreview()" class="btn-danger">❌ Cancel</button></div>`;
                 importPreviewContainer.innerHTML = previewHtml;
                 importPreviewContainer.style.display = 'block';
                 excelFileInput.value = '';
-            } catch (err) {
-                console.error('Excel error:', err);
-                alert('Error reading Excel: ' + err.message);
-            }
+            } catch (err) { alert('Error reading Excel: ' + err.message); }
         };
         reader.readAsArrayBuffer(file);
     });
 
     window.applyImportedItems = function() {
         if (importedItems.length === 0) return;
-        // Clear existing items
         itemsContainer.innerHTML = '';
         importedItems.forEach(it => {
             itemsContainer.appendChild(createItemRow(it.itemName, it.quantity, it.unitPrice));
@@ -488,8 +443,13 @@
         }
     });
 
-    // ==================== Save Shipment ====================
+    // ==================== Save Shipment (with confirmation) ====================
     async function saveShipment(status) {
+        // Confirmation dialog
+        if (!confirm(`Are you sure you want to ${status === 'Draft' ? 'save this draft' : 'dispatch this shipment'}?`)) {
+            return;
+        }
+
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
         const supplierId = document.getElementById("supplierSelect").value;
