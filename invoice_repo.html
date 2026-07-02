@@ -284,7 +284,7 @@
     }
     invoiceItemsContainer.addEventListener('input', updateCostPreview);
 
-    // ==================== Import Excel ====================
+    // ==================== Import Excel (Robust) ====================
     importExcelBtn.addEventListener('click', () => excelFileInput.click());
 
     excelFileInput.addEventListener('change', function(e) {
@@ -300,79 +300,106 @@
                 const data = new Uint8Array(loadEvent.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const json = XLSX.utils.sheet_to_json(firstSheet);
 
-                if (json.length === 0) {
-                    formMessage.innerText = '⚠️ The Excel file is empty.';
-                    return;
-                }
+                // First, try to read with headers
+                let json = XLSX.utils.sheet_to_json(firstSheet);
+                let headers = Object.keys(json[0] || {});
 
-                const headers = Object.keys(json[0]);
-                const findColumn = (variations) => {
+                // Check if headers look like data (not column names)
+                const looksLikeData = (headers) => {
+                    // If any header is empty or looks like numeric, treat as data
+                    if (headers.length === 0) return true;
+                    // If any header contains only digits, it's likely data
+                    for (const h of headers) {
+                        if (h.trim() === '' || /^\d+$/.test(h.trim())) return true;
+                    }
+                    // If the first header is not a common column name, we might be in trouble
+                    const commonCols = ['item', 'product', 'name', 'description', 'quantity', 'qty', 'price', 'unit price', 'total'];
+                    let matchCount = 0;
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
-                        for (const v of variations) {
-                            if (hLower === v.toLowerCase().trim()) return h;
+                        for (const c of commonCols) {
+                            if (hLower.includes(c)) matchCount++;
                         }
                     }
-                    for (const h of headers) {
-                        const hLower = h.toLowerCase().trim();
-                        for (const v of variations) {
-                            if (hLower.includes(v.toLowerCase().trim()) || v.toLowerCase().trim().includes(hLower)) {
-                                return h;
-                            }
-                        }
-                    }
-                    return null;
+                    // If at least 2 common names match, assume headers; otherwise treat as data
+                    return matchCount < 2;
                 };
 
-                const itemCol = findColumn([
-                    'item', 'product', 'product name', 'item name', 'description', 'description of goods',
-                    'goods', 'name', 'particulars', 'details'
-                ]);
-                const qtyCol = findColumn([
-                    'quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered'
-                ]);
-                const priceCol = findColumn([
-                    'unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit',
-                    'unit rate', 'cost per unit'
-                ]);
-
-                if (!itemCol || !qtyCol || !priceCol) {
-                    const available = headers.join(', ');
-                    formMessage.innerText = `⚠️ Could not detect required columns. Found: ${available}. Expected: 'Item', 'Quantity', 'Price' (or similar).`;
-                    return;
-                }
-
-                const parsedItems = [];
-                json.forEach(row => {
-                    const name = String(row[itemCol] || '').trim();
-                    let qty = parseFloat(row[qtyCol]) || 0;
-                    let price = parseFloat(row[priceCol]) || 0;
-                    if (price === 0 && qty > 0) {
-                        const amountCol = findColumn(['amount', 'total', 'subtotal', 'net', 'gross']);
-                        if (amountCol) {
-                            const amount = parseFloat(row[amountCol]) || 0;
-                            if (amount > 0 && qty > 0) {
-                                price = amount / qty;
+                let rows = [];
+                if (looksLikeData(headers)) {
+                    // Read without headers
+                    const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                    if (rawRows.length === 0) {
+                        formMessage.innerText = '⚠️ The Excel file is empty.';
+                        return;
+                    }
+                    // Map columns: col0 = item, col1 = quantity, col2 = price
+                    // Also handle CSV with headers but we forced no headers
+                    rows = rawRows.map(row => {
+                        // Normalize numbers: remove commas
+                        const clean = (val) => {
+                            if (typeof val === 'string') {
+                                // Remove commas and spaces
+                                return val.replace(/,/g, '').trim();
+                            }
+                            return val;
+                        };
+                        const name = String(row[0] || '').trim();
+                        const qty = parseFloat(clean(row[1])) || 0;
+                        const price = parseFloat(clean(row[2])) || 0;
+                        return { itemName: name, quantity: qty, unitPrice: price };
+                    }).filter(it => it.itemName && it.quantity > 0);
+                } else {
+                    // Normal header detection
+                    const findColumn = (variations) => {
+                        for (const h of headers) {
+                            const hLower = h.toLowerCase().trim();
+                            for (const v of variations) {
+                                if (hLower === v.toLowerCase().trim()) return h;
                             }
                         }
-                    }
-                    if (name && qty > 0) {
-                        parsedItems.push({ itemName: name, quantity: qty, unitPrice: price });
-                    }
-                });
+                        for (const h of headers) {
+                            const hLower = h.toLowerCase().trim();
+                            for (const v of variations) {
+                                if (hLower.includes(v.toLowerCase().trim()) || v.toLowerCase().trim().includes(hLower)) {
+                                    return h;
+                                }
+                            }
+                        }
+                        return null;
+                    };
+                    const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'description of goods', 'goods', 'name', 'particulars', 'details']);
+                    const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered']);
+                    const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit']);
 
-                if (parsedItems.length === 0) {
+                    if (!itemCol || !qtyCol || !priceCol) {
+                        formMessage.innerText = `⚠️ Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`;
+                        return;
+                    }
+                    rows = json.map(row => {
+                        const clean = (val) => {
+                            if (typeof val === 'string') {
+                                return val.replace(/,/g, '').trim();
+                            }
+                            return val;
+                        };
+                        const name = String(row[itemCol] || '').trim();
+                        const qty = parseFloat(clean(row[qtyCol])) || 0;
+                        const price = parseFloat(clean(row[priceCol])) || 0;
+                        return { itemName: name, quantity: qty, unitPrice: price };
+                    }).filter(it => it.itemName && it.quantity > 0);
+                }
+
+                if (rows.length === 0) {
                     formMessage.innerText = '⚠️ No valid items found. Ensure columns contain data.';
                     return;
                 }
 
-                importedItems = parsedItems;
-
-                let previewHtml = `<p><strong>✅ Imported ${parsedItems.length} items:</strong></p>
+                importedItems = rows;
+                let previewHtml = `<p><strong>✅ Imported ${rows.length} items:</strong></p>
                     <table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>`;
-                parsedItems.forEach(it => {
+                rows.forEach(it => {
                     previewHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
                 });
                 previewHtml += `</table>
@@ -383,7 +410,6 @@
                 importPreviewContainer.innerHTML = previewHtml;
                 importPreviewContainer.style.display = 'block';
                 formMessage.innerText = '';
-
                 excelFileInput.value = '';
             } catch (err) {
                 console.error('❌ Excel parsing error:', err);
@@ -596,16 +622,12 @@
                         const d = doc.data();
                         const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
                         const total = d.total || 0;
-                        // Enhanced search: by invoice #, customer, OR any item name inside the invoice
                         let match = false;
                         if (search === '') {
                             match = true;
                         } else {
-                            // Check invoice number
                             if (d.invoiceNumber.toLowerCase().includes(search)) match = true;
-                            // Check customer
                             if (!match && d.customer.toLowerCase().includes(search)) match = true;
-                            // Check items
                             if (!match && d.items && d.items.length > 0) {
                                 for (const item of d.items) {
                                     if (item.itemName && item.itemName.toLowerCase().includes(search)) {
@@ -964,7 +986,7 @@
 
     // ==================== Initialize ====================
     addItemRow();
-    console.log('NEVAMAK Invoice Repository loaded with item search.');
+    console.log('NEVAMAK Invoice Repository loaded with improved Excel import.');
 </script>
 </body>
 </html>
