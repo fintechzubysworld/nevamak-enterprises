@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Returns Management</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1200px; margin: auto; }
+        header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: white; border-radius: 20px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #0a3d62; }
+        .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
+        .stat-card .num { font-size: 1.5rem; font-weight: bold; margin: 0; color: #0a3d62; word-wrap: break-word; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+        .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
+        .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
+        .filters button.export { background: #27ae60; }
+        .filters button.clear { background: #e74c3c; }
+        .section-card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; word-wrap: break-word; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; white-space: nowrap; }
+        .status-pending { background: #ffeaa7; color: #b85c00; }
+        .status-resent { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 500px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.8rem; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
+        .empty { text-align: center; color: #888; padding: 20px; }
+        @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } td, th { font-size: 0.8rem; padding: 6px 4px; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🔄 Returns Management</h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="chat.html">💬 Chat</a>
+            <a href="reports.html">📊 Reports</a>
+            <a href="warehouse.html">🏚️ Warehouse</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><h4>Total Returns</h4><div class="num" id="totalReturns">-</div></div>
+        <div class="stat-card"><h4>Pending</h4><div class="num" id="pendingCount">-</div></div>
+        <div class="stat-card"><h4>Resent</h4><div class="num" id="resentCount">-</div></div>
+        <div class="stat-card"><h4>Rejected</h4><div class="num" id="rejectedCount">-</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <input type="text" id="searchReturns" placeholder="🔍 Search by item or shipment...">
+        <select id="filterBranch">
+            <option value="all">All Branches</option>
+            <option value="Abuja">Abuja</option>
+            <option value="Port Harcourt">Port Harcourt</option>
+        </select>
+        <select id="filterStatus">
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="resent">Resent</option>
+            <option value="rejected">Rejected</option>
+        </select>
+        <input type="date" id="filterDateFrom" placeholder="From">
+        <input type="date" id="filterDateTo" placeholder="To">
+        <button id="applyFilters">🔍 Apply</button>
+        <button id="clearFilters" class="clear">✖ Clear</button>
+        <button class="export" onclick="exportCSV('returnsTable')">📄 Export CSV</button>
+    </div>
+
+    <!-- Returns Table -->
+    <div class="section-card">
+        <div id="returnsList">Loading returns...</div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('editModal')">&times;</span>
+        <h3>✏️ Edit Return</h3>
+        <form id="editForm">
+            <input type="text" id="editItemName" placeholder="Item name" required>
+            <input type="number" id="editQty" placeholder="Quantity" required min="1">
+            <textarea id="editReason" placeholder="Reason" rows="2"></textarea>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button type="submit" class="btn-primary" style="flex:1;">💾 Save</button>
+                <button type="button" onclick="closeModal('editModal')" class="btn-danger" style="flex:1;">Cancel</button>
+            </div>
+            <div id="editMessage" style="color:red; margin-top:8px;"></div>
+        </form>
+    </div>
+</div>
+
+<!-- Resend Modal -->
+<div id="resendModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('resendModal')">&times;</span>
+        <h3>🔄 Resend Return</h3>
+        <p><strong>Item:</strong> <span id="resendItemName"></span></p>
+        <p><strong>Quantity:</strong> <span id="resendQty"></span></p>
+        <p><strong>Original Branch:</strong> <span id="resendBranch"></span></p>
+        <p><strong>Reason:</strong> <span id="resendReason"></span></p>
+        <div style="margin:12px 0;">
+            <label>Destination Branch:</label>
+            <select id="resendDestination">
+                <option value="Lagos">Lagos (Sender)</option>
+                <option value="Abuja">Abuja</option>
+                <option value="Portharcourt">Port Harcourt</option>
+            </select>
+        </div>
+        <textarea id="resendNotes" placeholder="Additional notes" rows="2"></textarea>
+        <div style="display:flex; gap:8px; margin-top:12px;">
+            <button id="resendConfirmBtn" class="btn-success" style="flex:1;">✅ Resend</button>
+            <button onclick="closeModal('resendModal')" class="btn-danger" style="flex:1;">Cancel</button>
+        </div>
+        <div id="resendMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let currentUserRole = '';
+    let currentUserEmail = '';
+    let currentReturnId = null; // for edit
+
+    // ==================== DOM refs ====================
+    const returnsList = document.getElementById('returnsList');
+    const stats = {
+        total: document.getElementById('totalReturns'),
+        pending: document.getElementById('pendingCount'),
+        resent: document.getElementById('resentCount'),
+        rejected: document.getElementById('rejectedCount')
+    };
+    const searchInput = document.getElementById('searchReturns');
+    const branchFilter = document.getElementById('filterBranch');
+    const statusFilter = document.getElementById('filterStatus');
+    const dateFrom = document.getElementById('filterDateFrom');
+    const dateTo = document.getElementById('filterDateTo');
+    const applyBtn = document.getElementById('applyFilters');
+    const clearBtn = document.getElementById('clearFilters');
+
+    const editModal = document.getElementById('editModal');
+    const editForm = document.getElementById('editForm');
+    const editItemName = document.getElementById('editItemName');
+    const editQty = document.getElementById('editQty');
+    const editReason = document.getElementById('editReason');
+    const editMessage = document.getElementById('editMessage');
+
+    const resendModal = document.getElementById('resendModal');
+    const resendItemName = document.getElementById('resendItemName');
+    const resendQty = document.getElementById('resendQty');
+    const resendBranch = document.getElementById('resendBranch');
+    const resendReason = document.getElementById('resendReason');
+    const resendDestination = document.getElementById('resendDestination');
+    const resendNotes = document.getElementById('resendNotes');
+    const resendConfirmBtn = document.getElementById('resendConfirmBtn');
+    const resendMessage = document.getElementById('resendMessage');
+
+    let allReturns = []; // cache
+
+    // ==================== Auth ====================
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserEmail = user.email;
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            currentUserRole = userDoc.data().role || '';
+        }
+        // Only admin/lagos_sender can manage returns; branch reps can view their own returns
+        if (!['admin', 'lagos_sender', 'abuja_rep', 'ph_rep'].includes(currentUserRole)) {
+            alert('You do not have permission to view returns.');
+            window.location.href = 'index.html';
+            return;
+        }
+        loadReturns();
+        loadStats();
+        applyBtn.addEventListener('click', loadReturns);
+        clearBtn.addEventListener('click', clearFilters);
+        searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') loadReturns(); });
+        editForm.addEventListener('submit', saveEdit);
+        resendConfirmBtn.addEventListener('click', confirmResend);
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+
+    // ==================== Clear Filters ====================
+    function clearFilters() {
+        searchInput.value = '';
+        branchFilter.value = 'all';
+        statusFilter.value = 'all';
+        dateFrom.value = '';
+        dateTo.value = '';
+        loadReturns();
+    }
+
+    // ==================== Load Returns ====================
+    function loadReturns() {
+        const search = searchInput.value.toLowerCase().trim();
+        const branch = branchFilter.value;
+        const status = statusFilter.value;
+        const from = dateFrom.value;
+        const to = dateTo.value;
+
+        let query = db.collection('returns').orderBy('date', 'desc');
+
+        // Role-based filtering: branch reps see only their branch
+        if (currentUserRole === 'abuja_rep') {
+            query = query.where('branch', '==', 'Abuja');
+        } else if (currentUserRole === 'ph_rep') {
+            query = query.where('branch', '==', 'Port Harcourt');
+        }
+
+        query.onSnapshot((snap) => {
+            let returns = [];
+            snap.forEach(doc => {
+                const data = doc.data();
+                data.id = doc.id;
+                returns.push(data);
+            });
+
+            // Apply filters
+            if (branch !== 'all') {
+                returns = returns.filter(r => r.branch === branch);
+            }
+            if (status !== 'all') {
+                returns = returns.filter(r => r.status === status);
+            }
+            if (from) {
+                const fromDate = new Date(from);
+                fromDate.setHours(0,0,0,0);
+                returns = returns.filter(r => {
+                    if (!r.date) return false;
+                    return r.date.toDate() >= fromDate;
+                });
+            }
+            if (to) {
+                const toDate = new Date(to);
+                toDate.setHours(23,59,59,999);
+                returns = returns.filter(r => {
+                    if (!r.date) return false;
+                    return r.date.toDate() <= toDate;
+                });
+            }
+            if (search) {
+                returns = returns.filter(r =>
+                    (r.itemName || '').toLowerCase().includes(search) ||
+                    (r.shipmentId || '').toLowerCase().includes(search)
+                );
+            }
+
+            allReturns = returns;
+            renderReturns(returns);
+            updateStats(returns);
+        }, (error) => {
+            console.error('Returns load error:', error);
+            returnsList.innerHTML = '<p class="empty">Error loading returns.</p>';
+        });
+    }
+
+    // ==================== Render Returns ====================
+    function renderReturns(returns) {
+        if (returns.length === 0) {
+            returnsList.innerHTML = '<p class="empty">No returns found.</p>';
+            return;
+        }
+
+        const canManage = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+
+        let html = `<table id="returnsTable">
+            <tr>
+                <th>Date</th>
+                <th>Branch</th>
+                <th>Shipment</th>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>By</th>
+                ${canManage ? '<th>Actions</th>' : ''}
+            </tr>`;
+        returns.forEach(r => {
+            const date = r.date ? new Date(r.date.toDate()).toLocaleString() : '';
+            const statusClass = `status-${r.status || 'pending'}`;
+            const statusDisplay = r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : 'Pending';
+            html += `<tr>
+                <td>${date}</td>
+                <td>${r.branch}</td>
+                <td>${r.shipmentId ? r.shipmentId.slice(0,8) : 'N/A'}</td>
+                <td>${r.itemName}</td>
+                <td>${r.returnedQty}</td>
+                <td>${r.reason || '-'}</td>
+                <td><span class="status-badge ${statusClass}">${statusDisplay}</span></td>
+                <td>${r.createdBy || '-'}</td>
+                ${canManage ? `
+                <td>
+                    ${r.status !== 'resent' ? `<button class="btn-sm btn-success" onclick="openResendModal('${r.id}')">🔄 Resend</button>` : ''}
+                    ${r.status !== 'resent' ? `<button class="btn-sm btn-warning" onclick="openEditModal('${r.id}')">✏️ Edit</button>` : ''}
+                    <button class="btn-sm btn-danger" onclick="deleteReturn('${r.id}')">🗑️</button>
+                </td>` : ''}
+            </tr>`;
+        });
+        html += '</table>';
+        returnsList.innerHTML = html;
+    }
+
+    // ==================== Stats ====================
+    function updateStats(returns) {
+        let total = returns.length;
+        let pending = returns.filter(r => r.status === 'pending').length;
+        let resent = returns.filter(r => r.status === 'resent').length;
+        let rejected = returns.filter(r => r.status === 'rejected').length;
+        stats.total.innerText = total;
+        stats.pending.innerText = pending;
+        stats.resent.innerText = resent;
+        stats.rejected.innerText = rejected;
+    }
+
+    function loadStats() {
+        // Stats are updated by loadReturns, but we can also have a separate listener
+        // We'll rely on loadReturns to update stats.
+    }
+
+    // ==================== Edit Return ====================
+    window.openEditModal = function(id) {
+        const ret = allReturns.find(r => r.id === id);
+        if (!ret) return alert('Return not found.');
+        currentReturnId = id;
+        editItemName.value = ret.itemName || '';
+        editQty.value = ret.returnedQty || 0;
+        editReason.value = ret.reason || '';
+        editMessage.innerText = '';
+        editModal.style.display = 'flex';
+    };
+
+    async function saveEdit(e) {
+        e.preventDefault();
+        const itemName = editItemName.value.trim();
+        const qty = parseInt(editQty.value);
+        const reason = editReason.value.trim();
+        if (!itemName || !qty || qty < 1) {
+            editMessage.innerText = 'Please enter valid item and quantity.';
+            return;
+        }
+        try {
+            await db.collection('returns').doc(currentReturnId).update({
+                itemName: itemName,
+                returnedQty: qty,
+                reason: reason,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await db.collection('activityLog').add({
+                actionType: 'return_edit',
+                returnId: currentReturnId,
+                details: `Return edited by ${currentUserEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+            alert('✅ Return updated.');
+            closeModal('editModal');
+            loadReturns();
+        } catch (err) {
+            editMessage.innerText = 'Error: ' + err.message;
+        }
+    }
+
+    // ==================== Resend Return ====================
+    window.openResendModal = function(id) {
+        const ret = allReturns.find(r => r.id === id);
+        if (!ret) return alert('Return not found.');
+        resendItemName.innerText = ret.itemName || '';
+        resendQty.innerText = ret.returnedQty || 0;
+        resendBranch.innerText = ret.branch || '';
+        resendReason.innerText = ret.reason || '';
+        resendNotes.value = '';
+        resendDestination.value = 'Lagos';
+        resendMessage.innerText = '';
+        resendModal.style.display = 'flex';
+        // Store return id for confirmation
+        resendModal.dataset.returnId = id;
+    };
+
+    async function confirmResend() {
+        const id = resendModal.dataset.returnId;
+        const destination = resendDestination.value;
+        const notes = resendNotes.value.trim();
+        if (!id) return alert('No return selected.');
+        try {
+            // Update status to 'resent'
+            await db.collection('returns').doc(id).update({
+                status: 'resent',
+                resentDate: firebase.firestore.FieldValue.serverTimestamp(),
+                resentDestination: destination,
+                resentNotes: notes,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            // Log activity
+            await db.collection('activityLog').add({
+                actionType: 'return_resent',
+                returnId: id,
+                destination: destination,
+                details: `Return resent to ${destination} by ${currentUserEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+            // Optionally, create a new shipment? For now, just mark as resent.
+            alert('✅ Return marked as resent.');
+            closeModal('resendModal');
+            loadReturns();
+        } catch (err) {
+            resendMessage.innerText = 'Error: ' + err.message;
+        }
+    }
+
+    // ==================== Delete Return ====================
+    window.deleteReturn = async function(id) {
+        if (!confirm('Permanently delete this return record?')) return;
+        try {
+            await db.collection('returns').doc(id).delete();
+            await db.collection('activityLog').add({
+                actionType: 'return_delete',
+                returnId: id,
+                details: `Return deleted by ${currentUserEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+            alert('✅ Return deleted.');
+            loadReturns();
+        } catch (err) {
+            alert('Error deleting: ' + err.message);
+        }
+    };
+
+    // ==================== Export CSV ====================
+    function exportCSV(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return alert('No data to export.');
+        let csv = '';
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(row => {
+            const cols = row.querySelectorAll('td, th');
+            const rowData = [];
+            cols.forEach(col => rowData.push('"' + col.innerText.replace(/"/g, '""') + '"'));
+            csv += rowData.join(',') + '\n';
+        });
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `returns_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // ==================== Modal helpers ====================
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+        editMessage.innerText = '';
+        resendMessage.innerText = '';
+    }
+    window.closeModal = closeModal;
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+            editMessage.innerText = '';
+            resendMessage.innerText = '';
+        }
+    };
+
+    console.log('NEVAMAK Returns Management loaded.');
+</script>
+</body>
+</html>
