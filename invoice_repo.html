@@ -111,7 +111,7 @@
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button type="button" id="addItemBtn" class="btn-success">+ Add Product</button>
                     <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
-                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv,.json" style="display:none;">
                 </div>
                 <div id="importPreviewContainer" class="import-preview" style="display:none;"></div>
                 <div class="cost-summary" id="invoiceCostPreview">Total: ₦0</div>
@@ -227,7 +227,6 @@
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
-            // Pre-set branch based on role
             if (currentUserRole === 'abuja_rep') {
                 invoiceBranch.value = 'Abuja';
                 invoiceBranch.disabled = true;
@@ -302,9 +301,6 @@
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const json = XLSX.utils.sheet_to_json(firstSheet);
 
-                console.log('📊 Excel parsed rows:', json.length);
-                console.log('📊 Column headers:', Object.keys(json[0] || {}));
-
                 if (json.length === 0) {
                     formMessage.innerText = '⚠️ The Excel file is empty.';
                     return;
@@ -340,8 +336,6 @@
                     'unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit',
                     'unit rate', 'cost per unit'
                 ]);
-
-                console.log('🔍 Detected columns:', { itemCol, qtyCol, priceCol });
 
                 if (!itemCol || !qtyCol || !priceCol) {
                     const available = headers.join(', ');
@@ -465,9 +459,15 @@
         return html;
     }
 
-    // ==================== Save Invoice ====================
+    // ==================== Save Invoice (with confirmation) ====================
     invoiceForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // === CONFIRMATION DIALOG ===
+        if (!confirm('Are you sure you want to save this invoice?')) {
+            return;
+        }
+
         const invNum = document.getElementById('invoiceNumber').value;
         const date = document.getElementById('invoiceDate').value;
         const customer = document.getElementById('customerName').value.trim();
@@ -855,10 +855,8 @@
             document.getElementById('moveCustomer').innerText = d.customer;
             document.getElementById('moveDate').innerText = d.date;
 
-            // Set branch dropdown: default to invoice's branch, but allow admin to change
             const branch = d.branch || 'Lagos';
             moveBranchSelect.value = branch;
-            // If user is branch rep, disable the dropdown to prevent changing branch
             if (currentUserRole === 'abuja_rep' || currentUserRole === 'ph_rep') {
                 moveBranchSelect.disabled = true;
             } else {
@@ -899,7 +897,6 @@
                 loadInvoices();
                 return;
             }
-            // For each item, add to inventory (warehouse) with the selected branch
             const items = d.items || [];
             for (const item of items) {
                 const invRef = db.collection('inventory')
@@ -925,13 +922,11 @@
                 }
             }
 
-            // Mark invoice as moved
             await db.collection('invoices').doc(moveInvoiceId).update({
                 movedToWarehouse: true,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Log activity
             await db.collection('activityLog').add({
                 actionType: 'invoice_moved_to_warehouse',
                 invoiceNumber: d.invoiceNumber,
@@ -953,7 +948,7 @@
 
     // ==================== Initialize ====================
     addItemRow();
-    console.log('NEVAMAK Invoice Repository loaded with branch support.');
+    console.log('NEVAMAK Invoice Repository loaded with confirmation.');
 </script>
 </body>
 </html>
