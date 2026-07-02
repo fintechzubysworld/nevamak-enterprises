@@ -20,42 +20,39 @@
         .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
         .stat-card { background: white; border-radius: 20px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #0a3d62; }
         .stat-card h3 { margin: 0 0 6px; font-size: 0.85rem; color: #555; }
-        .stat-card .number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #0a3d62; }
+        .stat-card .number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #0a3d62; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }
         .section-card { background: white; border-radius: 20px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
         .section-title { font-size: 1.2rem; margin-top: 0; margin-bottom: 12px; color: #0a3d62; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
         table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #ddd; font-size: 0.85rem; }
+        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #ddd; font-size: 0.85rem; word-wrap: break-word; overflow-wrap: break-word; max-width: 200px; }
         th { background: #f8f9fa; }
-        .status { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; }
+        .status { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; white-space: nowrap; }
         .status-dispatched { background: #ffeaa7; color: #b85c00; }
         .status-delivered { background: #d4edda; color: #155724; }
         .status-partial { background: #fff3cd; color: #856404; }
         .status-rejected { background: #f8d7da; color: #721c24; }
-        .status-pending { background: #ffeaa7; color: #b85c00; }
-        .status-approved { background: #d4edda; color: #155724; }
-        .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
-        .cost-cell { font-family: monospace; font-weight: bold; }
+        .status-cancelled { background: #f5c6cb; color: #721c24; }
+        .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .cost-cell { font-family: monospace; font-weight: bold; white-space: nowrap; }
         .notification-bell { position: relative; cursor: pointer; }
         .notification-badge { position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; }
         .notification-panel { background: white; border-radius: 20px; padding: 16px; max-height: 300px; overflow-y: auto; display: none; position: absolute; right: 0; width: 300px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); z-index: 1000; }
         .notification-panel.show { display: block; }
         footer { text-align: center; margin-top: 24px; font-size: 0.75rem; color: #7f8c8d; }
         .lang-toggle { background: #3c6382; color: white; border: none; padding: 6px 12px; border-radius: 40px; cursor: pointer; }
-        @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } .stat-card .number { font-size: 1.3rem; } header { flex-direction: column; text-align: center; } }
-        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-danger { background: #e74c3c; color: white; }
-        .btn-primary { background: #0a3d62; color: white; }
-        .btn-warning { background: #f39c12; color: white; }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 700px; width: 95%; max-height: 80vh; overflow-y: auto; }
-        .close { float: right; cursor: pointer; font-size: 1.5rem; }
-        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
-        .item-row input { flex: 1; margin: 0; }
-        .removeItem { background: #e74c3c; color: white; width: auto; padding: 10px 16px; border-radius: 40px; border: none; cursor: pointer; }
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; }
+        /* Additional word-wrap fix for long item lists */
+        .items-cell { word-wrap: break-word; overflow-wrap: break-word; max-width: 150px; }
+        /* Make sure long numbers don't overflow */
+        .cost-cell { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+        @media (max-width: 640px) {
+            .stats { grid-template-columns: 1fr 1fr; }
+            .stat-card .number { font-size: 1.3rem; }
+            header { flex-direction: column; text-align: center; }
+            td, th { font-size: 0.75rem; padding: 6px 4px; }
+            .items-cell { max-width: 100px; }
+        }
     </style>
 </head>
 <body>
@@ -70,6 +67,7 @@
             <a href="reports.html">📊 Reports</a>
             <a href="warehouse.html">🏚️ Warehouse</a>
             <a href="request_invoice.html">📄 Request Invoice</a>
+            <a href="invoice_repo.html">🧾 Invoice Repo</a>
             <a href="admin_create_user.html" id="adminPanelLink" style="display:none;">👑 Admin</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
@@ -153,7 +151,7 @@
     </div>
 </div>
 
-<!-- Modal: Approve Request (convert to dispatch) - already present but keep for reference -->
+<!-- Modal: Approve Request (convert to dispatch) -->
 <div id="approveRequestModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('approveRequestModal')">&times;</span>
@@ -202,7 +200,6 @@
         document.getElementById('roleBadge').innerText = `Role: ${currentRole}`;
         if (currentRole === 'admin') document.getElementById('adminPanelLink').style.display = 'inline-block';
 
-        // Show pending requests section only for admin/lagos_sender
         if (currentRole === 'admin' || currentRole === 'lagos_sender') {
             document.getElementById('pendingRequestsSection').style.display = 'block';
             loadPendingRequests();
@@ -258,7 +255,7 @@
                     <td><strong>${doc.id.slice(0,6)}</strong></td>
                     <td>${d.senderName||"—"}</td>
                     <td><span class="badge">${d.destinationBranch}</span></td>
-                    <td>${itemsShort}</td>
+                    <td class="items-cell">${itemsShort}</td>
                     <td class="cost-cell">₦${goods.toLocaleString()}</td>
                     <td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td>
                     <td><span class="${statusClass}">${d.status}</span></td>
@@ -441,7 +438,7 @@
                             <td>${d.requestedAt ? new Date(d.requestedAt.toDate()).toLocaleDateString() : ''}</td>
                             <td>${d.branch}</td>
                             <td>${d.requestedBy}</td>
-                            <td>${itemsShort}</td>
+                            <td class="items-cell">${itemsShort}</td>
                             <td class="cost-cell">₦${total.toLocaleString()}</td>
                             <td>
                                 <button class="btn-sm btn-success" onclick="openApproveModal('${doc.id}')">✅ Approve</button>
@@ -477,7 +474,6 @@
             document.getElementById('approveTransportCost').value = '0';
             document.getElementById('approveNotes').value = currentRequestData.notes || '';
 
-            // Populate items
             const container = document.getElementById('approveItemsContainer');
             container.innerHTML = '';
             if (currentRequestData.items && currentRequestData.items.length > 0) {
@@ -568,7 +564,6 @@
         }
 
         try {
-            // Create shipment
             const shipmentRef = await db.collection('shipments').add({
                 senderName,
                 destinationBranch: currentRequestData.branch,
@@ -585,14 +580,12 @@
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Update request status to approved and link shipment
             await db.collection('invoiceRequests').doc(currentRequestId).update({
                 status: 'approved',
                 shipmentId: shipmentRef.id,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Log activity
             await db.collection('activityLog').add({
                 actionType: 'approve_request',
                 shipmentId: shipmentRef.id,
@@ -605,7 +598,6 @@
             alert('Request approved and dispatched successfully!');
             closeModal('approveRequestModal');
             loadPendingRequests();
-            // Refresh shipments via listener
         } catch (error) {
             document.getElementById('approveMessage').innerText = 'Error: ' + error.message;
         }
