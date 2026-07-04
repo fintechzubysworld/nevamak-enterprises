@@ -39,6 +39,8 @@
         .search-box input { flex: 1; }
         .search-box button { width: auto; padding: 8px 20px; }
         .draft-badge { background: #dfe6e9; color: #2d3436; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; }
+        .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 0.9rem; color: #721c24; }
+        .permission-error a { color: #0a3d62; font-weight: 600; }
         @media (max-width: 500px) { .input-group { flex-direction: column; } .input-group input { width: 100%; } }
     </style>
 </head>
@@ -416,19 +418,18 @@
             const doc = await docRef.get();
             if (!doc.exists) return;
             const data = doc.data();
-            const items = data.items.map(it => ({
+            const items = data.items.map((it, idx) => ({
                 itemName: it.itemName,
                 orderedQty: it.orderedQty,
                 unitPrice: it.unitPrice,
                 totalItemCost: it.totalItemCost,
-                receivedQty: parseInt(document.getElementById(`recv_${shipId}_${items.indexOf(it)}`)?.value || 0),
-                damageQty: parseInt(document.getElementById(`dam_${shipId}_${items.indexOf(it)}`)?.value || 0),
-                location: document.getElementById(`location_${shipId}_${items.indexOf(it)}`)?.value || 'Shelf A'
+                receivedQty: parseInt(document.getElementById(`recv_${shipId}_${idx}`)?.value || 0),
+                damageQty: parseInt(document.getElementById(`dam_${shipId}_${idx}`)?.value || 0),
+                location: document.getElementById(`location_${shipId}_${idx}`)?.value || 'Shelf A'
             }));
             const rep = document.getElementById(`repName_${shipId}`).value.trim() || 'Draft';
             const quality = document.getElementById(`quality_${shipId}`).value || 'Pass';
 
-            // Save to receiveDrafts collection
             await db.collection('receiveDrafts').add({
                 shipmentId: shipId,
                 branch: BRANCH,
@@ -479,27 +480,35 @@
             });
             html += '</table>';
             container.innerHTML = html;
-        } catch (err) {
-            console.error('Load drafts error:', err);
-            document.getElementById('draftsList').innerHTML = '<p>Error loading drafts.</p>';
+        } catch (error) {
+            console.error('Load drafts error:', error);
+            let errorMsg = error.message;
+            let helpHtml = `<div class="permission-error">
+                <p><strong>⚠️ Permission Error:</strong> ${errorMsg}</p>
+                <p>To fix this, add the following rule to your Firestore database:</p>
+                <pre style="background:#f0f0f0; padding:8px; border-radius:8px; font-size:0.8rem;">
+match /receiveDrafts/{document} {
+  allow read, write: if request.auth != null;
+}</pre>
+                <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">🔗 Click here to open Firestore Rules</a></p>
+                <p style="margin-top:8px;">After adding the rule, click <strong>Publish</strong> and refresh this page.</p>
+            </div>`;
+            document.getElementById('draftsList').innerHTML = helpHtml;
         }
-    }
+    };
 
-    // ==================== Load Draft into Receive Tab ====================
+    // ==================== Load Draft ====================
     window.loadDraft = async (draftId) => {
         try {
             const doc = await db.collection('receiveDrafts').doc(draftId).get();
             if (!doc.exists) return alert('Draft not found.');
             const draft = doc.data();
-            // Switch to receive tab
             document.querySelector('.tab-btn[data-tab="receive"]').click();
-            // Find the shipment card
             const shipmentCard = document.getElementById(`ship-${draft.shipmentId}`);
             if (!shipmentCard) {
                 alert('The original shipment may have been deleted. Please refresh.');
                 return;
             }
-            // Populate fields
             draft.items.forEach((item, idx) => {
                 const recvInput = document.getElementById(`recv_${draft.shipmentId}_${idx}`);
                 const damInput = document.getElementById(`dam_${draft.shipmentId}_${idx}`);
@@ -513,7 +522,6 @@
             const qualitySelect = document.getElementById(`quality_${draft.shipmentId}`);
             if (qualitySelect && draft.qualityCheck) qualitySelect.value = draft.qualityCheck;
 
-            // Highlight the shipment card
             shipmentCard.style.border = '3px solid #f39c12';
             setTimeout(() => { shipmentCard.style.border = ''; }, 3000);
             alert('✅ Draft loaded. Review and submit when ready.');
@@ -608,7 +616,7 @@
         }
     };
 
-    // ==================== Returns (unchanged) ====================
+    // ==================== Returns ====================
     async function loadReturnShipmentsDropdown() {
         try {
             const snap = await db.collection("shipments")
@@ -670,7 +678,6 @@
                 status: 'pending'
             });
 
-            // Reduce inventory
             const invRef = db.collection('inventory')
                 .where('itemName', '==', item.itemName)
                 .where('branch', '==', BRANCH);
