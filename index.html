@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
+        /* (all existing styles remain, plus no new ones needed) */
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
         .container { max-width: 1400px; margin: auto; }
@@ -20,13 +21,13 @@
         .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
         .stat-card { background: white; border-radius: 20px; padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #0a3d62; }
         .stat-card h3 { margin: 0 0 6px; font-size: 0.85rem; color: #555; }
-        .stat-card .number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #0a3d62; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }
+        .stat-card .number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #0a3d62; word-wrap: break-word; }
         .section-card { background: white; border-radius: 20px; padding: 16px; margin-bottom: 20px; overflow-x: auto; }
         .section-title { font-size: 1.2rem; margin-top: 0; margin-bottom: 12px; color: #0a3d62; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
         table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #ddd; font-size: 0.85rem; word-wrap: break-word; overflow-wrap: break-word; max-width: 200px; }
+        th, td { text-align: left; padding: 10px 6px; border-bottom: 1px solid #ddd; font-size: 0.85rem; word-wrap: break-word; }
         th { background: #f8f9fa; }
         .status { padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; white-space: nowrap; }
         .status-dispatched { background: #ffeaa7; color: #b85c00; }
@@ -42,17 +43,20 @@
         .notification-panel.show { display: block; }
         footer { text-align: center; margin-top: 24px; font-size: 0.75rem; color: #7f8c8d; }
         .lang-toggle { background: #3c6382; color: white; border: none; padding: 6px 12px; border-radius: 40px; cursor: pointer; }
-        /* Additional word-wrap fix for long item lists */
-        .items-cell { word-wrap: break-word; overflow-wrap: break-word; max-width: 150px; }
-        /* Make sure long numbers don't overflow */
-        .cost-cell { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
-        @media (max-width: 640px) {
-            .stats { grid-template-columns: 1fr 1fr; }
-            .stat-card .number { font-size: 1.3rem; }
-            header { flex-direction: column; text-align: center; }
-            td, th { font-size: 0.75rem; padding: 6px 4px; }
-            .items-cell { max-width: 100px; }
-        }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 700px; width: 95%; max-height: 80vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.5rem; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .item-row input { flex: 1; margin: 0; }
+        .removeItem { background: #e74c3c; color: white; width: auto; padding: 10px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
+        @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } .stat-card .number { font-size: 1.3rem; } header { flex-direction: column; text-align: center; } }
     </style>
 </head>
 <body>
@@ -102,7 +106,7 @@
         <div id="notificationList" style="max-height:200px; overflow-y:auto;"></div>
     </div>
 
-    <!-- Pending Invoice Requests (only for admin/lagos_sender) -->
+    <!-- Pending Invoice Requests -->
     <div id="pendingRequestsSection" class="section-card" style="display:none;">
         <div class="section-title">📋 Pending Invoice Requests</div>
         <div id="pendingRequestsList">Loading...</div>
@@ -152,7 +156,7 @@
     </div>
 </div>
 
-<!-- Modal: Approve Request (convert to dispatch) -->
+<!-- Modal: Approve Request (convert to dispatch or draft) -->
 <div id="approveRequestModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('approveRequestModal')">&times;</span>
@@ -171,6 +175,7 @@
             <textarea id="approveNotes" placeholder="Additional notes"></textarea>
             <div style="display:flex; gap:12px; flex-wrap:wrap;">
                 <button type="submit" class="btn-primary" style="flex:2;">🚛 Approve & Dispatch</button>
+                <button type="button" id="saveDraftRequestBtn" class="btn-warning" style="flex:1;">💾 Save Draft</button>
                 <button type="button" id="rejectRequestBtn" class="btn-danger" style="flex:1;">❌ Reject</button>
             </div>
             <div id="approveMessage" style="color:red; margin-top:8px;"></div>
@@ -356,7 +361,7 @@
         });
     });
 
-    // ---- View Shipment Details (Modal) ----
+    // ---- View Shipment Details ----
     window.viewShipment = async function(id) {
         try {
             const doc = await db.collection('shipments').doc(id).get();
@@ -456,7 +461,7 @@
             });
     }
 
-    // ---- Approve / Reject ----
+    // ---- Approve / Reject / Draft ----
     let currentRequestId = null;
     let currentRequestData = null;
 
@@ -535,6 +540,7 @@
     }
     document.getElementById('approveItemsContainer').addEventListener('input', updateApprovePreview);
 
+    // ---- Submit Approve (Dispatch) ----
     document.getElementById('approveRequestForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!currentRequestId) return alert('No request selected.');
@@ -604,6 +610,76 @@
         }
     });
 
+    // ---- Save Draft ----
+    document.getElementById('saveDraftRequestBtn').addEventListener('click', async function() {
+        if (!currentRequestId) return alert('No request selected.');
+        const senderName = document.getElementById('approveSenderName').value.trim();
+        const vehicleNo = document.getElementById('approveVehicleNo').value.trim();
+        const expectedDate = document.getElementById('approveExpectedDate').value;
+        const transportCost = parseFloat(document.getElementById('approveTransportCost').value) || 0;
+        const notes = document.getElementById('approveNotes').value.trim();
+        const items = [];
+        document.querySelectorAll('#approveItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.appItemName').value.trim();
+            const qty = parseInt(row.querySelector('.appItemQty').value);
+            const price = parseFloat(row.querySelector('.appItemPrice').value);
+            if (name && qty > 0 && price >= 0) {
+                items.push({
+                    itemName: name,
+                    orderedQty: qty,
+                    unitPrice: price,
+                    totalItemCost: qty * price,
+                    receivedQty: 0,
+                    damageQty: 0
+                });
+            }
+        });
+        if (!items.length || !senderName) {
+            document.getElementById('approveMessage').innerText = 'Please fill all fields and add items.';
+            return;
+        }
+
+        try {
+            const shipmentRef = await db.collection('shipments').add({
+                senderName,
+                destinationBranch: currentRequestData.branch,
+                supplierId: '',
+                vehicleNo,
+                expectedDate,
+                driver: '',
+                trackingNo: 'NEV-' + Date.now().toString(36).toUpperCase(),
+                notes: notes,
+                transportCost,
+                items,
+                status: 'Draft',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection('invoiceRequests').doc(currentRequestId).update({
+                status: 'draft',
+                shipmentId: shipmentRef.id,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection('activityLog').add({
+                actionType: 'draft_request',
+                shipmentId: shipmentRef.id,
+                branch: currentRequestData.branch,
+                details: `Drafted invoice request from ${currentRequestData.requestedBy}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUser.email
+            });
+
+            alert('✅ Draft saved! You can complete it later from the Dispatch page.');
+            closeModal('approveRequestModal');
+            loadPendingRequests();
+        } catch (error) {
+            document.getElementById('approveMessage').innerText = 'Error: ' + error.message;
+        }
+    });
+
+    // ---- Reject ----
     window.rejectRequest = async function(requestId) {
         if (!confirm('Reject this request?')) return;
         const reason = prompt('Reason for rejection (optional):');
