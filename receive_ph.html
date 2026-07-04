@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Port Harcourt Receiving</title>
+    <!-- (same head and styles as Abuja, but with PH colours) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <style>
+        /* use PH styles – same as previous, but with #e67e22 accents */
         * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; box-sizing: border-box; }
         body { background: #eef2fa; margin: 0; padding: 12px; }
         .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
@@ -35,6 +37,12 @@
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.5rem; }
+        .search-box { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .search-box input { flex: 1; }
+        .search-box button { width: auto; padding: 8px 20px; }
+        .draft-badge { background: #dfe6e9; color: #2d3436; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; }
+        .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; font-size: 0.9rem; color: #721c24; }
+        .permission-error a { color: #0a3d62; font-weight: 600; }
         @media (max-width: 500px) { .input-group { flex-direction: column; } .input-group input { width: 100%; } }
     </style>
 </head>
@@ -44,6 +52,7 @@
     <a href="chat.html">💬 Chat</a>
     <a href="reports.html">📊 Reports</a>
     <a href="warehouse.html">🏚️ Warehouse</a>
+    <a href="returns.html">🔄 Returns</a>
     <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
 </div>
 <h2>🌊 Port Harcourt Receiving</h2>
@@ -60,6 +69,7 @@
 <!-- Tabs -->
 <div class="tabs">
     <button class="tab-btn active" data-tab="receive">📦 Receive Goods</button>
+    <button class="tab-btn" data-tab="drafts">📝 Drafts</button>
     <button class="tab-btn" data-tab="returns">🔄 Returns</button>
     <button class="tab-btn" data-tab="inventory">📊 Inventory</button>
     <button class="tab-btn" data-tab="history">📜 Activity</button>
@@ -67,7 +77,17 @@
 
 <!-- Tab: Receive Goods -->
 <div id="tab-receive" class="tab-content active">
+    <div class="search-box">
+        <input type="text" id="searchItem" placeholder="🔍 Search by item description...">
+        <button id="searchBtn" class="btn-primary">Search</button>
+        <button id="clearSearchBtn" class="btn-secondary">Clear</button>
+    </div>
     <div id="shipmentsList" class="card">Loading...</div>
+</div>
+
+<!-- Tab: Drafts -->
+<div id="tab-drafts" class="tab-content">
+    <div id="draftsList" class="card">Loading drafts...</div>
 </div>
 
 <!-- Tab: Returns -->
@@ -119,7 +139,6 @@
 </div>
 
 <script>
-    // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -135,10 +154,11 @@
 
     let currentUserEmail = "";
     const BRANCH = "Portharcourt";
+    let currentUserId = "";
 
-    // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
+        currentUserId = user.uid;
         const userDoc = await db.collection('users').doc(user.uid).get();
         const role = userDoc.data()?.role || '';
         if (!['admin', 'lagos_sender', 'ph_rep'].includes(role)) {
@@ -152,11 +172,13 @@
         loadActivityHistory();
         loadInventory();
         loadStats();
+        loadDrafts();
+        setupSearch();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // ==================== Tab Switching ====================
+    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -166,7 +188,28 @@
         });
     });
 
-    // ==================== Stats ====================
+    function setupSearch() {
+        const searchInput = document.getElementById('searchItem');
+        const searchBtn = document.getElementById('searchBtn');
+        const clearBtn = document.getElementById('clearSearchBtn');
+        function filterShipments() {
+            const query = searchInput.value.toLowerCase().trim();
+            const cards = document.querySelectorAll('.shipment-card');
+            cards.forEach(card => {
+                const text = card.innerText.toLowerCase();
+                card.style.display = text.includes(query) ? '' : 'none';
+            });
+        }
+        searchBtn.addEventListener('click', filterShipments);
+        clearBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            filterShipments();
+        });
+        searchInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') filterShipments();
+        });
+    }
+
     function loadStats() {
         db.collection("shipments").where("destinationBranch", "==", BRANCH).onSnapshot((snap) => {
             let received = 0, pending = 0, totalGoods = 0;
@@ -180,11 +223,9 @@
             document.getElementById('pendingCount').innerText = pending;
             document.getElementById('totalGoods').innerText = '₦' + totalGoods.toLocaleString();
         }, (err) => console.error('Stats error:', err));
-
         db.collection("returns").where("branch", "==", BRANCH).onSnapshot((snap) => {
             document.getElementById('returnedCount').innerText = snap.size;
         }, (err) => console.error('Returns stats error:', err));
-
         db.collection("inventory").where("branch", "==", BRANCH).onSnapshot((snap) => {
             let val = 0;
             snap.forEach(doc => {
@@ -195,7 +236,6 @@
         }, (err) => console.error('Inventory stats error:', err));
     }
 
-    // ==================== Receive Shipments ====================
     async function loadShipments() {
         try {
             const snap = await db.collection("shipments")
@@ -248,7 +288,8 @@
                 html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div>
                          <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div>
                          <button onclick="receiveShipment('${id}')">✅ Confirm Receipt</button>
-                         <button onclick="viewInvoice('${id}')" style="background:#f39c12;">🧾 Preview Invoice</button>
+                         <button onclick="saveReceiveDraft('${id}')" style="background:#f39c12;">💾 Save Draft</button>
+                         <button onclick="viewInvoice('${id}')" style="background:#3498db;">🧾 Preview Invoice</button>
                          </div>`;
             }
             container.innerHTML = html;
@@ -259,14 +300,10 @@
     }
 
     window.receiveShipment = async (shipId) => {
-        let errors = [];
         try {
             const docRef = db.collection("shipments").doc(shipId);
             const doc = await docRef.get();
-            if (!doc.exists) {
-                alert('Shipment not found.');
-                return;
-            }
+            if (!doc.exists) return;
             const data = doc.data();
             let items = [...data.items];
             let updated = false;
@@ -295,60 +332,42 @@
             const allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
             const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
 
-            // ---- Step 1: Update shipment ----
-            try {
-                await docRef.update({
-                    items,
-                    status: newStatus,
-                    receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
-                    receivingRep: rep,
-                    grnNumber: grn || `GRN-${Date.now()}`,
-                    qualityCheck: quality,
-                    receivedBy: rep
-                });
-                console.log('Shipment updated successfully.');
-            } catch (err) {
-                console.error('Shipment update failed:', err);
-                errors.push('Failed to update shipment status.');
-                alert('Failed to update shipment. Please try again or contact admin.');
-                return; // critical, stop here
-            }
+            await docRef.update({
+                items,
+                status: newStatus,
+                receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+                receivingRep: rep,
+                grnNumber: grn || `GRN-${Date.now()}`,
+                qualityCheck: quality,
+                receivedBy: rep
+            });
 
-            // ---- Step 2: Update inventory ----
-            try {
-                for (const item of items) {
-                    if (item.receivedQty > 0) {
-                        const invRef = db.collection('inventory')
-                            .where('itemName', '==', item.itemName)
-                            .where('branch', '==', BRANCH);
-                        const snap = await invRef.get();
-                        if (snap.empty) {
-                            await db.collection('inventory').add({
-                                itemName: item.itemName,
-                                branch: BRANCH,
-                                stock: item.receivedQty,
-                                unitPrice: item.unitPrice,
-                                location: item.location || 'Shelf A',
+            for (const item of items) {
+                if (item.receivedQty > 0) {
+                    const invRef = db.collection('inventory')
+                        .where('itemName', '==', item.itemName)
+                        .where('branch', '==', BRANCH);
+                    const snap = await invRef.get();
+                    if (snap.empty) {
+                        await db.collection('inventory').add({
+                            itemName: item.itemName,
+                            branch: BRANCH,
+                            stock: item.receivedQty,
+                            unitPrice: item.unitPrice,
+                            location: item.location || 'Shelf A',
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        snap.forEach(d => {
+                            d.ref.update({
+                                stock: firebase.firestore.FieldValue.increment(item.receivedQty),
                                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                             });
-                        } else {
-                            for (const d of snap.docs) {
-                                await d.ref.update({
-                                    stock: firebase.firestore.FieldValue.increment(item.receivedQty),
-                                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                                });
-                            }
-                        }
+                        });
                     }
                 }
-                console.log('Inventory updated successfully.');
-            } catch (err) {
-                console.error('Inventory update failed:', err);
-                errors.push('Failed to update inventory.');
-                // Non-critical, we continue
             }
 
-            // ---- Step 3: Log activity ----
             try {
                 await db.collection('activityLog').add({
                     actionType: 'receive',
@@ -358,13 +377,8 @@
                     timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                     user: rep
                 });
-                console.log('Activity logged successfully.');
-            } catch (err) {
-                console.error('Activity log failed:', err);
-                errors.push('Failed to log activity.');
-            }
+            } catch (logError) { console.warn('Activity log failed:', logError); }
 
-            // ---- Step 4: Send notification ----
             try {
                 await db.collection('notifications').add({
                     userId: 'admin',
@@ -372,25 +386,143 @@
                     read: false,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                console.log('Notification sent successfully.');
-            } catch (err) {
-                console.error('Notification failed:', err);
-                errors.push('Failed to send notification.');
-            }
+            } catch (notifError) { console.warn('Notification failed:', notifError); }
 
-            // ---- Final feedback ----
-            if (errors.length === 0) {
-                alert(`${newStatus} - GRN: ${grn}. All operations successful.`);
-            } else {
-                alert(`${newStatus} - GRN: ${grn}. But some non-critical operations failed:\n- ${errors.join('\n- ')}`);
-            }
+            alert(`${newStatus} - GRN: ${grn}`);
             loadShipments();
             loadActivityHistory();
             loadStats();
             loadInventory();
+            loadDrafts();
         } catch (error) {
             console.error('Receive error:', error);
             alert('Error receiving shipment: ' + error.message);
+        }
+    };
+
+    window.saveReceiveDraft = async (shipId) => {
+        try {
+            const docRef = db.collection("shipments").doc(shipId);
+            const doc = await docRef.get();
+            if (!doc.exists) return;
+            const data = doc.data();
+            const items = data.items.map((it, idx) => ({
+                itemName: it.itemName,
+                orderedQty: it.orderedQty,
+                unitPrice: it.unitPrice,
+                totalItemCost: it.totalItemCost,
+                receivedQty: parseInt(document.getElementById(`recv_${shipId}_${idx}`)?.value || 0),
+                damageQty: parseInt(document.getElementById(`dam_${shipId}_${idx}`)?.value || 0),
+                location: document.getElementById(`location_${shipId}_${idx}`)?.value || 'Shelf A'
+            }));
+            const rep = document.getElementById(`repName_${shipId}`).value.trim() || 'Draft';
+            const quality = document.getElementById(`quality_${shipId}`).value || 'Pass';
+
+            await db.collection('receiveDrafts').add({
+                shipmentId: shipId,
+                branch: BRANCH,
+                items: items,
+                receivingRep: rep,
+                qualityCheck: quality,
+                userId: currentUserId,
+                userEmail: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            alert('✅ Draft saved! You can continue later from the Drafts tab.');
+            loadDrafts();
+        } catch (err) {
+            alert('Error saving draft: ' + err.message);
+        }
+    };
+
+    async function loadDrafts() {
+        try {
+            const snap = await db.collection('receiveDrafts')
+                .where('userId', '==', currentUserId)
+                .where('branch', '==', BRANCH)
+                .orderBy('createdAt', 'desc')
+                .get();
+            const container = document.getElementById('draftsList');
+            if (snap.empty) {
+                container.innerHTML = '<p class="empty">No drafts saved.</p>';
+                return;
+            }
+            let html = '<table><tr><th>Shipment</th><th>Items</th><th>Rep</th><th>Date</th><th>Action</th></tr>';
+            snap.forEach(doc => {
+                const d = doc.data();
+                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0}/${i.damageQty||0})`).join(", ").substring(0,40) : '-';
+                const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
+                html += `<tr>
+                    <td>${d.shipmentId.slice(0,8)}</td>
+                    <td>${itemsShort}</td>
+                    <td>${d.receivingRep || '-'}</td>
+                    <td>${date}</td>
+                    <td>
+                        <button class="btn-sm btn-primary" onclick="loadDraft('${doc.id}')">📂 Load</button>
+                        <button class="btn-sm btn-danger" onclick="deleteDraft('${doc.id}')">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Load drafts error:', error);
+            let helpHtml = `<div class="permission-error">
+                <p><strong>⚠️ Permission Error:</strong> ${error.message}</p>
+                <p>To fix this, add the following rule to your Firestore database:</p>
+                <pre style="background:#f0f0f0; padding:8px; border-radius:8px; font-size:0.8rem;">
+match /receiveDrafts/{document} {
+  allow read, write: if request.auth != null;
+}</pre>
+                <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">🔗 Click here to open Firestore Rules</a></p>
+                <p style="margin-top:8px;">After adding the rule, click <strong>Publish</strong> and refresh this page.</p>
+            </div>`;
+            document.getElementById('draftsList').innerHTML = helpHtml;
+        }
+    }
+
+    window.loadDraft = async (draftId) => {
+        try {
+            const doc = await db.collection('receiveDrafts').doc(draftId).get();
+            if (!doc.exists) return alert('Draft not found.');
+            const draft = doc.data();
+            document.querySelector('.tab-btn[data-tab="receive"]').click();
+            const shipmentCard = document.getElementById(`ship-${draft.shipmentId}`);
+            if (!shipmentCard) {
+                alert('The original shipment may have been deleted. Please refresh.');
+                return;
+            }
+            draft.items.forEach((item, idx) => {
+                const recvInput = document.getElementById(`recv_${draft.shipmentId}_${idx}`);
+                const damInput = document.getElementById(`dam_${draft.shipmentId}_${idx}`);
+                const locSelect = document.getElementById(`location_${draft.shipmentId}_${idx}`);
+                if (recvInput) recvInput.value = item.receivedQty || 0;
+                if (damInput) damInput.value = item.damageQty || 0;
+                if (locSelect && item.location) locSelect.value = item.location;
+            });
+            const repInput = document.getElementById(`repName_${draft.shipmentId}`);
+            if (repInput) repInput.value = draft.receivingRep || '';
+            const qualitySelect = document.getElementById(`quality_${draft.shipmentId}`);
+            if (qualitySelect && draft.qualityCheck) qualitySelect.value = draft.qualityCheck;
+
+            shipmentCard.style.border = '3px solid #f39c12';
+            setTimeout(() => { shipmentCard.style.border = ''; }, 3000);
+            alert('✅ Draft loaded. Review and submit when ready.');
+        } catch (err) {
+            alert('Error loading draft: ' + err.message);
+        }
+    };
+
+    window.deleteDraft = async (draftId) => {
+        if (!confirm('Delete this draft?')) return;
+        try {
+            await db.collection('receiveDrafts').doc(draftId).delete();
+            alert('Draft deleted.');
+            loadDrafts();
+        } catch (err) {
+            alert('Error: ' + err.message);
         }
     };
 
@@ -466,7 +598,7 @@
         }
     };
 
-    // ==================== Returns ====================
+    // Returns, Inventory, Activity (same as Abuja but with BRANCH)
     async function loadReturnShipmentsDropdown() {
         try {
             const snap = await db.collection("shipments")
@@ -482,9 +614,7 @@
                 sel.appendChild(opt);
             });
             sel.onchange = () => loadReturnItems(sel.value);
-        } catch (error) {
-            console.error('Load return dropdown error:', error);
-        }
+        } catch (error) { console.error('Load return dropdown error:', error); }
     }
 
     async function loadReturnItems(shipmentId) {
@@ -500,9 +630,7 @@
                 opt.textContent = `${it.itemName} (OK: ${it.receivedQty}, Damaged: ${it.damageQty})`;
                 itemSelect.appendChild(opt);
             });
-        } catch (error) {
-            console.error('Load return items error:', error);
-        }
+        } catch (error) { console.error('Load return items error:', error); }
     }
 
     document.getElementById("recordReturnBtn").addEventListener("click", async () => {
@@ -528,10 +656,10 @@
                 returnedQty: qty,
                 reason,
                 date: firebase.firestore.FieldValue.serverTimestamp(),
-                createdBy: currentUserEmail
+                createdBy: currentUserEmail,
+                status: 'pending'
             });
 
-            // Reduce inventory
             const invRef = db.collection('inventory')
                 .where('itemName', '==', item.itemName)
                 .where('branch', '==', BRANCH);
@@ -584,7 +712,6 @@
         }
     }
 
-    // ==================== Inventory ====================
     async function loadInventory() {
         try {
             const snap = await db.collection("inventory").where("branch", "==", BRANCH).get();
@@ -611,7 +738,6 @@
         });
     });
 
-    // ==================== Activity History ====================
     async function loadActivityHistory(startDate, endDate) {
         try {
             let query = db.collection("activityLog").where("branch", "==", BRANCH).orderBy("timestamp", "desc").limit(100);
@@ -645,7 +771,6 @@
         const end = document.getElementById('historyEnd').value;
         loadActivityHistory(start, end);
     });
-    // Initial load
     loadActivityHistory();
 </script>
 </body>
