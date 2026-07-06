@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Invoice Repository</title>
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -61,7 +62,11 @@
         .tax-total { font-size: 0.85rem; color: #555; text-align: center; padding: 4px; }
         .item-tax-fields { display: flex; gap: 6px; flex-wrap: wrap; flex: 2; }
         .item-tax-fields input { flex: 1; min-width: 60px; }
-        @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } }
+        .transport-field { display: flex; gap: 8px; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+        .transport-field input { flex: 1; min-width: 120px; }
+        .transport-field label { font-weight: 600; }
+        .transport-field .hint { font-size: 0.8rem; color: #888; }
+        @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
 <body>
@@ -115,6 +120,13 @@
                     <button type="button" id="applyToSelectedBtn" class="btn-warning">📋 Apply to Selected</button>
                     <button type="button" id="applyToAllBtn" class="btn-primary">📋 Apply to All</button>
                     <button type="button" id="clearTaxesBtn" class="btn-danger">🧹 Clear Taxes</button>
+                </div>
+
+                <!-- Transport Cost Multiplier -->
+                <div class="transport-field">
+                    <label>🚛 Transport Multiplier:</label>
+                    <input type="number" id="transportMultiplier" placeholder="e.g., 1.05 = +5%" value="1.00" step="0.01" min="0">
+                    <span class="hint">Multiplier applied to each item's unit price before tax</span>
                 </div>
 
                 <div id="importPreviewContainer" class="import-preview" style="display:none;"></div>
@@ -246,6 +258,7 @@
     const importPreviewContainer = document.getElementById('importPreviewContainer');
     const invoiceBranch = document.getElementById('invoiceBranch');
     const moveBranchSelect = document.getElementById('moveBranchSelect');
+    const transportMultiplier = document.getElementById('transportMultiplier');
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
@@ -279,11 +292,12 @@
         // Initialize with one row
         addItemRow();
         updateCostPreview();
+        transportMultiplier.addEventListener('input', updateCostPreview);
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // ==================== Items Management with Tax Fields ====================
+    // ==================== Items Management ====================
     function addItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
         const rowCount = document.querySelectorAll('.item-row').length;
         const div = document.createElement('div');
@@ -292,7 +306,7 @@
             <input type="checkbox" class="item-checkbox" data-row="${rowCount}" style="width:auto; margin:0 4px;">
             <input type="text" placeholder="Item name" class="itemName" value="${itemName}" style="flex:2;">
             <input type="number" placeholder="Qty" class="itemQty" value="${qty}" style="flex:0.8;">
-            <input type="number" placeholder="Price/unit" class="itemPrice" value="${price}" style="flex:1;">
+            <input type="number" placeholder="Unit Price" class="itemPrice" value="${price}" style="flex:1;">
             <div class="item-tax-fields">
                 <input type="number" placeholder="Disc %" class="itemDiscPct" value="${discPct}" step="0.01" min="0">
                 <input type="number" placeholder="Disc ₦" class="itemDiscAmt" value="${discAmt}" step="0.01" min="0">
@@ -306,20 +320,17 @@
             div.remove();
             updateCostPreview();
         };
-        // Update preview on any input change
         div.querySelectorAll('input').forEach(inp => {
             inp.addEventListener('input', updateCostPreview);
         });
         updateCostPreview();
     }
 
-    // ==================== Update Cost Preview with Per‑Item Taxes ====================
-    function updateCostPreview() {
-        let subtotal = 0;
-        let totalDiscount = 0;
-        let totalVAT = 0;
-        let totalWHT = 0;
-        let grandTotal = 0;
+    // ==================== Calculate Item Totals with Transport Multiplier ====================
+    function calculateItemTotals() {
+        const multiplier = parseFloat(transportMultiplier.value) || 1.00;
+        const items = [];
+        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
 
         document.querySelectorAll('.item-row').forEach(row => {
             const name = row.querySelector('.itemName').value.trim();
@@ -331,25 +342,50 @@
             const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
 
             if (name && qty > 0) {
-                const itemSub = qty * price;
+                // Apply transport multiplier to unit price
+                const updatedPrice = price * multiplier;
+                const itemSub = qty * updatedPrice;
                 subtotal += itemSub;
                 const itemDisc = (itemSub * (discPct / 100)) + discAmt;
-                totalDiscount += itemDisc;
+                totalDisc += itemDisc;
                 const afterDisc = itemSub - itemDisc;
                 const itemVAT = afterDisc * (vatPct / 100);
                 const itemWHT = afterDisc * (whtPct / 100);
                 totalVAT += itemVAT;
                 totalWHT += itemWHT;
-                grandTotal += afterDisc + itemVAT - itemWHT;
+                const itemTotal = afterDisc + itemVAT - itemWHT;
+                grandTotal += itemTotal;
+                items.push({
+                    name,
+                    qty,
+                    originalPrice: price,
+                    updatedPrice,
+                    subtotal: itemSub,
+                    discPct,
+                    discAmt,
+                    itemDisc,
+                    vatPct,
+                    whtPct,
+                    itemVAT,
+                    itemWHT,
+                    total: itemTotal
+                });
             }
         });
 
+        return { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier };
+    }
+
+    // ==================== Update Cost Preview ====================
+    function updateCostPreview() {
+        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
         document.getElementById('invoiceCostPreview').innerHTML = `Total: ₦${grandTotal.toLocaleString()}`;
         document.getElementById('taxBreakdown').innerHTML = `
             Subtotal: ₦${subtotal.toLocaleString()} | 
-            Discount: ₦${totalDiscount.toLocaleString()} | 
+            Discount: ₦${totalDisc.toLocaleString()} | 
             VAT: ₦${totalVAT.toLocaleString()} | 
             WHT: ₦${totalWHT.toLocaleString()} | 
+            Transport Multiplier: ${multiplier.toFixed(2)} |
             <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
         `;
     }
@@ -368,7 +404,6 @@
         document.getElementById('bulkWHT').value = '0';
         document.getElementById('bulkMessage').innerText = '';
         document.getElementById('bulkApplyModal').style.display = 'flex';
-        // Store selected indices for later
         document.getElementById('bulkApplyModal').dataset.selected = JSON.stringify(
             Array.from(selected).map(cb => cb.dataset.row)
         );
@@ -542,7 +577,6 @@
 
     window.applyImportedItems = function() {
         if (importedItems.length === 0) return;
-        // Remove all rows except maybe clear all and add new
         invoiceItemsContainer.innerHTML = '';
         importedItems.forEach(it => {
             addItemRow(it.itemName, it.quantity, it.unitPrice);
@@ -562,7 +596,7 @@
         formMessage.innerText = '';
     };
 
-    // ==================== Preview Invoice ====================
+    // ==================== Preview Invoice (clean receipt) ====================
     document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
         const preview = generateInvoiceHTML();
         invoicePreviewContainer.innerHTML = preview;
@@ -576,45 +610,19 @@
         const email = document.getElementById('customerEmail').value.trim() || 'N/A';
         const notes = document.getElementById('invoiceNotes').value.trim() || '';
         const branch = document.getElementById('invoiceBranch').value;
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
+
+        if (items.length === 0) return '<p style="color:red;">Add at least one item.</p>';
+
         let itemsHtml = '';
-        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
-
-        document.querySelectorAll('.item-row').forEach(row => {
-            const name = row.querySelector('.itemName').value.trim();
-            const qty = parseFloat(row.querySelector('.itemQty').value) || 0;
-            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
-            const discPct = parseFloat(row.querySelector('.itemDiscPct').value) || 0;
-            const discAmt = parseFloat(row.querySelector('.itemDiscAmt').value) || 0;
-            const vatPct = parseFloat(row.querySelector('.itemVAT').value) || 0;
-            const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
-
-            if (name && qty > 0) {
-                const itemSub = qty * price;
-                subtotal += itemSub;
-                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
-                totalDisc += itemDisc;
-                const afterDisc = itemSub - itemDisc;
-                const itemVAT = afterDisc * (vatPct / 100);
-                const itemWHT = afterDisc * (whtPct / 100);
-                totalVAT += itemVAT;
-                totalWHT += itemWHT;
-                const itemTotal = afterDisc + itemVAT - itemWHT;
-                grandTotal += itemTotal;
-                itemsHtml += `<tr>
-                    <td>${name}</td>
-                    <td>${qty}</td>
-                    <td>₦${price.toFixed(2)}</td>
-                    <td>₦${itemSub.toFixed(2)}</td>
-                    <td>${discPct}% + ₦${discAmt.toFixed(2)}</td>
-                    <td>₦${itemDisc.toFixed(2)}</td>
-                    <td>${vatPct}%</td>
-                    <td>${whtPct}%</td>
-                    <td>₦${itemTotal.toFixed(2)}</td>
-                </tr>`;
-            }
+        items.forEach(it => {
+            itemsHtml += `<tr>
+                <td>${it.name}</td>
+                <td>${it.qty}</td>
+                <td>₦${it.updatedPrice.toFixed(2)}</td>
+                <td>₦${it.total.toFixed(2)}</td>
+            </tr>`;
         });
-
-        if (!itemsHtml) return '<p style="color:red;">Add at least one item.</p>';
 
         const html = `
             <h2>NEVAMAK Enterprises</h2>
@@ -629,19 +637,15 @@
                     <th>Item</th>
                     <th>Qty</th>
                     <th>Unit Price</th>
-                    <th>Subtotal</th>
-                    <th>Discount</th>
-                    <th>Disc Amount</th>
-                    <th>VAT %</th>
-                    <th>WHT %</th>
                     <th>Total</th>
                 </tr>
                 ${itemsHtml}
-                <tr><td colspan="4"><strong>Subtotal</strong></td><td colspan="4"></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                <tr><td colspan="4"><strong>Total Discount</strong></td><td colspan="4"></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                <tr><td colspan="4"><strong>Total VAT</strong></td><td colspan="4"></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                <tr><td colspan="4"><strong>Total WHT</strong></td><td colspan="4"></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                <tr><td colspan="4"><strong>Grand Total</strong></td><td colspan="4"></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="3"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="3"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="3"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="3"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="3"><strong>Transport Multiplier</strong></td><td><strong>${multiplier.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
             </table>
             ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
             <p><em>Generated by ${currentUserEmail}</em></p>
@@ -663,51 +667,29 @@
         const email = document.getElementById('customerEmail').value.trim();
         const notes = document.getElementById('invoiceNotes').value.trim();
         const branch = document.getElementById('invoiceBranch').value;
-        const items = [];
-        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
+        const multiplier = parseFloat(transportMultiplier.value) || 1.00;
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
 
-        document.querySelectorAll('.item-row').forEach(row => {
-            const name = row.querySelector('.itemName').value.trim();
-            const qty = parseFloat(row.querySelector('.itemQty').value) || 0;
-            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
-            const discPct = parseFloat(row.querySelector('.itemDiscPct').value) || 0;
-            const discAmt = parseFloat(row.querySelector('.itemDiscAmt').value) || 0;
-            const vatPct = parseFloat(row.querySelector('.itemVAT').value) || 0;
-            const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
-
-            if (name && qty > 0 && price >= 0) {
-                const itemSub = qty * price;
-                subtotal += itemSub;
-                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
-                totalDisc += itemDisc;
-                const afterDisc = itemSub - itemDisc;
-                const itemVAT = afterDisc * (vatPct / 100);
-                const itemWHT = afterDisc * (whtPct / 100);
-                totalVAT += itemVAT;
-                totalWHT += itemWHT;
-                const itemTotal = afterDisc + itemVAT - itemWHT;
-                grandTotal += itemTotal;
-                items.push({
-                    itemName: name,
-                    quantity: qty,
-                    unitPrice: price,
-                    subtotal: itemSub,
-                    discountPercent: discPct,
-                    discountAmount: discAmt,
-                    discountTotal: itemDisc,
-                    vatPercent: vatPct,
-                    whtPercent: whtPct,
-                    vat: itemVAT,
-                    wht: itemWHT,
-                    total: itemTotal
-                });
-            }
-        });
-
-        if (!items.length) {
+        if (items.length === 0) {
             formMessage.innerText = 'Add at least one item.';
             return;
         }
+
+        const savedItems = items.map(it => ({
+            itemName: it.name,
+            quantity: it.qty,
+            originalPrice: it.originalPrice,
+            updatedPrice: it.updatedPrice,
+            subtotal: it.subtotal,
+            discountPercent: it.discPct,
+            discountAmount: it.discAmt,
+            discountTotal: it.itemDisc,
+            vatPercent: it.vatPct,
+            whtPercent: it.whtPct,
+            vat: it.itemVAT,
+            wht: it.itemWHT,
+            total: it.total
+        }));
 
         try {
             await db.collection('invoices').add({
@@ -717,7 +699,8 @@
                 customerEmail: email || '',
                 notes: notes,
                 branch: branch,
-                items: items,
+                items: savedItems,
+                transportMultiplier: multiplier,
                 subtotal: subtotal,
                 totalDiscount: totalDisc,
                 totalVAT: totalVAT,
@@ -732,6 +715,7 @@
             formMessage.innerText = '✅ Invoice saved successfully!';
             invoiceItemsContainer.innerHTML = '';
             addItemRow();
+            transportMultiplier.value = '1.00';
             updateCostPreview();
             document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
             document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
@@ -772,40 +756,23 @@
 
     // ==================== Generate CSV ====================
     document.getElementById('generateCSVBtn').addEventListener('click', () => {
-        const rows = [['Item', 'Quantity', 'Unit Price', 'Subtotal', 'Disc %', 'Disc Amount', 'VAT %', 'WHT %', 'Total']];
-        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
-        document.querySelectorAll('.item-row').forEach(row => {
-            const name = row.querySelector('.itemName').value.trim();
-            const qty = parseFloat(row.querySelector('.itemQty').value) || 0;
-            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
-            const discPct = parseFloat(row.querySelector('.itemDiscPct').value) || 0;
-            const discAmt = parseFloat(row.querySelector('.itemDiscAmt').value) || 0;
-            const vatPct = parseFloat(row.querySelector('.itemVAT').value) || 0;
-            const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
-            if (name && qty > 0) {
-                const itemSub = qty * price;
-                subtotal += itemSub;
-                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
-                totalDisc += itemDisc;
-                const afterDisc = itemSub - itemDisc;
-                const itemVAT = afterDisc * (vatPct / 100);
-                const itemWHT = afterDisc * (whtPct / 100);
-                totalVAT += itemVAT;
-                totalWHT += itemWHT;
-                const itemTotal = afterDisc + itemVAT - itemWHT;
-                grandTotal += itemTotal;
-                rows.push([name, qty, price, itemSub, discPct, discAmt, vatPct, whtPct, itemTotal]);
-            }
-        });
-        if (rows.length === 1) {
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
+        if (items.length === 0) {
             alert('Add at least one item.');
             return;
         }
-        rows.push(['Subtotal', '', '', subtotal, '', '', '', '', '']);
-        rows.push(['Total Discount', '', '', '', '', '', '', '', totalDisc]);
-        rows.push(['Total VAT', '', '', '', '', '', '', '', totalVAT]);
-        rows.push(['Total WHT', '', '', '', '', '', '', '', totalWHT]);
-        rows.push(['Grand Total', '', '', '', '', '', '', '', grandTotal]);
+        const rows = [
+            ['Item', 'Quantity', 'Unit Price', 'Total']
+        ];
+        items.forEach(it => {
+            rows.push([it.name, it.qty, it.updatedPrice, it.total]);
+        });
+        rows.push(['Subtotal', '', '', subtotal]);
+        rows.push(['Total Discount', '', '', totalDisc]);
+        rows.push(['Total VAT', '', '', totalVAT]);
+        rows.push(['Total WHT', '', '', totalWHT]);
+        rows.push(['Transport Multiplier', '', '', multiplier]);
+        rows.push(['Grand Total', '', '', grandTotal]);
 
         const csvContent = rows.map(row => row.join(',')).join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -888,7 +855,7 @@
             let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
-                    const itemSub = it.subtotal || (it.quantity * it.unitPrice);
+                    const itemSub = it.subtotal || (it.quantity * (it.updatedPrice || it.unitPrice));
                     subtotal += itemSub;
                     totalDisc += it.discountTotal || 0;
                     totalVAT += it.vat || 0;
@@ -897,17 +864,13 @@
                     itemsHtml += `<tr>
                         <td>${it.itemName}</td>
                         <td>${it.quantity}</td>
-                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
-                        <td>₦${itemSub.toFixed(2)}</td>
-                        <td>${it.discountPercent||0}% + ₦${(it.discountAmount||0).toFixed(2)}</td>
-                        <td>₦${(it.discountTotal||0).toFixed(2)}</td>
-                        <td>${it.vatPercent||0}%</td>
-                        <td>${it.whtPercent||0}%</td>
-                        <td>₦${(it.total||0).toFixed(2)}</td>
+                        <td>₦${(it.updatedPrice || it.unitPrice || 0).toFixed(2)}</td>
+                        <td>₦${(it.total || 0).toFixed(2)}</td>
                     </tr>`;
                 });
             }
             const total = d.total || grandTotal;
+            const multiplier = d.transportMultiplier || 1.00;
             const html = `
                 <div style="font-family:sans-serif; padding:16px;">
                     <h2>NEVAMAK Enterprises</h2>
@@ -918,18 +881,14 @@
                     <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
                     <table style="width:100%; border-collapse:collapse;">
-                        <tr>
-                            <th>Item</th><th>Qty</th><th>Unit Price</th>
-                            <th>Subtotal</th><th>Discount</th>
-                            <th>Disc Amount</th><th>VAT %</th>
-                            <th>WHT %</th><th>Total</th>
-                        </tr>
+                        <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
                         ${itemsHtml}
-                        <tr><td colspan="4"><strong>Subtotal</strong></td><td colspan="4"></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total Discount</strong></td><td colspan="4"></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total VAT</strong></td><td colspan="4"></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total WHT</strong></td><td colspan="4"></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Grand Total</strong></td><td colspan="4"></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Transport Multiplier</strong></td><td><strong>${multiplier.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
                     <p><em>Created by ${d.createdBy}</em></p>
@@ -953,7 +912,7 @@
             let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
-                    const itemSub = it.subtotal || (it.quantity * it.unitPrice);
+                    const itemSub = it.subtotal || (it.quantity * (it.updatedPrice || it.unitPrice));
                     subtotal += itemSub;
                     totalDisc += it.discountTotal || 0;
                     totalVAT += it.vat || 0;
@@ -962,17 +921,13 @@
                     itemsHtml += `<tr>
                         <td>${it.itemName}</td>
                         <td>${it.quantity}</td>
-                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
-                        <td>₦${itemSub.toFixed(2)}</td>
-                        <td>${it.discountPercent||0}% + ₦${(it.discountAmount||0).toFixed(2)}</td>
-                        <td>₦${(it.discountTotal||0).toFixed(2)}</td>
-                        <td>${it.vatPercent||0}%</td>
-                        <td>${it.whtPercent||0}%</td>
-                        <td>₦${(it.total||0).toFixed(2)}</td>
+                        <td>₦${(it.updatedPrice || it.unitPrice || 0).toFixed(2)}</td>
+                        <td>₦${(it.total || 0).toFixed(2)}</td>
                     </tr>`;
                 });
             }
             const total = d.total || grandTotal;
+            const multiplier = d.transportMultiplier || 1.00;
             const html = `
                 <div id="pdfContent" style="padding:20px; font-family:sans-serif;">
                     <h2>NEVAMAK Enterprises</h2>
@@ -983,18 +938,14 @@
                     <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
                     <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
-                        <tr style="background:#f0f0f0;">
-                            <th>Item</th><th>Qty</th><th>Unit Price</th>
-                            <th>Subtotal</th><th>Discount</th>
-                            <th>Disc Amount</th><th>VAT %</th>
-                            <th>WHT %</th><th>Total</th>
-                        </tr>
+                        <tr style="background:#f0f0f0;"><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
                         ${itemsHtml}
-                        <tr><td colspan="4"><strong>Subtotal</strong></td><td colspan="4"></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total Discount</strong></td><td colspan="4"></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total VAT</strong></td><td colspan="4"></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total WHT</strong></td><td colspan="4"></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Grand Total</strong></td><td colspan="4"></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Transport Multiplier</strong></td><td><strong>${multiplier.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
                     <p><em>Created by ${d.createdBy}</em></p>
@@ -1023,11 +974,11 @@
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) return alert('Invoice not found.');
             const d = doc.data();
-            const rows = [['Item', 'Quantity', 'Unit Price', 'Subtotal', 'Disc %', 'Disc Amount', 'VAT %', 'WHT %', 'Total']];
+            const rows = [['Item', 'Quantity', 'Unit Price', 'Total']];
             let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
-                    const itemSub = it.subtotal || (it.quantity * it.unitPrice);
+                    const itemSub = it.subtotal || (it.quantity * (it.updatedPrice || it.unitPrice));
                     subtotal += itemSub;
                     totalDisc += it.discountTotal || 0;
                     totalVAT += it.vat || 0;
@@ -1036,21 +987,17 @@
                     rows.push([
                         it.itemName,
                         it.quantity,
-                        it.unitPrice,
-                        itemSub,
-                        it.discountPercent || 0,
-                        it.discountAmount || 0,
-                        it.vatPercent || 0,
-                        it.whtPercent || 0,
+                        it.updatedPrice || it.unitPrice || 0,
                         it.total || 0
                     ]);
                 });
             }
-            rows.push(['Subtotal', '', '', subtotal, '', '', '', '', '']);
-            rows.push(['Total Discount', '', '', '', '', '', '', '', totalDisc]);
-            rows.push(['Total VAT', '', '', '', '', '', '', '', totalVAT]);
-            rows.push(['Total WHT', '', '', '', '', '', '', '', totalWHT]);
-            rows.push(['Grand Total', '', '', '', '', '', '', '', d.total || grandTotal]);
+            rows.push(['Subtotal', '', '', subtotal]);
+            rows.push(['Total Discount', '', '', totalDisc]);
+            rows.push(['Total VAT', '', '', totalVAT]);
+            rows.push(['Total WHT', '', '', totalWHT]);
+            rows.push(['Transport Multiplier', '', '', d.transportMultiplier || 1.00]);
+            rows.push(['Grand Total', '', '', d.total || grandTotal]);
 
             const csvContent = rows.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -1182,7 +1129,7 @@
             let itemsHtml = '<table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
-                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${(it.updatedPrice || it.unitPrice || 0).toFixed(2)}</td></tr>`;
                 });
             } else {
                 itemsHtml += '<tr><td colspan="3">No items</td></tr>';
@@ -1224,7 +1171,7 @@
                         itemName: item.itemName,
                         branch: targetBranch,
                         stock: item.quantity,
-                        unitPrice: item.unitPrice,
+                        unitPrice: item.updatedPrice || item.unitPrice || 0,
                         location: 'Shelf A',
                         lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -1263,7 +1210,7 @@
     });
 
     // ==================== Initialize ====================
-    console.log('NEVAMAK Invoice Repository loaded with per‑item and group tax features.');
+    console.log('NEVAMAK Invoice Repository loaded with transport multiplier.');
 </script>
 </body>
 </html>
