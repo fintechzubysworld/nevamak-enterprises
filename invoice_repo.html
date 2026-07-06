@@ -126,7 +126,7 @@
                 <div class="transport-field">
                     <label>🚛 Transport Multiplier:</label>
                     <input type="number" id="transportMultiplier" placeholder="e.g., 1.05 = +5%" value="1.00" step="0.01" min="0">
-                    <span class="hint">Multiplier applied to each item's unit price before tax</span>
+                    <span class="hint">Multiplier applied to each item's unit price (hidden from final invoice)</span>
                 </div>
 
                 <div id="importPreviewContainer" class="import-preview" style="display:none;"></div>
@@ -596,7 +596,7 @@
         formMessage.innerText = '';
     };
 
-    // ==================== Preview Invoice (clean receipt) ====================
+    // ==================== Preview Invoice (clean receipt – no multiplier visible) ====================
     document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
         const preview = generateInvoiceHTML();
         invoicePreviewContainer.innerHTML = preview;
@@ -610,7 +610,7 @@
         const email = document.getElementById('customerEmail').value.trim() || 'N/A';
         const notes = document.getElementById('invoiceNotes').value.trim() || '';
         const branch = document.getElementById('invoiceBranch').value;
-        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
 
         if (items.length === 0) return '<p style="color:red;">Add at least one item.</p>';
 
@@ -644,7 +644,6 @@
                 <tr><td colspan="3"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
                 <tr><td colspan="3"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
                 <tr><td colspan="3"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                <tr><td colspan="3"><strong>Transport Multiplier</strong></td><td><strong>${multiplier.toFixed(2)}</strong></td></tr>
                 <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
             </table>
             ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
@@ -754,9 +753,9 @@
         }
     });
 
-    // ==================== Generate CSV ====================
+    // ==================== Generate CSV (no multiplier row) ====================
     document.getElementById('generateCSVBtn').addEventListener('click', () => {
-        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
         if (items.length === 0) {
             alert('Add at least one item.');
             return;
@@ -771,7 +770,6 @@
         rows.push(['Total Discount', '', '', totalDisc]);
         rows.push(['Total VAT', '', '', totalVAT]);
         rows.push(['Total WHT', '', '', totalWHT]);
-        rows.push(['Transport Multiplier', '', '', multiplier]);
         rows.push(['Grand Total', '', '', grandTotal]);
 
         const csvContent = rows.map(row => row.join(',')).join('\n');
@@ -845,7 +843,7 @@
     refreshBtn.addEventListener('click', loadInvoices);
     searchInvoices.addEventListener('input', loadInvoices);
 
-    // ==================== View Invoice ====================
+    // ==================== View Invoice (no multiplier) ====================
     window.viewInvoice = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
@@ -870,7 +868,6 @@
                 });
             }
             const total = d.total || grandTotal;
-            const multiplier = d.transportMultiplier || 1.00;
             const html = `
                 <div style="font-family:sans-serif; padding:16px;">
                     <h2>NEVAMAK Enterprises</h2>
@@ -887,7 +884,6 @@
                         <tr><td colspan="3"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
                         <tr><td colspan="3"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
                         <tr><td colspan="3"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="3"><strong>Transport Multiplier</strong></td><td><strong>${multiplier.toFixed(2)}</strong></td></tr>
                         <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
@@ -927,7 +923,6 @@
                 });
             }
             const total = d.total || grandTotal;
-            const multiplier = d.transportMultiplier || 1.00;
             const html = `
                 <div id="pdfContent" style="padding:20px; font-family:sans-serif;">
                     <h2>NEVAMAK Enterprises</h2>
@@ -944,7 +939,6 @@
                         <tr><td colspan="3"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
                         <tr><td colspan="3"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
                         <tr><td colspan="3"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="3"><strong>Transport Multiplier</strong></td><td><strong>${multiplier.toFixed(2)}</strong></td></tr>
                         <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
@@ -996,7 +990,6 @@
             rows.push(['Total Discount', '', '', totalDisc]);
             rows.push(['Total VAT', '', '', totalVAT]);
             rows.push(['Total WHT', '', '', totalWHT]);
-            rows.push(['Transport Multiplier', '', '', d.transportMultiplier || 1.00]);
             rows.push(['Grand Total', '', '', d.total || grandTotal]);
 
             const csvContent = rows.map(row => row.join(',')).join('\n');
@@ -1210,7 +1203,7 @@
     });
 
     // ==================== Initialize ====================
-    console.log('NEVAMAK Invoice Repository loaded with transport multiplier.');
+    console.log('NEVAMAK Invoice Repository loaded with transport multiplier hidden from invoice.');
 </script>
 </body>
 </html>
