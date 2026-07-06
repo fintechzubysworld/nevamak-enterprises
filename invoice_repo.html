@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Invoice Repository</title>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
-    <!-- Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -29,7 +27,7 @@
         .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         h2 { font-size: 1.3rem; margin-top: 0; color: #0a3d62; }
         h3 { font-size: 1.1rem; color: #2c3e50; margin: 12px 0 8px; }
-        input, select, textarea { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; margin: 4px 0; }
+        input, select, textarea { padding: 10px; border-radius: 40px; border: 1px solid #ccc; font-size: 1rem; margin: 4px 0; }
         button { padding: 10px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 4px 0; }
         .btn-primary { background: #0a3d62; color: white; }
         .btn-success { background: #27ae60; color: white; }
@@ -37,9 +35,10 @@
         .btn-warning { background: #f39c12; color: white; }
         .btn-info { background: #3498db; color: white; }
         .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
-        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center; }
-        .item-row input { flex: 1; margin: 0; }
-        .removeItem { background: #e74c3c; color: white; width: auto; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; padding: 8px; background: #f8f9fa; border-radius: 16px; border-left: 3px solid #0a3d62; }
+        .item-row select, .item-row input { flex: 1; margin: 0; min-width: 70px; }
+        .item-row .item-checkbox { flex: 0 0 30px; }
+        .item-row .removeItem { background: #e74c3c; color: white; width: auto; padding: 8px 12px; border-radius: 40px; border: none; cursor: pointer; }
         .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; word-wrap: break-word; }
         .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .flex-row > * { flex: 1; }
@@ -57,7 +56,12 @@
         .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; }
         .moved-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
         .search-hint { font-size: 0.8rem; color: #888; margin-left: 8px; }
-        @media (max-width: 500px) { .flex-row { flex-direction: column; } .item-row { flex-direction: column; } .item-row input { width: 100%; } }
+        .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+        .bulk-actions button { width: auto; padding: 6px 16px; }
+        .tax-total { font-size: 0.85rem; color: #555; text-align: center; padding: 4px; }
+        .item-tax-fields { display: flex; gap: 6px; flex-wrap: wrap; flex: 2; }
+        .item-tax-fields input { flex: 1; min-width: 60px; }
+        @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } }
     </style>
 </head>
 <body>
@@ -101,21 +105,22 @@
                     <input type="text" id="invoiceNotes" placeholder="Notes (optional)">
                 </div>
                 <label>Items:</label>
-                <div id="invoiceItemsContainer">
-                    <div class="item-row">
-                        <input type="text" placeholder="Item name" class="itemName">
-                        <input type="number" placeholder="Qty" class="itemQty" value="1">
-                        <input type="number" placeholder="Price/unit" class="itemPrice" value="0">
-                        <button type="button" class="removeItem">✖</button>
-                    </div>
-                </div>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <div id="invoiceItemsContainer"></div>
+
+                <!-- Bulk Actions -->
+                <div class="bulk-actions">
                     <button type="button" id="addItemBtn" class="btn-success">+ Add Product</button>
                     <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
                     <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv,.json" style="display:none;">
+                    <button type="button" id="applyToSelectedBtn" class="btn-warning">📋 Apply to Selected</button>
+                    <button type="button" id="applyToAllBtn" class="btn-primary">📋 Apply to All</button>
+                    <button type="button" id="clearTaxesBtn" class="btn-danger">🧹 Clear Taxes</button>
                 </div>
+
                 <div id="importPreviewContainer" class="import-preview" style="display:none;"></div>
                 <div class="cost-summary" id="invoiceCostPreview">Total: ₦0</div>
+                <div id="taxBreakdown" class="tax-total"></div>
+
                 <div style="display:flex; gap:12px; flex-wrap:wrap;">
                     <button type="submit" class="btn-primary" style="flex:2;">💾 Save Invoice</button>
                     <button type="button" id="previewInvoiceBtn" class="btn-warning" style="flex:1;">👁️ Preview</button>
@@ -178,6 +183,28 @@
             <button onclick="closeModal('moveWarehouseModal')" class="btn-danger" style="flex:1;">Cancel</button>
         </div>
         <div id="moveMessage" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
+<!-- Bulk Apply Modal -->
+<div id="bulkApplyModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('bulkApplyModal')">&times;</span>
+        <h3>📋 Bulk Apply to Selected Items</h3>
+        <p><span id="bulkItemCount">0</span> items selected.</p>
+        <div class="flex-row">
+            <input type="number" id="bulkDiscountPct" placeholder="Discount %" value="0" step="0.01" min="0">
+            <input type="number" id="bulkDiscountAmt" placeholder="Discount Amount (₦)" value="0" step="0.01" min="0">
+        </div>
+        <div class="flex-row">
+            <input type="number" id="bulkVAT" placeholder="VAT %" value="0" step="0.01" min="0">
+            <input type="number" id="bulkWHT" placeholder="WHT %" value="0" step="0.01" min="0">
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px;">
+            <button id="bulkApplyConfirm" class="btn-success" style="flex:1;">✅ Apply</button>
+            <button onclick="closeModal('bulkApplyModal')" class="btn-danger" style="flex:1;">Cancel</button>
+        </div>
+        <div id="bulkMessage" style="color:red; margin-top:8px;"></div>
     </div>
 </div>
 
@@ -249,18 +276,29 @@
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
             });
         });
+        // Initialize with one row
+        addItemRow();
+        updateCostPreview();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
-    // ==================== Items Management ====================
-    function addItemRow(itemName = '', qty = 1, price = 0) {
+    // ==================== Items Management with Tax Fields ====================
+    function addItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
+        const rowCount = document.querySelectorAll('.item-row').length;
         const div = document.createElement('div');
         div.className = 'item-row';
         div.innerHTML = `
-            <input type="text" placeholder="Item name" class="itemName" value="${itemName}">
-            <input type="number" placeholder="Qty" class="itemQty" value="${qty}">
-            <input type="number" placeholder="Price/unit" class="itemPrice" value="${price}">
+            <input type="checkbox" class="item-checkbox" data-row="${rowCount}" style="width:auto; margin:0 4px;">
+            <input type="text" placeholder="Item name" class="itemName" value="${itemName}" style="flex:2;">
+            <input type="number" placeholder="Qty" class="itemQty" value="${qty}" style="flex:0.8;">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${price}" style="flex:1;">
+            <div class="item-tax-fields">
+                <input type="number" placeholder="Disc %" class="itemDiscPct" value="${discPct}" step="0.01" min="0">
+                <input type="number" placeholder="Disc ₦" class="itemDiscAmt" value="${discAmt}" step="0.01" min="0">
+                <input type="number" placeholder="VAT %" class="itemVAT" value="${vatPct}" step="0.01" min="0">
+                <input type="number" placeholder="WHT %" class="itemWHT" value="${whtPct}" step="0.01" min="0">
+            </div>
             <button type="button" class="removeItem">✖</button>
         `;
         invoiceItemsContainer.appendChild(div);
@@ -268,23 +306,127 @@
             div.remove();
             updateCostPreview();
         };
+        // Update preview on any input change
+        div.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('input', updateCostPreview);
+        });
         updateCostPreview();
     }
 
-    addItemBtn.addEventListener('click', () => addItemRow());
-
+    // ==================== Update Cost Preview with Per‑Item Taxes ====================
     function updateCostPreview() {
-        let total = 0;
-        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
-            const qty = parseInt(row.querySelector('.itemQty')?.value || 0);
-            const price = parseFloat(row.querySelector('.itemPrice')?.value || 0);
-            total += qty * price;
-        });
-        document.getElementById('invoiceCostPreview').innerHTML = `Total: ₦${total.toLocaleString()}`;
-    }
-    invoiceItemsContainer.addEventListener('input', updateCostPreview);
+        let subtotal = 0;
+        let totalDiscount = 0;
+        let totalVAT = 0;
+        let totalWHT = 0;
+        let grandTotal = 0;
 
-    // ==================== Import Excel (Robust) ====================
+        document.querySelectorAll('.item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = parseFloat(row.querySelector('.itemQty').value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            const discPct = parseFloat(row.querySelector('.itemDiscPct').value) || 0;
+            const discAmt = parseFloat(row.querySelector('.itemDiscAmt').value) || 0;
+            const vatPct = parseFloat(row.querySelector('.itemVAT').value) || 0;
+            const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
+
+            if (name && qty > 0) {
+                const itemSub = qty * price;
+                subtotal += itemSub;
+                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
+                totalDiscount += itemDisc;
+                const afterDisc = itemSub - itemDisc;
+                const itemVAT = afterDisc * (vatPct / 100);
+                const itemWHT = afterDisc * (whtPct / 100);
+                totalVAT += itemVAT;
+                totalWHT += itemWHT;
+                grandTotal += afterDisc + itemVAT - itemWHT;
+            }
+        });
+
+        document.getElementById('invoiceCostPreview').innerHTML = `Total: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('taxBreakdown').innerHTML = `
+            Subtotal: ₦${subtotal.toLocaleString()} | 
+            Discount: ₦${totalDiscount.toLocaleString()} | 
+            VAT: ₦${totalVAT.toLocaleString()} | 
+            WHT: ₦${totalWHT.toLocaleString()} | 
+            <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
+        `;
+    }
+
+    // ==================== Bulk Apply to Selected ====================
+    document.getElementById('applyToSelectedBtn').addEventListener('click', () => {
+        const selected = document.querySelectorAll('.item-checkbox:checked');
+        if (selected.length === 0) {
+            alert('Please select at least one item.');
+            return;
+        }
+        document.getElementById('bulkItemCount').innerText = selected.length;
+        document.getElementById('bulkDiscountPct').value = '0';
+        document.getElementById('bulkDiscountAmt').value = '0';
+        document.getElementById('bulkVAT').value = '0';
+        document.getElementById('bulkWHT').value = '0';
+        document.getElementById('bulkMessage').innerText = '';
+        document.getElementById('bulkApplyModal').style.display = 'flex';
+        // Store selected indices for later
+        document.getElementById('bulkApplyModal').dataset.selected = JSON.stringify(
+            Array.from(selected).map(cb => cb.dataset.row)
+        );
+    });
+
+    document.getElementById('bulkApplyConfirm').addEventListener('click', () => {
+        const selectedIndices = JSON.parse(document.getElementById('bulkApplyModal').dataset.selected || '[]');
+        const discPct = parseFloat(document.getElementById('bulkDiscountPct').value) || 0;
+        const discAmt = parseFloat(document.getElementById('bulkDiscountAmt').value) || 0;
+        const vat = parseFloat(document.getElementById('bulkVAT').value) || 0;
+        const wht = parseFloat(document.getElementById('bulkWHT').value) || 0;
+
+        const rows = document.querySelectorAll('.item-row');
+        selectedIndices.forEach(idx => {
+            const row = rows[idx];
+            if (row) {
+                row.querySelector('.itemDiscPct').value = discPct;
+                row.querySelector('.itemDiscAmt').value = discAmt;
+                row.querySelector('.itemVAT').value = vat;
+                row.querySelector('.itemWHT').value = wht;
+            }
+        });
+        closeModal('bulkApplyModal');
+        updateCostPreview();
+        alert('✅ Applied to ' + selectedIndices.length + ' items.');
+    });
+
+    // ==================== Apply to All ====================
+    document.getElementById('applyToAllBtn').addEventListener('click', () => {
+        const rows = document.querySelectorAll('.item-row');
+        if (rows.length === 0) { alert('No items to apply to.'); return; }
+        const discPct = prompt('Enter Discount % for all items:') || '0';
+        const discAmt = prompt('Enter Discount Amount (₦) for all items:') || '0';
+        const vat = prompt('Enter VAT % for all items:') || '0';
+        const wht = prompt('Enter WHT % for all items:') || '0';
+        rows.forEach(row => {
+            row.querySelector('.itemDiscPct').value = parseFloat(discPct) || 0;
+            row.querySelector('.itemDiscAmt').value = parseFloat(discAmt) || 0;
+            row.querySelector('.itemVAT').value = parseFloat(vat) || 0;
+            row.querySelector('.itemWHT').value = parseFloat(wht) || 0;
+        });
+        updateCostPreview();
+        alert('✅ Applied to all items.');
+    });
+
+    // ==================== Clear Taxes ====================
+    document.getElementById('clearTaxesBtn').addEventListener('click', () => {
+        if (!confirm('Clear all tax/discount fields on all items?')) return;
+        document.querySelectorAll('.item-row').forEach(row => {
+            row.querySelector('.itemDiscPct').value = '0';
+            row.querySelector('.itemDiscAmt').value = '0';
+            row.querySelector('.itemVAT').value = '0';
+            row.querySelector('.itemWHT').value = '0';
+        });
+        updateCostPreview();
+    });
+
+    // ==================== Import Excel ====================
     importExcelBtn.addEventListener('click', () => excelFileInput.click());
 
     excelFileInput.addEventListener('change', function(e) {
@@ -300,20 +442,14 @@
                 const data = new Uint8Array(loadEvent.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-
-                // First, try to read with headers
                 let json = XLSX.utils.sheet_to_json(firstSheet);
                 let headers = Object.keys(json[0] || {});
 
-                // Check if headers look like data (not column names)
                 const looksLikeData = (headers) => {
-                    // If any header is empty or looks like numeric, treat as data
                     if (headers.length === 0) return true;
-                    // If any header contains only digits, it's likely data
                     for (const h of headers) {
                         if (h.trim() === '' || /^\d+$/.test(h.trim())) return true;
                     }
-                    // If the first header is not a common column name, we might be in trouble
                     const commonCols = ['item', 'product', 'name', 'description', 'quantity', 'qty', 'price', 'unit price', 'total'];
                     let matchCount = 0;
                     for (const h of headers) {
@@ -322,27 +458,16 @@
                             if (hLower.includes(c)) matchCount++;
                         }
                     }
-                    // If at least 2 common names match, assume headers; otherwise treat as data
                     return matchCount < 2;
                 };
 
                 let rows = [];
                 if (looksLikeData(headers)) {
-                    // Read without headers
                     const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                    if (rawRows.length === 0) {
-                        formMessage.innerText = '⚠️ The Excel file is empty.';
-                        return;
-                    }
-                    // Map columns: col0 = item, col1 = quantity, col2 = price
-                    // Also handle CSV with headers but we forced no headers
+                    if (rawRows.length === 0) { formMessage.innerText = '⚠️ The Excel file is empty.'; return; }
                     rows = rawRows.map(row => {
-                        // Normalize numbers: remove commas
                         const clean = (val) => {
-                            if (typeof val === 'string') {
-                                // Remove commas and spaces
-                                return val.replace(/,/g, '').trim();
-                            }
+                            if (typeof val === 'string') return val.replace(/,/g, '').trim();
                             return val;
                         };
                         const name = String(row[0] || '').trim();
@@ -351,7 +476,6 @@
                         return { itemName: name, quantity: qty, unitPrice: price };
                     }).filter(it => it.itemName && it.quantity > 0);
                 } else {
-                    // Normal header detection
                     const findColumn = (variations) => {
                         for (const h of headers) {
                             const hLower = h.toLowerCase().trim();
@@ -372,16 +496,13 @@
                     const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'description of goods', 'goods', 'name', 'particulars', 'details']);
                     const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered']);
                     const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit']);
-
                     if (!itemCol || !qtyCol || !priceCol) {
                         formMessage.innerText = `⚠️ Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`;
                         return;
                     }
                     rows = json.map(row => {
                         const clean = (val) => {
-                            if (typeof val === 'string') {
-                                return val.replace(/,/g, '').trim();
-                            }
+                            if (typeof val === 'string') return val.replace(/,/g, '').trim();
                             return val;
                         };
                         const name = String(row[itemCol] || '').trim();
@@ -421,6 +542,7 @@
 
     window.applyImportedItems = function() {
         if (importedItems.length === 0) return;
+        // Remove all rows except maybe clear all and add new
         invoiceItemsContainer.innerHTML = '';
         importedItems.forEach(it => {
             addItemRow(it.itemName, it.quantity, it.unitPrice);
@@ -455,18 +577,45 @@
         const notes = document.getElementById('invoiceNotes').value.trim() || '';
         const branch = document.getElementById('invoiceBranch').value;
         let itemsHtml = '';
-        let total = 0;
-        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
+
+        document.querySelectorAll('.item-row').forEach(row => {
             const name = row.querySelector('.itemName').value.trim();
-            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const qty = parseFloat(row.querySelector('.itemQty').value) || 0;
             const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            const discPct = parseFloat(row.querySelector('.itemDiscPct').value) || 0;
+            const discAmt = parseFloat(row.querySelector('.itemDiscAmt').value) || 0;
+            const vatPct = parseFloat(row.querySelector('.itemVAT').value) || 0;
+            const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
+
             if (name && qty > 0) {
-                const subtotal = qty * price;
-                total += subtotal;
-                itemsHtml += `<tr><td>${name}</td><td>${qty}</td><td>₦${price.toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+                const itemSub = qty * price;
+                subtotal += itemSub;
+                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
+                totalDisc += itemDisc;
+                const afterDisc = itemSub - itemDisc;
+                const itemVAT = afterDisc * (vatPct / 100);
+                const itemWHT = afterDisc * (whtPct / 100);
+                totalVAT += itemVAT;
+                totalWHT += itemWHT;
+                const itemTotal = afterDisc + itemVAT - itemWHT;
+                grandTotal += itemTotal;
+                itemsHtml += `<tr>
+                    <td>${name}</td>
+                    <td>${qty}</td>
+                    <td>₦${price.toFixed(2)}</td>
+                    <td>₦${itemSub.toFixed(2)}</td>
+                    <td>${discPct}% + ₦${discAmt.toFixed(2)}</td>
+                    <td>₦${itemDisc.toFixed(2)}</td>
+                    <td>${vatPct}%</td>
+                    <td>${whtPct}%</td>
+                    <td>₦${itemTotal.toFixed(2)}</td>
+                </tr>`;
             }
         });
+
         if (!itemsHtml) return '<p style="color:red;">Add at least one item.</p>';
+
         const html = `
             <h2>NEVAMAK Enterprises</h2>
             <h3>Invoice</h3>
@@ -475,10 +624,24 @@
             <p><strong>Customer:</strong> ${customer}</p>
             <p><strong>Branch:</strong> ${branch}</p>
             ${email !== 'N/A' ? `<p><strong>Email:</strong> ${email}</p>` : ''}
-            <table>
-                <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+            <table style="width:100%; border-collapse:collapse;">
+                <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Subtotal</th>
+                    <th>Discount</th>
+                    <th>Disc Amount</th>
+                    <th>VAT %</th>
+                    <th>WHT %</th>
+                    <th>Total</th>
+                </tr>
                 ${itemsHtml}
-                <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="4"><strong>Subtotal</strong></td><td colspan="4"></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="4"><strong>Total Discount</strong></td><td colspan="4"></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="4"><strong>Total VAT</strong></td><td colspan="4"></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="4"><strong>Total WHT</strong></td><td colspan="4"></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                <tr><td colspan="4"><strong>Grand Total</strong></td><td colspan="4"></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
             </table>
             ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
             <p><em>Generated by ${currentUserEmail}</em></p>
@@ -486,7 +649,7 @@
         return html;
     }
 
-    // ==================== Save Invoice (with confirmation) ====================
+    // ==================== Save Invoice ====================
     invoiceForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -501,21 +664,51 @@
         const notes = document.getElementById('invoiceNotes').value.trim();
         const branch = document.getElementById('invoiceBranch').value;
         const items = [];
-        let total = 0;
-        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
+
+        document.querySelectorAll('.item-row').forEach(row => {
             const name = row.querySelector('.itemName').value.trim();
-            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const qty = parseFloat(row.querySelector('.itemQty').value) || 0;
             const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            const discPct = parseFloat(row.querySelector('.itemDiscPct').value) || 0;
+            const discAmt = parseFloat(row.querySelector('.itemDiscAmt').value) || 0;
+            const vatPct = parseFloat(row.querySelector('.itemVAT').value) || 0;
+            const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
+
             if (name && qty > 0 && price >= 0) {
-                const subtotal = qty * price;
-                total += subtotal;
-                items.push({ itemName: name, quantity: qty, unitPrice: price, total: subtotal });
+                const itemSub = qty * price;
+                subtotal += itemSub;
+                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
+                totalDisc += itemDisc;
+                const afterDisc = itemSub - itemDisc;
+                const itemVAT = afterDisc * (vatPct / 100);
+                const itemWHT = afterDisc * (whtPct / 100);
+                totalVAT += itemVAT;
+                totalWHT += itemWHT;
+                const itemTotal = afterDisc + itemVAT - itemWHT;
+                grandTotal += itemTotal;
+                items.push({
+                    itemName: name,
+                    quantity: qty,
+                    unitPrice: price,
+                    subtotal: itemSub,
+                    discountPercent: discPct,
+                    discountAmount: discAmt,
+                    discountTotal: itemDisc,
+                    vatPercent: vatPct,
+                    whtPercent: whtPct,
+                    vat: itemVAT,
+                    wht: itemWHT,
+                    total: itemTotal
+                });
             }
         });
+
         if (!items.length) {
             formMessage.innerText = 'Add at least one item.';
             return;
         }
+
         try {
             await db.collection('invoices').add({
                 invoiceNumber: invNum,
@@ -525,7 +718,11 @@
                 notes: notes,
                 branch: branch,
                 items: items,
-                total: total,
+                subtotal: subtotal,
+                totalDiscount: totalDisc,
+                totalVAT: totalVAT,
+                totalWHT: totalWHT,
+                total: grandTotal,
                 movedToWarehouse: false,
                 createdBy: currentUserEmail,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -533,9 +730,6 @@
             });
             formMessage.style.color = 'green';
             formMessage.innerText = '✅ Invoice saved successfully!';
-            document.getElementById('customerName').value = '';
-            document.getElementById('customerEmail').value = '';
-            document.getElementById('invoiceNotes').value = '';
             invoiceItemsContainer.innerHTML = '';
             addItemRow();
             updateCostPreview();
@@ -578,26 +772,42 @@
 
     // ==================== Generate CSV ====================
     document.getElementById('generateCSVBtn').addEventListener('click', () => {
-        const rows = [];
-        let total = 0;
-        document.querySelectorAll('#invoiceItemsContainer .item-row').forEach(row => {
+        const rows = [['Item', 'Quantity', 'Unit Price', 'Subtotal', 'Disc %', 'Disc Amount', 'VAT %', 'WHT %', 'Total']];
+        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
+        document.querySelectorAll('.item-row').forEach(row => {
             const name = row.querySelector('.itemName').value.trim();
-            const qty = parseInt(row.querySelector('.itemQty').value) || 0;
+            const qty = parseFloat(row.querySelector('.itemQty').value) || 0;
             const price = parseFloat(row.querySelector('.itemPrice').value) || 0;
+            const discPct = parseFloat(row.querySelector('.itemDiscPct').value) || 0;
+            const discAmt = parseFloat(row.querySelector('.itemDiscAmt').value) || 0;
+            const vatPct = parseFloat(row.querySelector('.itemVAT').value) || 0;
+            const whtPct = parseFloat(row.querySelector('.itemWHT').value) || 0;
             if (name && qty > 0) {
-                const subtotal = qty * price;
-                total += subtotal;
-                rows.push([name, qty, price, subtotal]);
+                const itemSub = qty * price;
+                subtotal += itemSub;
+                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
+                totalDisc += itemDisc;
+                const afterDisc = itemSub - itemDisc;
+                const itemVAT = afterDisc * (vatPct / 100);
+                const itemWHT = afterDisc * (whtPct / 100);
+                totalVAT += itemVAT;
+                totalWHT += itemWHT;
+                const itemTotal = afterDisc + itemVAT - itemWHT;
+                grandTotal += itemTotal;
+                rows.push([name, qty, price, itemSub, discPct, discAmt, vatPct, whtPct, itemTotal]);
             }
         });
-        if (!rows.length) {
+        if (rows.length === 1) {
             alert('Add at least one item.');
             return;
         }
-        const csvRows = [['Item', 'Quantity', 'Unit Price', 'Total']];
-        rows.forEach(row => csvRows.push(row));
-        csvRows.push(['', '', 'Grand Total', total]);
-        const csvContent = csvRows.map(row => row.join(',')).join('\n');
+        rows.push(['Subtotal', '', '', subtotal, '', '', '', '', '']);
+        rows.push(['Total Discount', '', '', '', '', '', '', '', totalDisc]);
+        rows.push(['Total VAT', '', '', '', '', '', '', '', totalVAT]);
+        rows.push(['Total WHT', '', '', '', '', '', '', '', totalWHT]);
+        rows.push(['Grand Total', '', '', '', '', '', '', '', grandTotal]);
+
+        const csvContent = rows.map(row => row.join(',')).join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -607,7 +817,7 @@
         URL.revokeObjectURL(url);
     });
 
-    // ==================== Load Saved Invoices (with item search) ====================
+    // ==================== Load Saved Invoices ====================
     function loadInvoices() {
         const search = searchInvoices.value.toLowerCase().trim();
         db.collection('invoices')
@@ -623,9 +833,8 @@
                         const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
                         const total = d.total || 0;
                         let match = false;
-                        if (search === '') {
-                            match = true;
-                        } else {
+                        if (search === '') match = true;
+                        else {
                             if (d.invoiceNumber.toLowerCase().includes(search)) match = true;
                             if (!match && d.customer.toLowerCase().includes(search)) match = true;
                             if (!match && d.items && d.items.length > 0) {
@@ -676,14 +885,29 @@
             if (!doc.exists) return alert('Invoice not found.');
             const d = doc.data();
             let itemsHtml = '';
-            let total = 0;
+            let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
-                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
-                    total += subtotal;
-                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+                    const itemSub = it.subtotal || (it.quantity * it.unitPrice);
+                    subtotal += itemSub;
+                    totalDisc += it.discountTotal || 0;
+                    totalVAT += it.vat || 0;
+                    totalWHT += it.wht || 0;
+                    grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
+                    itemsHtml += `<tr>
+                        <td>${it.itemName}</td>
+                        <td>${it.quantity}</td>
+                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                        <td>₦${itemSub.toFixed(2)}</td>
+                        <td>${it.discountPercent||0}% + ₦${(it.discountAmount||0).toFixed(2)}</td>
+                        <td>₦${(it.discountTotal||0).toFixed(2)}</td>
+                        <td>${it.vatPercent||0}%</td>
+                        <td>${it.whtPercent||0}%</td>
+                        <td>₦${(it.total||0).toFixed(2)}</td>
+                    </tr>`;
                 });
             }
+            const total = d.total || grandTotal;
             const html = `
                 <div style="font-family:sans-serif; padding:16px;">
                     <h2>NEVAMAK Enterprises</h2>
@@ -694,9 +918,18 @@
                     <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
                     <table style="width:100%; border-collapse:collapse;">
-                        <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                        <tr>
+                            <th>Item</th><th>Qty</th><th>Unit Price</th>
+                            <th>Subtotal</th><th>Discount</th>
+                            <th>Disc Amount</th><th>VAT %</th>
+                            <th>WHT %</th><th>Total</th>
+                        </tr>
                         ${itemsHtml}
-                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Subtotal</strong></td><td colspan="4"></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Total Discount</strong></td><td colspan="4"></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Total VAT</strong></td><td colspan="4"></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Total WHT</strong></td><td colspan="4"></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Grand Total</strong></td><td colspan="4"></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
                     <p><em>Created by ${d.createdBy}</em></p>
@@ -717,14 +950,29 @@
             if (!doc.exists) return alert('Invoice not found.');
             const d = doc.data();
             let itemsHtml = '';
-            let total = 0;
+            let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
-                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
-                    total += subtotal;
-                    itemsHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${subtotal.toFixed(2)}</td></tr>`;
+                    const itemSub = it.subtotal || (it.quantity * it.unitPrice);
+                    subtotal += itemSub;
+                    totalDisc += it.discountTotal || 0;
+                    totalVAT += it.vat || 0;
+                    totalWHT += it.wht || 0;
+                    grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
+                    itemsHtml += `<tr>
+                        <td>${it.itemName}</td>
+                        <td>${it.quantity}</td>
+                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                        <td>₦${itemSub.toFixed(2)}</td>
+                        <td>${it.discountPercent||0}% + ₦${(it.discountAmount||0).toFixed(2)}</td>
+                        <td>₦${(it.discountTotal||0).toFixed(2)}</td>
+                        <td>${it.vatPercent||0}%</td>
+                        <td>${it.whtPercent||0}%</td>
+                        <td>₦${(it.total||0).toFixed(2)}</td>
+                    </tr>`;
                 });
             }
+            const total = d.total || grandTotal;
             const html = `
                 <div id="pdfContent" style="padding:20px; font-family:sans-serif;">
                     <h2>NEVAMAK Enterprises</h2>
@@ -735,9 +983,18 @@
                     <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     ${d.customerEmail ? `<p><strong>Email:</strong> ${d.customerEmail}</p>` : ''}
                     <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
-                        <tr style="background:#f0f0f0;"><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+                        <tr style="background:#f0f0f0;">
+                            <th>Item</th><th>Qty</th><th>Unit Price</th>
+                            <th>Subtotal</th><th>Discount</th>
+                            <th>Disc Amount</th><th>VAT %</th>
+                            <th>WHT %</th><th>Total</th>
+                        </tr>
                         ${itemsHtml}
-                        <tr><td colspan="3"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Subtotal</strong></td><td colspan="4"></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Total Discount</strong></td><td colspan="4"></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Total VAT</strong></td><td colspan="4"></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Total WHT</strong></td><td colspan="4"></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="4"><strong>Grand Total</strong></td><td colspan="4"></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
                     <p><em>Created by ${d.createdBy}</em></p>
@@ -766,16 +1023,35 @@
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) return alert('Invoice not found.');
             const d = doc.data();
-            const rows = [['Item', 'Quantity', 'Unit Price', 'Total']];
-            let total = 0;
+            const rows = [['Item', 'Quantity', 'Unit Price', 'Subtotal', 'Disc %', 'Disc Amount', 'VAT %', 'WHT %', 'Total']];
+            let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
-                    const subtotal = (it.quantity || 0) * (it.unitPrice || 0);
-                    total += subtotal;
-                    rows.push([it.itemName, it.quantity, it.unitPrice, subtotal]);
+                    const itemSub = it.subtotal || (it.quantity * it.unitPrice);
+                    subtotal += itemSub;
+                    totalDisc += it.discountTotal || 0;
+                    totalVAT += it.vat || 0;
+                    totalWHT += it.wht || 0;
+                    grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
+                    rows.push([
+                        it.itemName,
+                        it.quantity,
+                        it.unitPrice,
+                        itemSub,
+                        it.discountPercent || 0,
+                        it.discountAmount || 0,
+                        it.vatPercent || 0,
+                        it.whtPercent || 0,
+                        it.total || 0
+                    ]);
                 });
             }
-            rows.push(['', '', 'Grand Total', total]);
+            rows.push(['Subtotal', '', '', subtotal, '', '', '', '', '']);
+            rows.push(['Total Discount', '', '', '', '', '', '', '', totalDisc]);
+            rows.push(['Total VAT', '', '', '', '', '', '', '', totalVAT]);
+            rows.push(['Total WHT', '', '', '', '', '', '', '', totalWHT]);
+            rows.push(['Grand Total', '', '', '', '', '', '', '', d.total || grandTotal]);
+
             const csvContent = rows.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
@@ -820,6 +1096,7 @@
         document.getElementById(id).style.display = 'none';
         document.getElementById('sendMessage').innerText = '';
         document.getElementById('moveMessage').innerText = '';
+        document.getElementById('bulkMessage').innerText = '';
     }
     window.closeModal = closeModal;
     window.onclick = function(event) {
@@ -827,6 +1104,7 @@
             event.target.style.display = 'none';
             document.getElementById('sendMessage').innerText = '';
             document.getElementById('moveMessage').innerText = '';
+            document.getElementById('bulkMessage').innerText = '';
         }
     };
 
@@ -985,8 +1263,7 @@
     });
 
     // ==================== Initialize ====================
-    addItemRow();
-    console.log('NEVAMAK Invoice Repository loaded with improved Excel import.');
+    console.log('NEVAMAK Invoice Repository loaded with per‑item and group tax features.');
 </script>
 </body>
 </html>
