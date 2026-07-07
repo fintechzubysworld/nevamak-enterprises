@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – External Vendor</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f4f7fc; margin: 0; padding: 12px; }
+        .container { max-width: 1000px; margin: auto; }
+        .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
+        input, select, textarea { width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
+        button { padding: 12px 20px; border-radius: 48px; border: none; font-weight: bold; cursor: pointer; margin: 6px 0; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
+        .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
+        .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+        .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; padding: 8px; background: #f8f9fa; border-radius: 16px; border-left: 3px solid #0a3d62; }
+        .item-row input { flex: 1; margin: 0; min-width: 60px; }
+        .item-row .item-checkbox { flex: 0 0 30px; }
+        .removeItem { background: #e74c3c; color: white; width: auto; padding: 8px 14px; border-radius: 40px; border: none; cursor: pointer; }
+        .item-tax-fields { display: flex; flex-wrap: wrap; gap: 4px; flex: 2; }
+        .item-tax-fields input { flex: 1; min-width: 50px; }
+        .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; }
+        .cost-breakdown { font-size: 0.9rem; color: #555; text-align: center; }
+        .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .flex-row > * { flex: 1; }
+        .scroll { overflow-x: auto; }
+        .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; display: none; }
+        .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+        .bulk-actions button { width: auto; padding: 6px 16px; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 800px; width: 95%; max-height: 80vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.5rem; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.85rem; word-wrap: break-word; overflow-wrap: break-word; max-width: 150px; }
+        th { background: #f8f9fa; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; display: inline-block; white-space: nowrap; }
+        .status-draft { background: #dfe6e9; color: #2d3436; }
+        .status-submitted { background: #ffeaa7; color: #b85c00; }
+        .status-received { background: #d4edda; color: #155724; }
+        .status-rejected { background: #f8d7da; color: #721c24; }
+        .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .cost-cell { font-family: monospace; font-weight: bold; white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
+        .items-cell { word-wrap: break-word; overflow-wrap: break-word; max-width: 120px; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .btn-loading { opacity: 0.7; pointer-events: none; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 40px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s ease; font-size: 0.95rem; max-width: 90%; text-align: center; }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
+        .tab-btn { background: #ccc; color: #333; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; }
+        .tab-btn.active { background: #0a3d62; color: white; }
+        .tab-content { display: none; background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .tab-content.active { display: block; }
+        @media (max-width: 600px) {
+            .flex-row { flex-direction: column; }
+            .item-row { flex-direction: column; align-items: stretch; }
+            .item-tax-fields { flex-direction: column; }
+            .item-row input { width: 100%; }
+            td, th { font-size: 0.75rem; padding: 6px 4px; }
+            .items-cell { max-width: 80px; }
+            .cost-cell { max-width: 70px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Nav – only logout, no dashboard -->
+    <div class="nav">
+        <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="create">✏️ Create Invoice</button>
+        <button class="tab-btn" data-tab="saved">📋 Saved Invoices</button>
+        <button class="tab-btn" data-tab="password">🔑 Change Password</button>
+    </div>
+
+    <!-- Create Invoice Tab -->
+    <div id="tab-create" class="tab-content active">
+        <div class="card">
+            <h2>New Dispatch / Invoice</h2>
+            <form id="invoiceForm">
+                <div class="flex-row">
+                    <input type="text" id="vendorName" placeholder="Vendor Name" readonly>
+                    <input type="date" id="invoiceDate" required>
+                </div>
+                <div class="flex-row">
+                    <select id="destBranch" required>
+                        <option value="Abuja">Abuja</option>
+                        <option value="Portharcourt">Port Harcourt</option>
+                        <option value="Lagos">Lagos</option>
+                    </select>
+                    <input type="text" id="invoiceNumber" placeholder="Invoice # (auto)" readonly>
+                </div>
+                <input type="text" id="referenceNo" placeholder="Reference / PO # (optional)">
+                <label>Items:</label>
+                <div id="itemsContainer"></div>
+
+                <!-- Bulk Actions -->
+                <div class="bulk-actions">
+                    <button type="button" id="addItemBtn" class="btn-success">+ Add Product</button>
+                    <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                    <button type="button" id="applyToSelectedBtn" class="btn-warning">📋 Apply to Selected</button>
+                    <button type="button" id="applyToAllBtn" class="btn-primary">📋 Apply to All</button>
+                    <button type="button" id="clearTaxesBtn" class="btn-danger">🧹 Clear Taxes</button>
+                </div>
+
+                <div id="importPreviewContainer" class="import-preview"></div>
+                <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
+                <div id="taxBreakdown" class="cost-breakdown"></div>
+                <textarea id="notes" placeholder="Additional notes"></textarea>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <button type="submit" id="dispatchBtn" class="btn-primary" style="flex:2;">🚛 Dispatch (Submit)</button>
+                    <button type="button" id="saveDraftBtn" class="btn-warning" style="flex:1;">💾 Save Draft</button>
+                </div>
+                <div id="formMessage" style="color:red; margin-top:8px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Saved Invoices Tab -->
+    <div id="tab-saved" class="tab-content">
+        <div class="card">
+            <h2>My Invoices / Dispatches</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <input type="text" id="searchInvoices" placeholder="🔍 Search by #, customer, or item..." style="flex:1;">
+                <select id="filterStatus" style="width:auto; flex:0;">
+                    <option value="all">All Status</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Submitted">Submitted</option>
+                    <option value="Received">Received</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+                <button id="refreshInvoicesBtn" class="btn-primary">🔄 Refresh</button>
+            </div>
+            <div class="scroll" id="invoicesList">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Change Password Tab -->
+    <div id="tab-password" class="tab-content">
+        <div class="card">
+            <h2>Change Password</h2>
+            <form id="passwordForm">
+                <input type="password" id="currentPassword" placeholder="Current Password" required>
+                <input type="password" id="newPassword" placeholder="New Password" required minlength="6">
+                <input type="password" id="confirmPassword" placeholder="Confirm New Password" required>
+                <button type="submit" class="btn-primary">Update Password</button>
+                <div id="passwordMessage" style="color:red; margin-top:8px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Apply Modal -->
+    <div id="bulkApplyModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('bulkApplyModal')">&times;</span>
+            <h3>📋 Bulk Apply to Selected Items</h3>
+            <p><span id="bulkItemCount">0</span> items selected.</p>
+            <div class="flex-row">
+                <input type="number" id="bulkDiscountPct" placeholder="Discount %" value="0" step="0.01" min="0" max="100">
+                <input type="number" id="bulkDiscountAmt" placeholder="Discount Amount (₦)" value="0" step="0.01" min="0">
+            </div>
+            <div class="flex-row">
+                <input type="number" id="bulkVAT" placeholder="VAT %" value="0" step="0.01" min="0" max="100">
+                <input type="number" id="bulkWHT" placeholder="WHT %" value="0" step="0.01" min="0" max="100">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="bulkApplyConfirm" class="btn-success" style="flex:1;">✅ Apply</button>
+                <button onclick="closeModal('bulkApplyModal')" class="btn-danger" style="flex:1;">Cancel</button>
+            </div>
+            <div id="bulkMessage" style="color:red; margin-top:8px;"></div>
+        </div>
+    </div>
+
+    <!-- View Invoice Modal -->
+    <div id="viewInvoiceModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('viewInvoiceModal')">&times;</span>
+            <h2>📄 Invoice Details</h2>
+            <div id="viewInvoiceContent"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let currentUserRole = '';
+    let currentUserEmail = '';
+    let vendorName = '';
+    let invoicesUnsubscribe = null;
+
+    // ==================== Helpers ====================
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+    }
+
+    function showToast(message, type = 'info', duration = 3000) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type;
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => {
+            toast.classList.remove('show');
+        }, duration);
+    }
+
+    function setButtonLoading(btn, loading) {
+        if (!btn) return;
+        if (loading) {
+            btn._originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-spinner"></span> Processing...';
+            btn.classList.add('btn-loading');
+            btn.disabled = true;
+        } else {
+            if (btn._originalText) btn.innerHTML = btn._originalText;
+            btn.classList.remove('btn-loading');
+            btn.disabled = false;
+        }
+    }
+
+    function validateNumber(val, min = 0, max = Infinity) {
+        const num = parseFloat(val);
+        if (isNaN(num) || num < min || num > max) return null;
+        return num;
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    window.closeModal = closeModal;
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
+
+    // ==================== Auth ====================
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserEmail = user.email;
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+            currentUserRole = userDoc.data().role || '';
+            vendorName = userDoc.data().vendorName || user.email.split('@')[0];
+            if (currentUserRole !== 'vendor' && currentUserRole !== 'external_vendor') {
+                showToast('Access denied. You are not a vendor.', 'error');
+                // Optionally redirect to login
+                // window.location.href = 'login.html';
+                // return;
+            }
+            document.getElementById('vendorName').value = vendorName;
+        } else {
+            // No profile found, use email as name
+            vendorName = user.email.split('@')[0];
+            document.getElementById('vendorName').value = vendorName;
+        }
+        document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+        document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+        // Initialize items
+        itemsContainer.innerHTML = '';
+        addItemRow();
+        updatePreview();
+
+        loadInvoices();
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+            });
+        });
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    // ==================== Items Management ====================
+    const itemsContainer = document.getElementById("itemsContainer");
+
+    function addItemRow(itemName = '', qty = 1, price = 0, discPct = '', discAmt = '', vatPct = '', whtPct = '') {
+        const rowId = Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.dataset.rowId = rowId;
+        div.innerHTML = `
+            <input type="checkbox" class="item-checkbox" data-row-id="${rowId}" style="width:auto; margin:0 4px;">
+            <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:1.5;">
+            <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" min="0" step="1" style="flex:0.8;">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${Math.max(0, price)}" min="0" step="0.01" style="flex:1;">
+            <div class="item-tax-fields">
+                <input type="number" placeholder="Disc %" class="itemDiscPct" value="${discPct}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="Disc ₦" class="itemDiscAmt" value="${discAmt}" step="0.01" min="0">
+                <input type="number" placeholder="VAT %" class="itemVAT" value="${vatPct}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="WHT %" class="itemWHT" value="${whtPct}" step="0.01" min="0" max="100">
+            </div>
+            <button type="button" class="removeItem">✖</button>
+        `;
+        itemsContainer.appendChild(div);
+        div.querySelector('.removeItem').onclick = () => {
+            if (itemsContainer.querySelectorAll('.item-row').length <= 1) {
+                showToast('Cannot remove the last item row', 'error');
+                return;
+            }
+            div.remove();
+            updatePreview();
+        };
+        div.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('input', updatePreview);
+            if (inp.type === 'number' && inp.min) {
+                inp.addEventListener('blur', function() {
+                    const min = parseFloat(this.min);
+                    if (!isNaN(min) && parseFloat(this.value) < min) {
+                        this.value = min;
+                        updatePreview();
+                    }
+                });
+            }
+        });
+        updatePreview();
+    }
+
+    document.getElementById("addItemBtn").addEventListener("click", () => {
+        addItemRow();
+    });
+
+    // ==================== Calculations (no transport multiplier) ====================
+    function calculateTotals(containerId) {
+        const items = [];
+        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
+
+        document.querySelectorAll(`#${containerId} .item-row`).forEach(row => {
+            const name = row.querySelector('.itemName')?.value.trim() || '';
+            const qty = validateNumber(row.querySelector('.itemQty')?.value, 0) || 0;
+            const price = validateNumber(row.querySelector('.itemPrice')?.value, 0) || 0;
+            const discPct = validateNumber(row.querySelector('.itemDiscPct')?.value, 0, 100) || 0;
+            const discAmt = validateNumber(row.querySelector('.itemDiscAmt')?.value, 0) || 0;
+            const vatPct = validateNumber(row.querySelector('.itemVAT')?.value, 0, 100) || 0;
+            const whtPct = validateNumber(row.querySelector('.itemWHT')?.value, 0, 100) || 0;
+
+            if (name && qty > 0 && price >= 0) {
+                const itemSub = qty * price;
+                subtotal += itemSub;
+                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
+                totalDisc += itemDisc;
+                const afterDisc = itemSub - itemDisc;
+                const itemVAT = afterDisc * (vatPct / 100);
+                const itemWHT = afterDisc * (whtPct / 100);
+                totalVAT += itemVAT;
+                totalWHT += itemWHT;
+                const itemTotal = afterDisc + itemVAT - itemWHT;
+                grandTotal += itemTotal;
+                items.push({
+                    itemName: name,
+                    orderedQty: qty,
+                    unitPrice: price,
+                    subtotal: itemSub,
+                    discountPercent: discPct,
+                    discountAmount: discAmt,
+                    discountTotal: itemDisc,
+                    vatPercent: vatPct,
+                    whtPercent: whtPct,
+                    vat: itemVAT,
+                    wht: itemWHT,
+                    total: itemTotal
+                });
+            }
+        });
+        return { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal };
+    }
+
+    function updatePreview() {
+        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('itemsContainer');
+        document.getElementById('costPreview').innerHTML = `Total goods value: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('taxBreakdown').innerHTML = `
+            Subtotal: ₦${subtotal.toLocaleString()} |
+            Discount: ₦${totalDisc.toLocaleString()} |
+            VAT: ₦${totalVAT.toLocaleString()} |
+            WHT: ₦${totalWHT.toLocaleString()} |
+            <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
+        `;
+    }
+    itemsContainer.addEventListener('input', updatePreview);
+
+    // ==================== Bulk Actions ====================
+    document.getElementById('applyToSelectedBtn').addEventListener('click', () => {
+        const selected = document.querySelectorAll('#itemsContainer .item-checkbox:checked');
+        if (selected.length === 0) {
+            showToast('Please select at least one item.', 'error');
+            return;
+        }
+        document.getElementById('bulkItemCount').textContent = selected.length;
+        document.getElementById('bulkDiscountPct').value = '';
+        document.getElementById('bulkDiscountAmt').value = '';
+        document.getElementById('bulkVAT').value = '';
+        document.getElementById('bulkWHT').value = '';
+        document.getElementById('bulkMessage').textContent = '';
+        document.getElementById('bulkApplyModal').style.display = 'flex';
+        document.getElementById('bulkApplyModal').dataset.target = 'itemsContainer';
+        document.getElementById('bulkApplyModal').dataset.selected = JSON.stringify(
+            Array.from(selected).map(cb => cb.dataset.rowId)
+        );
+    });
+
+    document.getElementById('applyToAllBtn').addEventListener('click', () => {
+        const rows = document.querySelectorAll('#itemsContainer .item-row');
+        if (rows.length === 0) { showToast('No items to apply to.', 'error'); return; }
+        const discPct = prompt('Enter Discount % for all items (0-100):', '0');
+        if (discPct === null) return;
+        const discAmt = prompt('Enter Discount Amount (₦) for all items:', '0');
+        if (discAmt === null) return;
+        const vat = prompt('Enter VAT % for all items (0-100):', '0');
+        if (vat === null) return;
+        const wht = prompt('Enter WHT % for all items (0-100):', '0');
+        if (wht === null) return;
+
+        rows.forEach(row => {
+            row.querySelector('.itemDiscPct').value = Math.max(0, parseFloat(discPct) || 0);
+            row.querySelector('.itemDiscAmt').value = Math.max(0, parseFloat(discAmt) || 0);
+            row.querySelector('.itemVAT').value = Math.max(0, parseFloat(vat) || 0);
+            row.querySelector('.itemWHT').value = Math.max(0, parseFloat(wht) || 0);
+        });
+        updatePreview();
+        showToast('✅ Applied to all items.', 'success');
+    });
+
+    document.getElementById('clearTaxesBtn').addEventListener('click', () => {
+        if (!confirm('Clear all tax/discount fields on all items?')) return;
+        document.querySelectorAll('#itemsContainer .item-row').forEach(row => {
+            row.querySelector('.itemDiscPct').value = '';
+            row.querySelector('.itemDiscAmt').value = '';
+            row.querySelector('.itemVAT').value = '';
+            row.querySelector('.itemWHT').value = '';
+        });
+        updatePreview();
+        showToast('🧹 Taxes cleared.', 'info');
+    });
+
+    document.getElementById('bulkApplyConfirm').addEventListener('click', () => {
+        const targetId = document.getElementById('bulkApplyModal').dataset.target || 'itemsContainer';
+        const selectedIds = JSON.parse(document.getElementById('bulkApplyModal').dataset.selected || '[]');
+        const discPct = validateNumber(document.getElementById('bulkDiscountPct').value, 0, 100) || 0;
+        const discAmt = validateNumber(document.getElementById('bulkDiscountAmt').value, 0) || 0;
+        const vat = validateNumber(document.getElementById('bulkVAT').value, 0, 100) || 0;
+        const wht = validateNumber(document.getElementById('bulkWHT').value, 0, 100) || 0;
+
+        const rows = document.querySelectorAll(`#${targetId} .item-row`);
+        selectedIds.forEach(id => {
+            const row = Array.from(rows).find(r => r.dataset.rowId === String(id));
+            if (row) {
+                row.querySelector('.itemDiscPct').value = discPct;
+                row.querySelector('.itemDiscAmt').value = discAmt;
+                row.querySelector('.itemVAT').value = vat;
+                row.querySelector('.itemWHT').value = wht;
+            }
+        });
+        closeModal('bulkApplyModal');
+        updatePreview();
+        showToast('✅ Applied to ' + selectedIds.length + ' items.', 'success');
+    });
+
+    // ==================== Import Excel ====================
+    const importExcelBtn = document.getElementById('importExcelBtn');
+    const excelFileInput = document.getElementById('excelFileInput');
+    const importPreviewContainer = document.getElementById('importPreviewContainer');
+    let importedItems = [];
+
+    importExcelBtn.addEventListener('click', () => excelFileInput.click());
+
+    excelFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        const reader = new FileReader();
+        reader.onload = function(loadEvent) {
+            try {
+                const data = new Uint8Array(loadEvent.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(firstSheet);
+                if (json.length === 0) {
+                    showToast('Excel file is empty.', 'error');
+                    return;
+                }
+                const headers = Object.keys(json[0]);
+                const findColumn = (variations) => {
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const v of variations) {
+                            if (hLower === v.toLowerCase().trim()) return h;
+                        }
+                    }
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const v of variations) {
+                            const vLower = v.toLowerCase().trim();
+                            if (hLower.length > 2 && vLower.length > 2 &&
+                                (hLower.includes(vLower) || vLower.includes(hLower))) {
+                                return h;
+                            }
+                        }
+                    }
+                    return null;
+                };
+                const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'goods', 'name']);
+                const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit']);
+                const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost']);
+                const discPctCol = findColumn(['discount %', 'disc%', 'discount percent']);
+                const discAmtCol = findColumn(['discount amount', 'disc amt', 'discount ₦']);
+                const vatCol = findColumn(['vat %', 'vat%', 'value added tax']);
+                const whtCol = findColumn(['wht %', 'wht%', 'withholding tax']);
+
+                if (!itemCol || !qtyCol || !priceCol) {
+                    showToast(`Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`, 'error');
+                    return;
+                }
+                const parsed = [];
+                json.forEach(row => {
+                    const name = String(row[itemCol] || '').trim();
+                    let qty = parseFloat(row[qtyCol]) || 0;
+                    let price = parseFloat(row[priceCol]) || 0;
+                    if (name && qty > 0 && price >= 0) {
+                        const discPct = discPctCol ? parseFloat(row[discPctCol]) || 0 : 0;
+                        const discAmt = discAmtCol ? parseFloat(row[discAmtCol]) || 0 : 0;
+                        const vat = vatCol ? parseFloat(row[vatCol]) || 0 : 0;
+                        const wht = whtCol ? parseFloat(row[whtCol]) || 0 : 0;
+                        parsed.push({ itemName: name, quantity: qty, unitPrice: price,
+                            discountPercent: Math.min(100, Math.max(0, discPct)),
+                            discountAmount: Math.max(0, discAmt),
+                            vatPercent: Math.min(100, Math.max(0, vat)),
+                            whtPercent: Math.min(100, Math.max(0, wht)) });
+                    }
+                });
+                if (parsed.length === 0) {
+                    showToast('No valid items found.', 'error');
+                    return;
+                }
+                importedItems = parsed;
+                let previewHtml = `<p><strong>✅ ${parsed.length} items imported:</strong></p>
+                    <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th></tr>`;
+                parsed.forEach(it => {
+                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td>
+                        <td>${it.discountPercent}%</td><td>₦${it.discountAmount}</td><td>${it.vatPercent}%</td><td>${it.whtPercent}%</td></tr>`;
+                });
+                previewHtml += `</table></div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button onclick="applyImportedItems()" class="btn-success">✅ Apply</button>
+                        <button onclick="clearImportPreview()" class="btn-danger">❌ Cancel</button>
+                    </div>`;
+                importPreviewContainer.innerHTML = previewHtml;
+                importPreviewContainer.style.display = 'block';
+                excelFileInput.value = '';
+                showToast(`✅ ${parsed.length} items imported`, 'success');
+            } catch (err) {
+                showToast('Error reading Excel: ' + err.message, 'error');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    window.applyImportedItems = function() {
+        if (importedItems.length === 0) return;
+        itemsContainer.innerHTML = '';
+        importedItems.forEach(it => {
+            addItemRow(it.itemName, it.quantity, it.unitPrice,
+                it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent);
+        });
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        updatePreview();
+        importedItems = [];
+        showToast('Items applied successfully.', 'success');
+    };
+
+    window.clearImportPreview = function() {
+        importPreviewContainer.style.display = 'none';
+        importPreviewContainer.innerHTML = '';
+        importedItems = [];
+    };
+
+    // ==================== Save Invoice (Draft or Dispatch) ====================
+    async function saveInvoice(status) {
+        const confirmMsg = status === 'Draft' ? 'save as draft' : 'dispatch (submit) this invoice';
+        if (!confirm(`Are you sure you want to ${confirmMsg}?`)) return;
+
+        const vendor = document.getElementById('vendorName').value.trim();
+        const date = document.getElementById('invoiceDate').value;
+        const destBranch = document.getElementById('destBranch').value;
+        const invoiceNumber = document.getElementById('invoiceNumber').value.trim();
+        const reference = document.getElementById('referenceNo').value.trim();
+        const notes = document.getElementById('notes').value.trim();
+
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('itemsContainer');
+
+        if (items.length === 0) {
+            document.getElementById('formMessage').innerText = 'Please add at least one item.';
+            return;
+        }
+        if (!vendor) {
+            document.getElementById('formMessage').innerText = 'Vendor name is required.';
+            return;
+        }
+
+        const submitBtn = document.getElementById('dispatchBtn');
+        const draftBtn = document.getElementById('saveDraftBtn');
+        const btn = status === 'Draft' ? draftBtn : submitBtn;
+        setButtonLoading(btn, true);
+        document.getElementById('formMessage').textContent = '';
+
+        try {
+            await db.collection('shipments').add({
+                vendorId: currentUser.uid,
+                vendorName: vendor,
+                invoiceNumber: invoiceNumber,
+                date: date,
+                destinationBranch: destBranch,
+                reference: reference,
+                notes: notes,
+                items: items,
+                subtotal: subtotal,
+                totalDiscount: totalDisc,
+                totalVAT: totalVAT,
+                totalWHT: totalWHT,
+                total: grandTotal,
+                status: status, // 'Draft' or 'Submitted'
+                submittedBy: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection('activityLog').add({
+                actionType: status === 'Draft' ? 'vendor_draft' : 'vendor_dispatch',
+                details: `${status} invoice by ${vendor} to ${destBranch}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail,
+                vendorId: currentUser.uid
+            });
+
+            showToast(`✅ Invoice ${status === 'Draft' ? 'saved as draft' : 'submitted successfully'}`, 'success');
+            // Reset form
+            document.getElementById('invoiceForm').reset();
+            itemsContainer.innerHTML = '';
+            addItemRow();
+            updatePreview();
+            document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+            document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+            loadInvoices();
+        } catch (err) {
+            document.getElementById('formMessage').innerText = 'Error: ' + err.message;
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    }
+
+    document.getElementById('invoiceForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveInvoice('Submitted');
+    });
+
+    document.getElementById('saveDraftBtn').addEventListener('click', () => {
+        saveInvoice('Draft');
+    });
+
+    // ==================== Load Invoices (Vendor only) ====================
+    function loadInvoices() {
+        if (invoicesUnsubscribe) invoicesUnsubscribe();
+
+        const search = document.getElementById('searchInvoices').value.toLowerCase().trim();
+        const statusFilter = document.getElementById('filterStatus').value;
+
+        const listDiv = document.getElementById('invoicesList');
+        listDiv.innerHTML = '<div class="loading-spinner"></div> Loading...';
+
+        let q = db.collection('shipments')
+            .where('vendorId', '==', currentUser.uid)
+            .orderBy('createdAt', 'desc');
+
+        invoicesUnsubscribe = q.onSnapshot(snap => {
+            let html = '';
+            if (snap.empty) {
+                html = '<p style="text-align:center; color:#888; padding:20px;">No invoices found.</p>';
+            } else {
+                html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Destination</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    // Filter by search
+                    let match = true;
+                    if (search) {
+                        const text = (d.invoiceNumber + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
+                        if (!text.includes(search)) match = false;
+                    }
+                    if (statusFilter !== 'all' && d.status !== statusFilter) match = false;
+                    if (!match) return;
+
+                    const total = d.total || 0;
+                    const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : '-';
+                    const statusClass = `status-${d.status?.toLowerCase() || 'draft'}`;
+                    const canEdit = d.status === 'Draft';
+                    const canDelete = d.status === 'Draft';
+                    const canView = true;
+
+                    html += `<tr>
+                        <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                        <td>${escapeHtml(d.date || '')}</td>
+                        <td><span class="badge">${escapeHtml(d.destinationBranch || 'N/A')}</span></td>
+                        <td class="items-cell">${escapeHtml(itemsShort)}</td>
+                        <td class="cost-cell">₦${total.toLocaleString()}</td>
+                        <td><span class="status-badge ${statusClass}">${escapeHtml(d.status)}</span></td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="viewInvoice('${doc.id}')">👁️</button>
+                            ${canEdit ? `<button class="btn-sm btn-warning" onclick="editDraft('${doc.id}')">✏️</button>` : ''}
+                            ${canDelete ? `<button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>` : ''}
+                        </td>
+                    </tr>`;
+                });
+                html += '</table></div>';
+            }
+            listDiv.innerHTML = html;
+        }, err => {
+            listDiv.innerHTML = '<p style="color:red;">Error loading invoices: ' + escapeHtml(err.message) + '</p>';
+            showToast('Error loading invoices: ' + err.message, 'error');
+        });
+    }
+
+    document.getElementById('searchInvoices').addEventListener('input', loadInvoices);
+    document.getElementById('filterStatus').addEventListener('change', loadInvoices);
+    document.getElementById('refreshInvoicesBtn').addEventListener('click', loadInvoices);
+
+    // ==================== View Invoice ====================
+    window.viewInvoice = async function(id) {
+        try {
+            const doc = await db.collection('shipments').doc(id).get();
+            if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+            const d = doc.data();
+            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th><th>Total</th></tr>';
+            if (d.items) {
+                d.items.forEach(it => {
+                    itemsHtml += `<tr>
+                        <td>${escapeHtml(it.itemName)}</td>
+                        <td>${it.orderedQty}</td>
+                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                        <td>${it.discountPercent||0}%</td>
+                        <td>₦${(it.discountAmount||0).toFixed(2)}</td>
+                        <td>${it.vatPercent||0}%</td>
+                        <td>${it.whtPercent||0}%</td>
+                        <td>₦${(it.total||0).toFixed(2)}</td>
+                    </tr>`;
+                });
+            }
+            itemsHtml += '</table></div>';
+            const total = d.total || 0;
+            const html = `
+                <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
+                <p><strong>Vendor:</strong> ${escapeHtml(d.vendorName)}</p>
+                <p><strong>Date:</strong> ${escapeHtml(d.date)}</p>
+                <p><strong>Destination:</strong> ${escapeHtml(d.destinationBranch)}</p>
+                <p><strong>Reference:</strong> ${escapeHtml(d.reference || 'N/A')}</p>
+                <p><strong>Status:</strong> <span class="status-badge status-${d.status?.toLowerCase()}">${escapeHtml(d.status)}</span></p>
+                <p><strong>Total Value:</strong> ₦${total.toLocaleString()}</p>
+                <p><strong>Subtotal:</strong> ₦${(d.subtotal||0).toLocaleString()}</p>
+                <p><strong>Total Discount:</strong> ₦${(d.totalDiscount||0).toLocaleString()}</p>
+                <p><strong>Total VAT:</strong> ₦${(d.totalVAT||0).toLocaleString()}</p>
+                <p><strong>Total WHT:</strong> ₦${(d.totalWHT||0).toLocaleString()}</p>
+                ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
+                <p><strong>Submitted:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleString() : ''}</p>
+                <h4>Items</h4>
+                ${itemsHtml}
+            `;
+            document.getElementById('viewInvoiceContent').innerHTML = html;
+            document.getElementById('viewInvoiceModal').style.display = 'flex';
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    // ==================== Edit Draft ====================
+    let editDraftId = null;
+
+    window.editDraft = async function(id) {
+        try {
+            const doc = await db.collection('shipments').doc(id).get();
+            if (!doc.exists) { showToast('Draft not found.', 'error'); return; }
+            const d = doc.data();
+            if (d.status !== 'Draft') {
+                showToast('Only draft invoices can be edited.', 'error');
+                return;
+            }
+            editDraftId = id;
+            // Populate form fields (we'll use the create form)
+            document.getElementById('vendorName').value = d.vendorName || '';
+            document.getElementById('invoiceDate').value = d.date || '';
+            document.getElementById('destBranch').value = d.destinationBranch || 'Abuja';
+            document.getElementById('invoiceNumber').value = d.invoiceNumber || '';
+            document.getElementById('referenceNo').value = d.reference || '';
+            document.getElementById('notes').value = d.notes || '';
+
+            // Populate items
+            itemsContainer.innerHTML = '';
+            if (d.items && d.items.length > 0) {
+                d.items.forEach(it => {
+                    addItemRow(it.itemName, it.orderedQty, it.unitPrice,
+                        it.discountPercent || '', it.discountAmount || '', it.vatPercent || '', it.whtPercent || '');
+                });
+            } else {
+                addItemRow();
+            }
+            updatePreview();
+
+            // Change submit button to update draft
+            const submitBtn = document.getElementById('dispatchBtn');
+            submitBtn.textContent = '💾 Update Draft';
+            submitBtn.onclick = async (e) => {
+                e.preventDefault();
+                await updateDraft();
+            };
+            const draftBtn = document.getElementById('saveDraftBtn');
+            draftBtn.style.display = 'none'; // hide save draft button during edit
+            document.getElementById('formMessage').textContent = 'Editing draft... Click "Update Draft" to save changes.';
+
+            // Switch to create tab
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('[data-tab="create"]').classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-create').classList.add('active');
+        } catch (err) {
+            showToast('Error loading draft: ' + err.message, 'error');
+        }
+    };
+
+    async function updateDraft() {
+        if (!editDraftId) return;
+        const vendor = document.getElementById('vendorName').value.trim();
+        const date = document.getElementById('invoiceDate').value;
+        const destBranch = document.getElementById('destBranch').value;
+        const invoiceNumber = document.getElementById('invoiceNumber').value.trim();
+        const reference = document.getElementById('referenceNo').value.trim();
+        const notes = document.getElementById('notes').value.trim();
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('itemsContainer');
+
+        if (items.length === 0) {
+            document.getElementById('formMessage').innerText = 'Please add at least one item.';
+            return;
+        }
+
+        const submitBtn = document.getElementById('dispatchBtn');
+        setButtonLoading(submitBtn, true);
+        document.getElementById('formMessage').textContent = '';
+
+        try {
+            await db.collection('shipments').doc(editDraftId).update({
+                vendorName: vendor,
+                date: date,
+                destinationBranch: destBranch,
+                invoiceNumber: invoiceNumber,
+                reference: reference,
+                notes: notes,
+                items: items,
+                subtotal: subtotal,
+                totalDiscount: totalDisc,
+                totalVAT: totalVAT,
+                totalWHT: totalWHT,
+                total: grandTotal,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast('✅ Draft updated successfully.', 'success');
+            // Reset form to normal mode
+            resetFormAfterEdit();
+            loadInvoices();
+        } catch (err) {
+            document.getElementById('formMessage').innerText = 'Error: ' + err.message;
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(submitBtn, false);
+        }
+    }
+
+    function resetFormAfterEdit() {
+        // Restore submit button
+        const submitBtn = document.getElementById('dispatchBtn');
+        submitBtn.textContent = '🚛 Dispatch (Submit)';
+        submitBtn.onclick = (e) => {
+            e.preventDefault();
+            saveInvoice('Submitted');
+        };
+        const draftBtn = document.getElementById('saveDraftBtn');
+        draftBtn.style.display = 'inline-block';
+        document.getElementById('formMessage').textContent = '';
+        editDraftId = null;
+        // Optionally clear form
+        // but keep as is
+    }
+
+    // ==================== Delete Invoice ====================
+    window.deleteInvoice = async function(id) {
+        if (!confirm('Delete this invoice permanently?')) return;
+        try {
+            const doc = await db.collection('shipments').doc(id).get();
+            if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+            if (doc.data().status !== 'Draft') {
+                showToast('Only draft invoices can be deleted.', 'error');
+                return;
+            }
+            await db.collection('shipments').doc(id).delete();
+            showToast('✅ Invoice deleted.', 'success');
+            loadInvoices();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    // ==================== Change Password ====================
+    document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const current = document.getElementById('currentPassword').value;
+        const newPass = document.getElementById('newPassword').value;
+        const confirm = document.getElementById('confirmPassword').value;
+        const msg = document.getElementById('passwordMessage');
+
+        if (newPass !== confirm) {
+            msg.textContent = 'Passwords do not match.';
+            return;
+        }
+        if (newPass.length < 6) {
+            msg.textContent = 'Password must be at least 6 characters.';
+            return;
+        }
+
+        const btn = e.target.querySelector('button[type="submit"]');
+        setButtonLoading(btn, true);
+        msg.textContent = '';
+
+        try {
+            // Re-authenticate user
+            const credential = firebase.auth.EmailAuthProvider.credential(currentUserEmail, current);
+            await currentUser.reauthenticateWithCredential(credential);
+            await currentUser.updatePassword(newPass);
+            msg.style.color = 'green';
+            msg.textContent = '✅ Password updated successfully.';
+            showToast('Password updated.', 'success');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+        } catch (err) {
+            msg.style.color = 'red';
+            msg.textContent = 'Error: ' + err.message;
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+
+    // ==================== Init ====================
+    console.log('External Vendor page loaded.');
+    // Initial row already added in auth callback.
+</script>
+</body>
+</html>
