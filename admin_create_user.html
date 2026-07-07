@@ -7,7 +7,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <style>
         * { font-family: 'Segoe UI', -apple-system, sans-serif; box-sizing: border-box; }
         body { background: #f0f2f5; margin: 0; padding: 16px; }
@@ -44,10 +43,6 @@
         .status-disabled { background: #f8d7da; color: #721c24; }
         .status-unverified { background: #fff3cd; color: #856404; }
         .status-missing { background: #f5c6cb; color: #721c24; }
-        .email-config-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 16px; padding: 12px 16px; margin: 8px 0; }
-        .email-config-box input { padding: 8px 12px; border-radius: 24px; font-size: 0.85rem; margin: 4px 0; }
-        .email-config-box .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
-        .email-config-box .flex-row > * { flex: 1; min-width: 120px; }
         @media (max-width: 600px) {
             .nav { flex-direction: column; align-items: stretch; }
             .user-table th, .user-table td { font-size: 0.75rem; padding: 6px 4px; }
@@ -65,7 +60,9 @@
     <h2>👥 User Management</h2>
     
     <div class="info-box" style="background:#f8d7da; border-color:#f5c6cb;">
-        <strong>⚠️ Missing Role?</strong> If a user cannot log in with <em>"User role not found"</em>, click the <strong>"Fix"</strong> button (🔧) below and re-enter their role. This will recreate their Firestore document.
+        <strong>⚠️ Permission Error?</strong> If you see <em>"Missing or insufficient permissions"</em> when using the Fix button, 
+        update your Firestore security rules to allow admin writes. 
+        <a href="#" onclick="showRulesHelp(); return false;" style="color:#0a3d62;">Click here for rules example</a>
     </div>
 
     <form id="createUserForm">
@@ -109,7 +106,6 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // DOM refs
         const userEmail = document.getElementById('userEmail');
         const userPassword = document.getElementById('userPassword');
         const userRole = document.getElementById('userRole');
@@ -122,7 +118,6 @@
         let suppliers = [];
         let usersCache = [];
 
-        // Auth
         auth.onAuthStateChanged(async (user) => {
             if (!user) { window.location.href = 'login.html'; return; }
             const userDoc = await db.collection('users').doc(user.uid).get();
@@ -141,7 +136,6 @@
             auth.signOut().then(() => window.location.href = 'login.html');
         });
 
-        // Suppliers
         async function loadSuppliers() {
             try {
                 const snap = await db.collection('suppliers').get();
@@ -174,7 +168,6 @@
             }
         }
 
-        // Create User
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = userEmail.value.trim();
@@ -223,14 +216,7 @@
                     userData.vendorName = supplierName;
                 }
 
-                try {
-                    await db.collection('users').doc(uid).set(userData);
-                } catch (firestoreError) {
-                    console.error('Firestore write error:', firestoreError);
-                    showMessage(`❌ Firestore write failed: ${firestoreError.message}. Check your security rules.`, 'error');
-                    return;
-                }
-
+                await db.collection('users').doc(uid).set(userData);
                 await newUser.sendEmailVerification();
 
                 await db.collection('activityLog').add({
@@ -259,16 +245,15 @@
             }
         });
 
-        // Load Users – Fix button is ALWAYS visible
         async function loadUsers() {
-            userListDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Loading users...</div>';
+            userListDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Loading...</div>';
             try {
                 const snap = await db.collection('users').get();
                 usersCache = [];
                 let html = `<table class="user-table">
                     <tr><th>Email</th><th>Role</th><th>Supplier</th><th>Status</th><th>Verification</th><th>Actions</th></tr>`;
                 if (snap.empty) {
-                    html += '<tr><td colspan="6" style="text-align:center;">No users found.</td></tr>';
+                    html += '<tr><td colspan="6">No users found.</td></tr>';
                 } else {
                     snap.forEach(doc => {
                         const u = doc.data();
@@ -290,7 +275,6 @@
                             <td>
                                 <button class="btn-sm btn-edit" onclick="editUser('${uid}')">✏️</button>
                                 <button class="btn-sm ${enabled ? 'btn-disable' : 'btn-enable'}" onclick="toggleUser('${uid}', ${!enabled})">${enabled ? '🔒' : '🔓'}</button>
-                                <!-- Fix button always visible -->
                                 <button class="btn-sm btn-fix" onclick="fixUser('${uid}')">🔧 Fix</button>
                                 ${!verified ? `<button class="btn-sm btn-resend" onclick="resendVerification('${uid}')">📧</button>` : ''}
                             </td>
@@ -305,11 +289,11 @@
             }
         }
 
-        // Fix User – Recreate document
+        // Fix User – with permission error handling
         window.fixUser = async function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) {
-                alert('User not found in cache.');
+                alert('User not found.');
                 return;
             }
             const email = user.email;
@@ -350,11 +334,14 @@
                 alert('✅ User document recreated successfully.');
                 loadUsers();
             } catch (err) {
-                alert('❌ Error: ' + err.message);
+                if (err.code === 'permission-denied') {
+                    alert(`❌ Permission denied.\n\nPlease update Firestore security rules to allow admin writes to users collection.\n\nExample rule:\n\nallow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == '${currentUserEmail}');`);
+                } else {
+                    alert('❌ Error: ' + err.message);
+                }
             }
         };
 
-        // Edit, toggle, resend functions
         window.editUser = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) { alert('User not found.'); return; }
@@ -383,7 +370,13 @@
             }
             db.collection('users').doc(uid).update(update)
                 .then(() => { alert('Updated.'); loadUsers(); })
-                .catch(err => alert('Error: ' + err.message));
+                .catch(err => {
+                    if (err.code === 'permission-denied') {
+                        alert(`Permission denied. Update security rules to allow admin writes.`);
+                    } else {
+                        alert('Error: ' + err.message);
+                    }
+                });
         };
 
         window.toggleUser = function(uid, enable) {
@@ -392,13 +385,40 @@
             if (!confirm(`${enable ? 'Enable' : 'Disable'} ${user.email}?`)) return;
             db.collection('users').doc(uid).update({ enabled: enable })
                 .then(() => { alert(enable ? 'Enabled.' : 'Disabled.'); loadUsers(); })
-                .catch(err => alert('Error: ' + err.message));
+                .catch(err => {
+                    if (err.code === 'permission-denied') {
+                        alert(`Permission denied. Update security rules to allow admin writes.`);
+                    } else {
+                        alert('Error: ' + err.message);
+                    }
+                });
         };
 
         window.resendVerification = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) return;
             alert(`📧 Verification resend requested for ${user.email}.\nThe user should log in and click "Resend verification" on login page.`);
+        };
+
+        // Show Firestore rules help
+        window.showRulesHelp = function() {
+            alert(
+`Firestore Security Rules Example:
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (request.auth.uid == userId || 
+         request.auth.token.email == '${currentUserEmail}');
+    }
+  }
+}
+
+Copy this into Firestore Console > Rules and publish.`
+            );
         };
     });
 </script>
