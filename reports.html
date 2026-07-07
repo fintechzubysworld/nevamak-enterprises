@@ -48,6 +48,9 @@
         .btn-primary { background: #0a3d62; color: white; }
         .btn-warning { background: #f39c12; color: white; }
         .btn-info { background: #3498db; color: white; }
+        .permission-error { background: #f8d7da; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 12px; margin: 12px 0; }
+        .permission-error a { color: #0a3d62; font-weight: 600; }
+        .permission-error .index-link { word-break: break-all; }
         @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
     </style>
 </head>
@@ -60,6 +63,7 @@
             <a href="chat.html">💬 Chat</a>
             <a href="invoice_repo.html">🧾 Invoice Repo</a>
             <a href="picture_repo.html">🖼️ Pictures</a>
+            <a href="permissions.html">🔐 Permissions</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -82,7 +86,7 @@
             <button id="invFilterBtn">Filter</button>
             <button class="export" onclick="exportCSV('invTable')">📄 Export CSV</button>
         </div>
-        <div class="scroll" id="invoiceList">Loading...</div>
+        <div id="invoiceList">Loading...</div>
     </div>
 
     <!-- Returns Tab -->
@@ -90,11 +94,11 @@
         <div class="filters">
             <input type="date" id="retDateStart">
             <input type="date" id="retDateEnd">
-            <select id="retBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Port Harcourt">Port Harcourt</option></select>
+            <select id="retBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
             <button id="retFilterBtn">Filter</button>
             <button class="export" onclick="exportCSV('retTable')">📄 Export CSV</button>
         </div>
-        <div class="scroll" id="returnsList">Loading...</div>
+        <div id="returnsList">Loading...</div>
     </div>
 
     <!-- Dispatched Tab -->
@@ -106,7 +110,7 @@
             <button id="dispFilterBtn">Filter</button>
             <button class="export" onclick="exportCSV('dispTable')">📄 Export CSV</button>
         </div>
-        <div class="scroll" id="dispatchedList">Loading...</div>
+        <div id="dispatchedList">Loading...</div>
     </div>
 
     <!-- Received Tab -->
@@ -118,7 +122,7 @@
             <button id="recvFilterBtn">Filter</button>
             <button class="export" onclick="exportCSV('recvTable')">📄 Export CSV</button>
         </div>
-        <div class="scroll" id="receivedList">Loading...</div>
+        <div id="receivedList">Loading...</div>
     </div>
 
     <!-- Chat History Tab -->
@@ -130,7 +134,7 @@
             <button id="chatFilterBtn">Filter</button>
             <button class="export" onclick="exportCSV('chatTable')">📄 Export CSV</button>
         </div>
-        <div class="scroll" id="chatList">Loading...</div>
+        <div id="chatList">Loading...</div>
     </div>
 
     <!-- Invoice Modal -->
@@ -164,12 +168,22 @@
     const db = firebase.firestore();
 
     let currentUser = null;
+    let currentRole = '';
     let currentShipmentId = null; // to reference the shipment when saving
 
     // ==================== Auth ====================
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        currentRole = userDoc.data()?.role || '';
+        // If vendor, redirect away
+        if (currentRole === 'vendor' || currentRole === 'external_vendor') {
+            alert('Access denied. Vendors cannot view reports.');
+            window.location.href = 'external_vendor.html';
+            return;
+        }
+        // Load all tabs with role-based filtering
         loadInvoices();
         loadReturns();
         loadDispatched();
@@ -208,38 +222,52 @@
         link.click();
     }
 
-    async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
+    // ==================== Build Role-Based Query ====================
+    function addRoleFilter(q, branchField = 'destinationBranch') {
+        if (currentRole === 'admin' || currentRole === 'lagos_sender') {
+            // No filter needed; can see all
+            return q;
+        } else if (currentRole === 'abuja_rep') {
+            // Abuja rep sees only Abuja branch
+            return q.where(branchField, '==', 'Abuja');
+        } else if (currentRole === 'ph_rep') {
+            // PH rep sees only Port Harcourt branch
+            return q.where(branchField, '==', 'Portharcourt');
+        } else {
+            // If any other role, deny access (should not happen)
+            return q.limit(0); // force empty result
+        }
+    }
+
     // ==================== Invoices ====================
     async function loadInvoices() {
+        const container = document.getElementById('invoiceList');
+        container.innerHTML = '<div style="text-align:center; padding:20px;"><div class="loading-spinner"></div> Loading...</div>';
         try {
             const start = document.getElementById('invDateStart').value;
             const end = document.getElementById('invDateEnd').value;
             const branch = document.getElementById('invBranch').value;
-            let query = db.collection('shipments').where('status', '==', 'Delivered').where('grnNumber', '!=', null);
-            if (start) query = query.where('receivedDate', '>=', new Date(start));
+            let q = db.collection('shipments')
+                        .where('status', '==', 'Delivered')
+                        .where('grnNumber', '!=', null);
+            // Role filtering
+            q = addRoleFilter(q);
+            if (start) q = q.where('receivedDate', '>=', new Date(start));
             if (end) {
                 const endDate = new Date(end);
                 endDate.setHours(23,59,59);
-                query = query.where('receivedDate', '<=', endDate);
+                q = q.where('receivedDate', '<=', endDate);
             }
-            if (branch) query = query.where('destinationBranch', '==', branch);
-            const snap = await query.get();
+            if (branch && (currentRole === 'admin' || currentRole === 'lagos_sender')) {
+                q = q.where('destinationBranch', '==', branch);
+            }
+            // Branch filter for branch reps is already applied via addRoleFilter
+            // But if they select a branch in the dropdown, respect it (but they only have one branch)
+            // For branch reps, branch filter is forced, so dropdown won't matter much
+
+            const snap = await q.get();
             if (snap.empty) {
-                document.getElementById('invoiceList').innerHTML = '<p class="empty">No invoices found. Try adjusting filters.</p>';
+                container.innerHTML = '<p class="empty">No invoices found. Try adjusting filters.</p>';
                 return;
             }
             let html = '<table id="invTable"><tr><th>GRN</th><th>Date</th><th>Branch</th><th>Supplier</th><th>Total Goods</th><th>Transport</th><th>Action</th></tr>';
@@ -257,10 +285,16 @@
                 </tr>`;
             });
             html += '</table>';
-            document.getElementById('invoiceList').innerHTML = html;
+            container.innerHTML = html;
         } catch (error) {
             console.error('Invoices load error:', error);
-            document.getElementById('invoiceList').innerHTML = `<p class="empty">⚠️ Error loading invoices: ${error.message}</p>`;
+            let errorHtml = `<div class="permission-error">
+                <strong>⚠️ Error loading invoices:</strong> ${error.message}
+                ${error.message && error.message.includes('https://console.firebase.google.com') ? 
+                    `<br><br><strong>🔗 Create Required Index:</strong><br>
+                     <a href="${error.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/)[0]}" target="_blank" style="color:#0a3d62;">Click here to create index</a>` : ''}
+            </div>`;
+            container.innerHTML = errorHtml;
         }
     }
 
@@ -312,7 +346,6 @@
         }
     };
 
-    // ==================== Save to Invoice Repository ====================
     document.getElementById('saveToRepositoryBtn').addEventListener('click', async () => {
         if (!currentShipmentId) {
             alert('No invoice loaded.');
@@ -322,7 +355,6 @@
             const doc = await db.collection('shipments').doc(currentShipmentId).get();
             if (!doc.exists) return alert('Shipment not found.');
             const d = doc.data();
-            // Build invoice data
             const items = (d.items || []).map(it => ({
                 itemName: it.itemName,
                 quantity: it.orderedQty || 0,
@@ -344,15 +376,12 @@
             };
             await db.collection('invoices').add(invoiceData);
             document.getElementById('saveMessage').innerText = '✅ Invoice saved to repository!';
-            setTimeout(() => {
-                document.getElementById('saveMessage').innerText = '';
-            }, 5000);
+            setTimeout(() => { document.getElementById('saveMessage').innerText = ''; }, 5000);
         } catch (error) {
             alert('Error saving to repository: ' + error.message);
         }
     });
 
-    // ==================== Download PDF (from modal) ====================
     document.getElementById('downloadInvoiceBtn').addEventListener('click', async () => {
         const element = document.getElementById('invoiceContentInner');
         if (!element) return alert('No invoice to download.');
@@ -370,29 +399,32 @@
         }
     });
 
-    // ==================== Filter listeners ====================
-    document.getElementById('invFilterBtn').addEventListener('click', loadInvoices);
-
     // ==================== Returns ====================
     async function loadReturns() {
+        const container = document.getElementById('returnsList');
+        container.innerHTML = '<div style="text-align:center; padding:20px;"><div class="loading-spinner"></div> Loading...</div>';
         try {
             const start = document.getElementById('retDateStart').value;
             const end = document.getElementById('retDateEnd').value;
             const branch = document.getElementById('retBranch').value;
-            let query = db.collection('returns');
-            if (start) query = query.where('date', '>=', new Date(start));
+            let q = db.collection('returns');
+            // Role filtering: use branch field (returns have a 'branch' field)
+            q = addRoleFilter(q, 'branch');
+            if (start) q = q.where('date', '>=', new Date(start));
             if (end) {
                 const endDate = new Date(end);
                 endDate.setHours(23,59,59);
-                query = query.where('date', '<=', endDate);
+                q = q.where('date', '<=', endDate);
             }
-            if (branch) query = query.where('branch', '==', branch);
-            const snap = await query.get();
+            if (branch && (currentRole === 'admin' || currentRole === 'lagos_sender')) {
+                q = q.where('branch', '==', branch);
+            }
+            const snap = await q.get();
             let docs = [];
             snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             docs.sort((a, b) => (b.date?.toDate() || 0) - (a.date?.toDate() || 0));
             if (docs.length === 0) {
-                document.getElementById('returnsList').innerHTML = '<p class="empty">No returns found. Try adjusting filters.</p>';
+                container.innerHTML = '<p class="empty">No returns found.</p>';
                 return;
             }
             let html = '<table id="retTable"><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr>';
@@ -408,34 +440,37 @@
                 </tr>`;
             });
             html += '</table>';
-            document.getElementById('returnsList').innerHTML = html;
+            container.innerHTML = html;
         } catch (error) {
             console.error('Returns load error:', error);
-            document.getElementById('returnsList').innerHTML = `<p class="empty">⚠️ Error loading returns: ${error.message}</p>`;
+            let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading returns:</strong> ${error.message}</div>`;
+            container.innerHTML = errorHtml;
         }
     }
-    document.getElementById('retFilterBtn').addEventListener('click', loadReturns);
 
     // ==================== Dispatched ====================
     async function loadDispatched() {
+        const container = document.getElementById('dispatchedList');
+        container.innerHTML = '<div style="text-align:center; padding:20px;"><div class="loading-spinner"></div> Loading...</div>';
         try {
             const start = document.getElementById('dispDateStart').value;
             const end = document.getElementById('dispDateEnd').value;
             const status = document.getElementById('dispStatus').value;
-            let query = db.collection('shipments');
-            if (start) query = query.where('createdAt', '>=', new Date(start));
+            let q = db.collection('shipments');
+            q = addRoleFilter(q);
+            if (start) q = q.where('createdAt', '>=', new Date(start));
             if (end) {
                 const endDate = new Date(end);
                 endDate.setHours(23,59,59);
-                query = query.where('createdAt', '<=', endDate);
+                q = q.where('createdAt', '<=', endDate);
             }
-            if (status) query = query.where('status', '==', status);
-            const snap = await query.get();
+            if (status) q = q.where('status', '==', status);
+            const snap = await q.get();
             let docs = [];
             snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             docs.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
             if (docs.length === 0) {
-                document.getElementById('dispatchedList').innerHTML = '<p class="empty">No dispatched shipments found. Try adjusting filters.</p>';
+                container.innerHTML = '<p class="empty">No dispatched shipments found.</p>';
                 return;
             }
             let html = '<table id="dispTable"><tr><th>ID</th><th>Date</th><th>Destination</th><th>Sender</th><th>Items</th><th>Goods Value</th><th>Status</th></tr>';
@@ -454,34 +489,40 @@
                 </tr>`;
             });
             html += '</table>';
-            document.getElementById('dispatchedList').innerHTML = html;
+            container.innerHTML = html;
         } catch (error) {
             console.error('Dispatched load error:', error);
-            document.getElementById('dispatchedList').innerHTML = `<p class="empty">⚠️ Error loading dispatched: ${error.message}</p>`;
+            let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading dispatched:</strong> ${error.message}</div>`;
+            container.innerHTML = errorHtml;
         }
     }
-    document.getElementById('dispFilterBtn').addEventListener('click', loadDispatched);
 
     // ==================== Received ====================
     async function loadReceived() {
+        const container = document.getElementById('receivedList');
+        container.innerHTML = '<div style="text-align:center; padding:20px;"><div class="loading-spinner"></div> Loading...</div>';
         try {
             const start = document.getElementById('recvDateStart').value;
             const end = document.getElementById('recvDateEnd').value;
             const branch = document.getElementById('recvBranch').value;
-            let query = db.collection('shipments').where('status', 'in', ['Delivered', 'Partially Delivered']);
-            if (start) query = query.where('receivedDate', '>=', new Date(start));
+            let q = db.collection('shipments')
+                        .where('status', 'in', ['Delivered', 'Partially Delivered']);
+            q = addRoleFilter(q);
+            if (start) q = q.where('receivedDate', '>=', new Date(start));
             if (end) {
                 const endDate = new Date(end);
                 endDate.setHours(23,59,59);
-                query = query.where('receivedDate', '<=', endDate);
+                q = q.where('receivedDate', '<=', endDate);
             }
-            if (branch) query = query.where('destinationBranch', '==', branch);
-            const snap = await query.get();
+            if (branch && (currentRole === 'admin' || currentRole === 'lagos_sender')) {
+                q = q.where('destinationBranch', '==', branch);
+            }
+            const snap = await q.get();
             let docs = [];
             snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             docs.sort((a, b) => (b.receivedDate?.toDate() || 0) - (a.receivedDate?.toDate() || 0));
             if (docs.length === 0) {
-                document.getElementById('receivedList').innerHTML = '<p class="empty">No received shipments found. Try adjusting filters.</p>';
+                container.innerHTML = '<p class="empty">No received shipments found.</p>';
                 return;
             }
             let html = '<table id="recvTable"><tr><th>Date</th><th>Branch</th><th>GRN</th><th>Supplier</th><th>Items</th><th>Goods Value</th><th>Received By</th></tr>';
@@ -499,34 +540,77 @@
                 </tr>`;
             });
             html += '</table>';
-            document.getElementById('receivedList').innerHTML = html;
+            container.innerHTML = html;
         } catch (error) {
             console.error('Received load error:', error);
-            document.getElementById('receivedList').innerHTML = `<p class="empty">⚠️ Error loading received: ${error.message}</p>`;
+            let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading received:</strong> ${error.message}</div>`;
+            container.innerHTML = errorHtml;
         }
     }
-    document.getElementById('recvFilterBtn').addEventListener('click', loadReceived);
 
     // ==================== Chat History ====================
     async function loadChatHistory() {
+        const container = document.getElementById('chatList');
+        container.innerHTML = '<div style="text-align:center; padding:20px;"><div class="loading-spinner"></div> Loading...</div>';
         try {
             const start = document.getElementById('chatDateStart').value;
             const end = document.getElementById('chatDateEnd').value;
             const search = document.getElementById('chatSearch').value.toLowerCase().trim();
-            let query = db.collection('messages').where('senderId', '==', currentUser.uid);
-            if (start) query = query.where('timestamp', '>=', new Date(start));
-            if (end) {
-                const endDate = new Date(end);
-                endDate.setHours(23,59,59);
-                query = query.where('timestamp', '<=', endDate);
-            }
-            const snap = await query.get();
+            // Chat messages are per user; we only see messages sent by this user (or global)
+            // But we want to see all messages the user participated in.
+            // Security rules restrict to messages where chatId contains user uid.
+            // So we can query messages where senderId == currentUser.uid (sent messages)
+            // Or where chatId contains currentUser.uid (received messages)
+            // For simplicity, we'll query messages where senderId == currentUser.uid
+            // and also messages where chatId contains currentUser.uid (to see received).
+            // Actually better: query messages where chatId == 'global' or chatId contains currentUser.uid
+            let q = db.collection('messages')
+                        .where('chatId', 'in', ['global', currentUser.uid + '_any']) // can't use in with dynamic. We'll use simple query.
+                        .orderBy('timestamp', 'desc');
+            // Better approach: query all messages and filter client-side? Not efficient.
+            // Let's just query messages where senderId == currentUser.uid (sent messages) and also messages where chatId contains currentUser.uid.
+            // Since we can't do complex OR, we'll combine two queries.
+            // For now, we'll just fetch messages where senderId == currentUser.uid (sent messages).
+            // This limits to user's own sent messages, but we want all their chat history.
+            // We'll modify to include all messages where user is participant (chatId contains uid).
+            // We'll need a composite index on chatId and timestamp.
+            // Since that may not exist, we'll query all messages and filter client-side.
+            // But that would require read access to all messages, which is denied by rules.
+            // So the correct approach: query messages where chatId contains currentUser.uid.
+            // We'll use a workaround: query where chatId >= currentUser.uid and chatId <= currentUser.uid + '\uf8ff' (prefix search)
+            // But chatId format is e.g., "uid1_uid2". So we can query where chatId starts with currentUser.uid.
+            // That will get all chats where user is first part. For chats where user is second part, we need another query.
+            // This is complex. Since this is a reports page and we want to show chat history for the user,
+            // we can simply query messages where senderId == currentUser.uid (sent messages) and also messages where receiverId == currentUser.uid (if we had that field).
+            // Without receiverId, we'll just show sent messages for now, plus global chat.
+            // We'll modify to get global messages as well.
+            // Simpler: fetch messages where senderId == currentUser.uid (sent) and also where chatId == 'global'.
+            // Global messages are public; user can read them.
+            // We'll combine two queries manually.
+            let sentSnapshot = await db.collection('messages')
+                                        .where('senderId', '==', currentUser.uid)
+                                        .orderBy('timestamp', 'desc')
+                                        .limit(100)
+                                        .get();
+            let globalSnapshot = await db.collection('messages')
+                                          .where('chatId', '==', 'global')
+                                          .orderBy('timestamp', 'desc')
+                                          .limit(100)
+                                          .get();
             let docs = [];
-            snap.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
-            docs.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
-            if (search) docs = docs.filter(m => (m.text || '').toLowerCase().includes(search));
+            sentSnapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+            globalSnapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
+            // Remove duplicates
+            const uniqueDocs = Array.from(new Map(docs.map(d => [d.id, d])).values());
+            uniqueDocs.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
+            if (search) {
+                const filtered = uniqueDocs.filter(m => (m.text || '').toLowerCase().includes(search));
+                docs = filtered;
+            } else {
+                docs = uniqueDocs;
+            }
             if (docs.length === 0) {
-                document.getElementById('chatList').innerHTML = '<p class="empty">No messages found. Try adjusting filters.</p>';
+                container.innerHTML = '<p class="empty">No messages found.</p>';
                 return;
             }
             let html = '<table id="chatTable"><tr><th>Time</th><th>Chat</th><th>Text</th><th>File</th></tr>';
@@ -548,17 +632,23 @@
                 </tr>`;
             });
             html += '</table>';
-            document.getElementById('chatList').innerHTML = html;
+            container.innerHTML = html;
         } catch (error) {
             console.error('Chat history load error:', error);
-            document.getElementById('chatList').innerHTML = `<p class="empty">⚠️ Error loading chat history: ${error.message}</p>`;
+            let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading chat history:</strong> ${error.message}</div>`;
+            container.innerHTML = errorHtml;
         }
     }
 
+    // ==================== Filter listeners ====================
+    document.getElementById('invFilterBtn').addEventListener('click', loadInvoices);
+    document.getElementById('retFilterBtn').addEventListener('click', loadReturns);
+    document.getElementById('dispFilterBtn').addEventListener('click', loadDispatched);
+    document.getElementById('recvFilterBtn').addEventListener('click', loadReceived);
     document.getElementById('chatFilterBtn').addEventListener('click', loadChatHistory);
     document.getElementById('chatSearch').addEventListener('input', loadChatHistory);
 
-    console.log('NEVAMAK Reports loaded with Save to Repository feature.');
+    console.log('NEVAMAK Reports loaded with role-based filtering and error handling.');
 </script>
 </body>
 </html>
