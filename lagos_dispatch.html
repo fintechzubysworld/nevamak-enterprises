@@ -69,6 +69,9 @@
         .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
         .bulk-actions button { width: auto; padding: 6px 16px; }
         .reroute-btn { background: #6c5ce7; color: white; }
+        .permission-error { background: #f8d7da; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 12px; margin: 12px 0; }
+        .permission-error a { color: #0a3d62; font-weight: 600; }
+        .permission-error .index-link { word-break: break-all; }
         @media (max-width: 600px) {
             .flex-row { flex-direction: column; }
             .item-row { flex-direction: column; align-items: stretch; }
@@ -88,6 +91,7 @@
         <a href="chat.html">💬 Chat</a>
         <a href="reports.html">📊 Reports</a>
         <a href="warehouse.html">🏚️ Warehouse</a>
+        <a href="permissions.html">🔐 Permissions</a>
         <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
 
@@ -182,6 +186,7 @@
                 <option value="Draft">Draft</option>
             </select>
         </div>
+        <div id="shipmentsError" style="display:none;"></div>
         <div class="scroll">
             <table id="shipmentsTable">
                 <thead><tr><th>ID</th><th>Dest</th><th>Supplier</th><th>Items</th><th>Goods</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
@@ -434,7 +439,17 @@
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
+            // ====== ROLE CHECK ======
+            if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
+                alert('⛔ Access Denied. Only Lagos Senders and Admins can access the Dispatch page.');
+                window.location.href = 'index.html';
+                return;
+            }
             document.getElementById('senderName').value = user.email.split('@')[0] + ' (' + currentUserRole + ')';
+        } else {
+            alert('User document not found. Please contact admin.');
+            window.location.href = 'login.html';
+            return;
         }
         document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
         await loadSuppliers();
@@ -458,22 +473,6 @@
         auth.signOut().then(() => window.location.href = 'login.html');
     });
 
-async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
-    
     // ==================== Suppliers ====================
     async function loadSuppliers() {
         try {
@@ -489,7 +488,6 @@ async function hasPermission(permName) {
                 opt.textContent = s.name;
                 sel.appendChild(opt);
             });
-            // Update reroute dropdowns if they exist
             updateRerouteSourceOptions();
             updateRerouteDestOptions();
         } catch (err) {
@@ -631,7 +629,6 @@ async function hasPermission(permName) {
             div.remove();
             updatePreview();
         };
-        // Attach input events
         div.querySelectorAll('input').forEach(inp => {
             inp.addEventListener('input', updatePreview);
             if (inp.type === 'number' && inp.min) {
@@ -1067,63 +1064,97 @@ async function hasPermission(permName) {
         }
     };
 
-    // ==================== Load Shipments ====================
+    // ==================== Load Shipments (with Error Handling) ====================
     function loadShipments() {
         const searchInput = document.getElementById('searchShipment');
         const filterSelect = document.getElementById('filterStatus');
+        const errorDiv = document.getElementById('shipmentsError');
 
         if (shipmentsUnsubscribe) shipmentsUnsubscribe();
         const tbody = document.querySelector("#shipmentsTable tbody");
         tbody.innerHTML = '<tr><td colspan="8"><div class="loading-spinner"></div> Loading...</td></tr>';
+        errorDiv.style.display = 'none';
+        errorDiv.innerHTML = '';
 
         let q = db.collection("shipments").orderBy("createdAt", "desc");
         const statusFilter = filterSelect.value;
         if (statusFilter !== 'all') q = q.where("status", "==", statusFilter);
 
-        shipmentsUnsubscribe = q.onSnapshot(snap => {
-            const search = searchInput.value.toLowerCase();
-            let filtered = [];
-            snap.forEach(doc => {
-                const d = doc.data();
-                const text = (d.senderName + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
-                if (text.includes(search)) filtered.push({ id: doc.id, data: d });
-            });
-            let html = '';
-            if (filtered.length === 0) html = '<tr><td colspan="8">No shipments</td></tr>';
-            else {
-                filtered.forEach(({id, data: d}) => {
-                    let goods = d.total || d.items?.reduce((s,i)=>s+(i.total||0),0) || 0;
-                    const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
-                    const supplierName = d.supplierId ? 'Supplier' : '-';
-                    const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
-                    const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
-                    const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered') &&
-                                      (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-                    const canDelete = (d.status === 'Draft' || d.status === 'Cancelled') &&
-                                      (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-                    const canEdit = d.status === 'Draft';
-                    html += `<tr>
-                        <td><strong>${escapeHtml(id.slice(0,6))}</strong></td>
-                        <td><span class="badge">${escapeHtml(d.destinationBranch)}</span></td>
-                        <td>${escapeHtml(supplierName)}</td>
-                        <td class="items-cell">${escapeHtml(itemsShort)}</td>
-                        <td class="cost-cell">₦${goods.toLocaleString()}</td>
-                        <td><span class="status-badge ${statusClass}">${escapeHtml(d.status)}</span></td>
-                        <td>${escapeHtml(date)}</td>
-                        <td>
-                            <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️ View</button>
-                            ${canEdit ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️ Edit</button>` : ''}
-                            ${canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${id}')">❌ Cancel</button>` : ''}
-                            ${canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${id}')">🗑️ Delete</button>` : ''}
-                        </td>
-                    </tr>`;
+        shipmentsUnsubscribe = q.onSnapshot(
+            (snap) => {
+                const search = searchInput.value.toLowerCase();
+                let filtered = [];
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    const text = (d.senderName + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
+                    if (text.includes(search)) filtered.push({ id: doc.id, data: d });
                 });
+                let html = '';
+                if (filtered.length === 0) html = '<tr><td colspan="8">No shipments</td></tr>';
+                else {
+                    filtered.forEach(({id, data: d}) => {
+                        let goods = d.total || d.items?.reduce((s,i)=>s+(i.total||0),0) || 0;
+                        const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
+                        const supplierName = d.supplierId ? 'Supplier' : '-';
+                        const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+                        const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
+                        const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered') &&
+                                          (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+                        const canDelete = (d.status === 'Draft' || d.status === 'Cancelled') &&
+                                          (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+                        const canEdit = d.status === 'Draft';
+                        html += `<tr>
+                            <td><strong>${escapeHtml(id.slice(0,6))}</strong></td>
+                            <td><span class="badge">${escapeHtml(d.destinationBranch)}</span></td>
+                            <td>${escapeHtml(supplierName)}</td>
+                            <td class="items-cell">${escapeHtml(itemsShort)}</td>
+                            <td class="cost-cell">₦${goods.toLocaleString()}</td>
+                            <td><span class="status-badge ${statusClass}">${escapeHtml(d.status)}</span></td>
+                            <td>${escapeHtml(date)}</td>
+                            <td>
+                                <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️ View</button>
+                                ${canEdit ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️ Edit</button>` : ''}
+                                ${canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${id}')">❌ Cancel</button>` : ''}
+                                ${canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${id}')">🗑️ Delete</button>` : ''}
+                            </td>
+                        </tr>`;
+                    });
+                }
+                tbody.innerHTML = html;
+            },
+            (err) => {
+                console.error('Shipments load error:', err);
+                tbody.innerHTML = '<tr><td colspan="8">Error loading shipments</td></tr>';
+                // Show detailed error with index creation link
+                let errorHtml = `
+                    <div class="permission-error">
+                        <strong>⚠️ Error loading shipments:</strong> ${escapeHtml(err.message)}
+                        <br><br>
+                        <strong>Possible Solutions:</strong>
+                        <ul style="margin:8px 0 0 16px;">
+                            <li>Check that your Firestore security rules allow reads for your role.</li>
+                            <li>If the error mentions an index, click the link below to create it.</li>
+                        </ul>
+                `;
+                // Check if error has index URL
+                if (err.message && err.message.includes('https://console.firebase.google.com')) {
+                    const match = err.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/);
+                    if (match) {
+                        errorHtml += `
+                            <br>
+                            <strong>🔗 Create Required Index:</strong><br>
+                            <a href="${match[0]}" target="_blank" style="color:#0a3d62; font-weight:600; word-break:break-all;">${match[0]}</a>
+                            <br><br>
+                            <span style="font-size:0.85rem; color:#666;">After creating the index, refresh this page.</span>
+                        `;
+                    }
+                }
+                errorHtml += `</div>`;
+                errorDiv.innerHTML = errorHtml;
+                errorDiv.style.display = 'block';
             }
-            tbody.innerHTML = html;
-        }, err => {
-            tbody.innerHTML = '<tr><td colspan="8">Error loading shipments: ' + escapeHtml(err.message) + '</td></tr>';
-            showToast('Error loading shipments: ' + err.message, 'error');
-        });
+        );
+
         searchInput.addEventListener('input', loadShipments);
         filterSelect.addEventListener('change', loadShipments);
     }
@@ -1406,9 +1437,7 @@ async function hasPermission(permName) {
 
     document.getElementById('openRerouteBtn').addEventListener('click', () => {
         document.getElementById('rerouteModal').style.display = 'flex';
-        // Reset form fields if needed
         document.getElementById('rerouteMessage').textContent = '';
-        // Ensure dropdowns reflect current supplier list
         updateRerouteSourceOptions();
         updateRerouteDestOptions();
     });
@@ -1461,7 +1490,6 @@ async function hasPermission(permName) {
     });
 
     function updateReroutePreview() {
-        // No multiplier in reroute, default 1.00
         const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateTotals('rerouteItemsContainer', 'dummyMultiplier');
         document.getElementById('rerouteCostPreview').innerHTML = `Total goods value: ₦${grandTotal.toLocaleString()}`;
         document.getElementById('rerouteTaxBreakdown').innerHTML = `
@@ -1473,7 +1501,6 @@ async function hasPermission(permName) {
         `;
     }
     document.getElementById('rerouteItemsContainer').addEventListener('input', updateReroutePreview);
-    // Add a hidden dummy multiplier input for calculateTotals to work
     const dummyMultiplier = document.createElement('input');
     dummyMultiplier.type = 'hidden';
     dummyMultiplier.id = 'dummyMultiplier';
@@ -1665,7 +1692,6 @@ async function hasPermission(permName) {
         const date = document.getElementById('rerouteDate').value;
         const notes = document.getElementById('rerouteNotes').value.trim();
 
-        // Get items from reroute container
         const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('rerouteItemsContainer', 'dummyMultiplier');
         if (items.length === 0) {
             document.getElementById('rerouteMessage').innerText = 'Please add at least one item.';
@@ -1702,13 +1728,11 @@ async function hasPermission(permName) {
             });
             showToast('✅ Reroute recorded successfully.', 'success');
             closeModal('rerouteModal');
-            // Reset reroute form
             rerouteItemsContainer.innerHTML = '';
             addRerouteItemRow();
             updateReroutePreview();
             document.getElementById('rerouteReference').value = '';
             document.getElementById('rerouteNotes').value = '';
-            // Optionally reload stats or shipments if needed
         } catch (err) {
             document.getElementById('rerouteMessage').innerText = 'Error: ' + err.message;
             showToast('Error: ' + err.message, 'error');
@@ -1749,7 +1773,7 @@ async function hasPermission(permName) {
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dispatch with Reroute and external vendor support loaded.');
+    console.log('NEVAMAK Dispatch with Reroute and error handling loaded.');
 </script>
 </body>
 </html>
