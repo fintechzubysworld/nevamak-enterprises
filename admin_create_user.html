@@ -43,6 +43,8 @@
         .status-disabled { background: #f8d7da; color: #721c24; }
         .status-unverified { background: #fff3cd; color: #856404; }
         .status-missing { background: #f5c6cb; color: #721c24; }
+        .fallback-input { margin-top: 8px; }
+        .fallback-input input { padding: 8px 12px; border-radius: 24px; font-size: 0.85rem; }
         @media (max-width: 600px) {
             .nav { flex-direction: column; align-items: stretch; }
             .user-table th, .user-table td { font-size: 0.75rem; padding: 6px 4px; }
@@ -60,9 +62,8 @@
     <h2>👥 User Management</h2>
     
     <div class="info-box" style="background:#f8d7da; border-color:#f5c6cb;">
-        <strong>⚠️ Permission Error?</strong> If you see <em>"Missing or insufficient permissions"</em> when using the Fix button, 
-        update your Firestore security rules to allow admin writes. 
-        <a href="#" onclick="showRulesHelp(); return false;" style="color:#0a3d62;">Click here for rules example</a>
+        <strong>⚠️ Permission Error?</strong> If you see <em>"Missing or insufficient permissions"</em> when loading suppliers,
+        update your Firestore security rules. <a href="#" onclick="showRulesHelp(); return false;" style="color:#0a3d62;">Click here for rules example</a>
     </div>
 
     <form id="createUserForm">
@@ -83,6 +84,12 @@
                 <option value="">-- Select Supplier --</option>
             </select>
             <div id="supplierStatus" style="font-size:0.8rem; color:#888; margin-top:4px;"></div>
+            <!-- Fallback: manual entry if dropdown fails -->
+            <div id="supplierFallback" class="hidden fallback-input">
+                <label style="font-size:0.85rem;">Or enter Supplier ID manually:</label>
+                <input type="text" id="manualSupplierId" placeholder="Supplier Document ID">
+                <small style="display:block; color:#666; margin-top:-4px;">Only if dropdown is not working.</small>
+            </div>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px; margin:8px 0;">
@@ -118,12 +125,15 @@
         const supplierSelect = document.getElementById('supplierSelect');
         const supplierField = document.getElementById('supplierField');
         const supplierStatus = document.getElementById('supplierStatus');
+        const supplierFallback = document.getElementById('supplierFallback');
+        const manualSupplierId = document.getElementById('manualSupplierId');
         const messageDiv = document.getElementById('message');
         const userListDiv = document.getElementById('userList');
 
         let currentUserEmail = '';
         let suppliers = [];
         let usersCache = [];
+        let suppliersLoaded = false;
 
         // ========== Auth ==========
         auth.onAuthStateChanged(async (user) => {
@@ -154,6 +164,8 @@
                 if (snap.empty) {
                     supplierStatus.textContent = '⚠️ No suppliers found. Please add suppliers first.';
                     supplierStatus.style.color = '#e67e22';
+                    // Show fallback
+                    supplierFallback.classList.remove('hidden');
                 } else {
                     snap.forEach(doc => {
                         const s = doc.data();
@@ -165,12 +177,19 @@
                     });
                     supplierStatus.textContent = `✅ ${suppliers.length} suppliers available.`;
                     supplierStatus.style.color = '#27ae60';
+                    supplierFallback.classList.add('hidden'); // hide fallback
                 }
+                suppliersLoaded = true;
             } catch (err) {
                 console.error('Error loading suppliers:', err);
                 supplierStatus.textContent = '❌ Error loading suppliers: ' + err.message;
                 supplierStatus.style.color = '#e74c3c';
                 suppliers = [];
+                suppliersLoaded = false;
+                // Show fallback for manual entry
+                supplierFallback.classList.remove('hidden');
+                // Show instructions to update rules
+                supplierStatus.innerHTML += ' <a href="#" onclick="showRulesHelp(); return false;" style="color:#0a3d62;">Update Firestore rules</a>';
             }
         }
 
@@ -178,8 +197,10 @@
         userRole.addEventListener('change', function() {
             if (this.value === 'vendor') {
                 supplierField.classList.remove('hidden');
-                // Reload suppliers in case list changed
-                loadSuppliers();
+                // Reload suppliers if not loaded yet or refresh
+                if (!suppliersLoaded) {
+                    loadSuppliers();
+                }
             } else {
                 supplierField.classList.add('hidden');
             }
@@ -201,7 +222,7 @@
             const email = userEmail.value.trim();
             const password = userPassword.value;
             const role = userRole.value;
-            const supplierId = supplierSelect.value;
+            let supplierId = supplierSelect.value;
 
             if (!email || !password) {
                 showMessage('Please fill all fields.', 'error');
@@ -214,16 +235,32 @@
 
             let supplierName = '';
             if (role === 'vendor') {
+                // If dropdown failed, check manual entry
+                if (!supplierId && manualSupplierId.value.trim()) {
+                    supplierId = manualSupplierId.value.trim();
+                    // Try to find supplier name from the loaded list, otherwise prompt
+                    const found = suppliers.find(s => s.id === supplierId);
+                    if (found) {
+                        supplierName = found.name;
+                    } else {
+                        // Ask user for supplier name
+                        const name = prompt('Enter supplier name for this ID:');
+                        if (!name) {
+                            showMessage('Supplier name required.', 'error');
+                            return;
+                        }
+                        supplierName = name;
+                    }
+                }
                 if (!supplierId) {
-                    showMessage('Please select a supplier for External Vendor.', 'error');
+                    showMessage('Please select a supplier or enter a valid Supplier ID.', 'error');
                     return;
                 }
-                const supplier = suppliers.find(s => s.id === supplierId);
-                if (!supplier) {
-                    showMessage('Selected supplier not found. Please refresh and try again.', 'error');
-                    return;
+                // If we still don't have supplierName, try to get from list
+                if (!supplierName) {
+                    const found = suppliers.find(s => s.id === supplierId);
+                    if (found) supplierName = found.name;
                 }
-                supplierName = supplier.name;
             }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -244,8 +281,8 @@
                 };
                 if (role === 'vendor') {
                     userData.supplierId = supplierId;
-                    userData.supplierName = supplierName;
-                    userData.vendorName = supplierName;
+                    userData.supplierName = supplierName || 'Unknown';
+                    userData.vendorName = supplierName || 'Unknown';
                 }
 
                 await db.collection('users').doc(uid).set(userData);
@@ -263,6 +300,7 @@
                 userPassword.value = '';
                 userRole.value = 'lagos_sender';
                 supplierField.classList.add('hidden');
+                manualSupplierId.value = '';
                 loadUsers();
             } catch (err) {
                 console.error('Create error:', err);
@@ -339,22 +377,34 @@
             }
             let supplierId = null, supplierName = null;
             if (role === 'vendor') {
-                // Reload suppliers to ensure fresh list
+                // Try to reload suppliers, but if fails, ask manually
                 await loadSuppliers();
                 if (suppliers.length === 0) {
-                    alert('No suppliers found. Please add a supplier first.');
-                    return;
+                    // Manual entry
+                    const id = prompt('Enter Supplier ID (document ID):');
+                    if (!id) return;
+                    const name = prompt('Enter Supplier Name:');
+                    if (!name) return;
+                    supplierId = id;
+                    supplierName = name;
+                } else {
+                    const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
+                    const input = prompt(`Enter supplier ID:\n${list}`);
+                    if (input === null) return;
+                    const sel = suppliers.find(s => s.id === input.trim());
+                    if (!sel) {
+                        alert('Supplier not found. You can enter manually.');
+                        const id = prompt('Enter Supplier ID manually:');
+                        if (!id) return;
+                        const name = prompt('Enter Supplier Name:');
+                        if (!name) return;
+                        supplierId = id;
+                        supplierName = name;
+                    } else {
+                        supplierId = sel.id;
+                        supplierName = sel.name;
+                    }
                 }
-                const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
-                const input = prompt(`Enter supplier ID:\n${list}`);
-                if (input === null) return;
-                const sel = suppliers.find(s => s.id === input.trim());
-                if (!sel) {
-                    alert('Supplier not found.');
-                    return;
-                }
-                supplierId = sel.id;
-                supplierName = sel.name;
             }
             const data = {
                 email,
@@ -394,20 +444,35 @@
             }
             let supplierId = null, supplierName = null;
             if (newRole === 'vendor') {
-                // Reload suppliers
+                // Similar fallback
                 loadSuppliers().then(() => {
                     if (suppliers.length === 0) {
-                        alert('No suppliers found.');
-                        return;
+                        const id = prompt('Enter Supplier ID:');
+                        if (!id) return;
+                        const name = prompt('Enter Supplier Name:');
+                        if (!name) return;
+                        supplierId = id;
+                        supplierName = name;
+                        proceedUpdate(uid, newRole, supplierId, supplierName);
+                    } else {
+                        const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
+                        const input = prompt(`Enter supplier ID:\n${list}`);
+                        if (input === null) return;
+                        const sel = suppliers.find(s => s.id === input.trim());
+                        if (!sel) { 
+                            // Manual fallback
+                            const id = prompt('Enter Supplier ID manually:');
+                            if (!id) return;
+                            const name = prompt('Enter Supplier Name:');
+                            if (!name) return;
+                            supplierId = id;
+                            supplierName = name;
+                        } else {
+                            supplierId = sel.id;
+                            supplierName = sel.name;
+                        }
+                        proceedUpdate(uid, newRole, supplierId, supplierName);
                     }
-                    const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
-                    const input = prompt(`Enter supplier ID:\n${list}`);
-                    if (input === null) return;
-                    const sel = suppliers.find(s => s.id === input.trim());
-                    if (!sel) { alert('Supplier not found.'); return; }
-                    supplierId = sel.id;
-                    supplierName = sel.name;
-                    proceedUpdate(uid, newRole, supplierId, supplierName);
                 });
                 return;
             }
@@ -463,11 +528,19 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Allow users to read/write their own data
     match /users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && 
         (request.auth.uid == userId || 
          request.auth.token.email == '${currentUserEmail}');
+    }
+    // Allow read access to suppliers for authenticated users
+    match /suppliers/{supplierId} {
+      allow read: if request.auth != null;
+      // Only admin can write
+      allow write: if request.auth != null && 
+        request.auth.token.email == '${currentUserEmail}';
     }
   }
 }
