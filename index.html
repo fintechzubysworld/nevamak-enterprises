@@ -9,7 +9,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
-        /* (all existing styles remain, plus no new ones needed) */
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
         .container { max-width: 1400px; margin: auto; }
@@ -56,48 +55,11 @@
         .btn-primary { background: #0a3d62; color: white; }
         .btn-warning { background: #f39c12; color: white; }
         .btn-info { background: #3498db; color: white; }
+        .items-cell { word-wrap: break-word; overflow-wrap: break-word; max-width: 150px; }
         @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } .stat-card .number { font-size: 1.3rem; } header { flex-direction: column; text-align: center; } }
     </style>
-    </head>
+</head>
 <body>
-    <script>
-    // Redirect external vendors away from the main dashboard
-    document.addEventListener('DOMContentLoaded', function() {
-        const firebaseConfig = {
-            apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
-            authDomain: "nevamak-enterprises.firebaseapp.com",
-            projectId: "nevamak-enterprises",
-            storageBucket: "nevamak-enterprises.firebasestorage.app",
-            messagingSenderId: "144324172534",
-            appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-            measurementId: "G-MZ8NT6KK8N"
-        };
-        // Only initialize Firebase if not already initialized
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                try {
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    if (userDoc.exists) {
-                        const role = userDoc.data().role;
-                        // If the user is a vendor, redirect to external_vendor.html
-                        if (role === 'vendor' || role === 'external_vendor') {
-                            window.location.href = 'external_vendor.html';
-                            return;
-                        }
-                    }
-                } catch (err) {
-                    console.warn('Vendor check error:', err);
-                }
-            }
-        });
-    });
-</script>
 <div class="container">
     <header>
         <div class="logo"><h1>🚛 NEVAMAK</h1><p id="roleBadge"></p></div>
@@ -222,6 +184,39 @@
 </div>
 
 <script>
+    // ==================== VENDOR REDIRECT: Prevent vendors from viewing dashboard ====================
+    (function() {
+        const firebaseConfig = {
+            apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+            authDomain: "nevamak-enterprises.firebaseapp.com",
+            projectId: "nevamak-enterprises",
+            storageBucket: "nevamak-enterprises.firebasestorage.app",
+            messagingSenderId: "144324172534",
+            appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+            measurementId: "G-MZ8NT6KK8N"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                try {
+                    const doc = await db.collection('users').doc(user.uid).get();
+                    if (doc.exists) {
+                        const role = doc.data().role;
+                        if (role === 'vendor' || role === 'external_vendor') {
+                            window.location.replace('external_vendor.html');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Vendor redirect check error:', e);
+                }
+            }
+        });
+    })();
+
+    // ==================== Main Application ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
         authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -231,15 +226,15 @@
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
         measurementId: "G-MZ8NT6KK8N"
     };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const auth2 = firebase.auth();
+    const db2 = firebase.firestore();
     let currentUser, currentRole;
 
-    auth.onAuthStateChanged(async (user) => {
+    auth2.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
-        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userDoc = await db2.collection('users').doc(user.uid).get();
         currentRole = userDoc.data()?.role || '';
         document.getElementById('roleBadge').innerText = `Role: ${currentRole}`;
         if (currentRole === 'admin') document.getElementById('adminPanelLink').style.display = 'inline-block';
@@ -255,7 +250,7 @@
         loadNotifications();
         initCharts();
     });
-    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+    document.getElementById('logoutBtn').addEventListener('click', () => auth2.signOut().then(() => window.location.href = 'login.html'));
 
     // ---- Charts ----
     let shipmentChart, costChart;
@@ -277,7 +272,7 @@
 
     // ---- Listeners ----
     function startListeners() {
-        db.collection("shipments").onSnapshot((snapshot) => {
+        db2.collection("shipments").onSnapshot((snapshot) => {
             let total=0, abuja=0, ph=0, delivered=0, totalGoods=0, totalTrans=0, rows=[];
             let chartData = {};
             snapshot.forEach(doc => {
@@ -319,7 +314,7 @@
             updateCharts(dataForChart);
         }, err => console.error('Shipments listener error:', err));
 
-        db.collection("returns").orderBy("date","desc").onSnapshot(snap => {
+        db2.collection("returns").orderBy("date","desc").onSnapshot(snap => {
             let returnRows="", totalReturned=0;
             snap.forEach(doc => {
                 const r = doc.data();
@@ -334,7 +329,7 @@
     // ---- Inventory ----
     async function loadInventory() {
         try {
-            const snap = await db.collection('inventory').get();
+            const snap = await db2.collection('inventory').get();
             if (snap.empty) {
                 document.getElementById('inventorySummary').innerHTML = '<p>No inventory data available. Please create inventory via receiving goods.</p>';
                 document.getElementById('inStockCount').innerText = '0';
@@ -360,7 +355,7 @@
     // ---- Audit Log ----
     async function loadAudit() {
         try {
-            const snap = await db.collection('activityLog').orderBy('timestamp','desc').limit(50).get();
+            const snap = await db2.collection('activityLog').orderBy('timestamp','desc').limit(50).get();
             let html = '';
             snap.forEach(doc => {
                 const a = doc.data();
@@ -375,7 +370,7 @@
 
     // ---- Notifications ----
     function loadNotifications() {
-        db.collection('notifications').where('userId','==',currentUser?.uid).orderBy('timestamp','desc').limit(20).onSnapshot(snap => {
+        db2.collection('notifications').where('userId','==',currentUser?.uid).orderBy('timestamp','desc').limit(20).onSnapshot(snap => {
             let count = 0;
             let html = '';
             snap.forEach(doc => {
@@ -402,7 +397,7 @@
     // ---- View Shipment Details ----
     window.viewShipment = async function(id) {
         try {
-            const doc = await db.collection('shipments').doc(id).get();
+            const doc = await db2.collection('shipments').doc(id).get();
             if (!doc.exists) return alert('Shipment not found.');
             const d = doc.data();
             let itemsHtml = '<table><tr><th>Item</th><th>Qty Ordered</th><th>Unit Price</th><th>Total</th><th>Received</th><th>Damaged</th></tr>';
@@ -463,40 +458,101 @@
         }
     };
 
-    // ==================== Pending Invoice Requests ====================
+    // ==================== Pending Invoice Requests (Fixed) ====================
     function loadPendingRequests() {
-        db.collection('invoiceRequests')
+        const container = document.getElementById('pendingRequestsList');
+        container.innerHTML = '<div style="text-align:center; padding:10px; color:#888;">Loading requests...</div>';
+
+        // Try the indexed query first
+        db2.collection('invoiceRequests')
             .where('status', '==', 'pending')
             .orderBy('requestedAt', 'desc')
-            .onSnapshot((snap) => {
-                let html = '';
-                if (snap.empty) {
-                    html = '<p style="text-align:center; color:#888; padding:20px;">No pending requests.</p>';
-                } else {
-                    html = '<table><tr><th>Date</th><th>Branch</th><th>Requested By</th><th>Items</th><th>Est. Total</th><th>Action</th></tr>';
-                    snap.forEach(doc => {
-                        const d = doc.data();
-                        const total = d.items.reduce((sum, it) => sum + (it.quantity * (it.estimatedPrice || 0)), 0);
-                        const itemsShort = d.items.map(it => `${it.itemName}(${it.quantity})`).join(", ").substring(0,40);
-                        html += `<tr>
-                            <td>${d.requestedAt ? new Date(d.requestedAt.toDate()).toLocaleDateString() : ''}</td>
-                            <td>${d.branch}</td>
-                            <td>${d.requestedBy}</td>
-                            <td class="items-cell">${itemsShort}</td>
-                            <td class="cost-cell">₦${total.toLocaleString()}</td>
-                            <td>
-                                <button class="btn-sm btn-success" onclick="openApproveModal('${doc.id}')">✅ Approve</button>
-                                <button class="btn-sm btn-danger" onclick="rejectRequest('${doc.id}')">❌ Reject</button>
-                            </td>
-                        </tr>`;
-                    });
-                    html += '</table>';
+            .onSnapshot(
+                (snap) => {
+                    renderRequests(snap);
+                },
+                (error) => {
+                    // If index missing, show help and offer fallback
+                    if (error.message && error.message.includes('requires an index')) {
+                        const match = error.message.match(/https:\/\/console\.firebase\.google\.com\/.*/);
+                        const indexUrl = match ? match[0] : '#';
+                        container.innerHTML = `
+                            <div style="background:#fff3cd; padding:12px; border-radius:8px; margin:8px 0;">
+                                <strong>⚠️ Missing Firestore Index</strong>
+                                <p>To load pending invoice requests, you need to create a composite index.</p>
+                                <p><a href="${indexUrl}" target="_blank" style="color:#0a3d62; font-weight:bold;">Click here to create the required index</a></p>
+                                <p style="font-size:0.8rem; color:#666;">Alternatively, the system can fallback to a simpler query (may be slower).</p>
+                                <button id="fallbackQueryBtn" class="btn-sm btn-primary" style="margin-top:8px;">Use fallback query</button>
+                            </div>
+                        `;
+                        document.getElementById('fallbackQueryBtn')?.addEventListener('click', function() {
+                            loadPendingRequestsFallback();
+                        });
+                    } else {
+                        // Other error (permissions, etc.)
+                        console.error('Error loading requests:', error);
+                        container.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
+                    }
                 }
-                document.getElementById('pendingRequestsList').innerHTML = html;
-            }, (error) => {
-                console.error('Pending requests error:', error);
-                document.getElementById('pendingRequestsList').innerHTML = '<p style="color:red;">Error loading requests.</p>';
+            );
+    }
+
+    // Fallback: fetch all and filter client-side (no composite index needed)
+    function loadPendingRequestsFallback() {
+        const container = document.getElementById('pendingRequestsList');
+        container.innerHTML = '<div style="text-align:center; padding:10px; color:#888;">Loading requests (fallback mode)...</div>';
+
+        db2.collection('invoiceRequests')
+            .orderBy('requestedAt', 'desc')
+            .onSnapshot(
+                (snap) => {
+                    const pendingDocs = [];
+                    snap.forEach(doc => {
+                        if (doc.data().status === 'pending') {
+                            pendingDocs.push(doc);
+                        }
+                    });
+                    const filteredSnap = {
+                        empty: pendingDocs.length === 0,
+                        forEach: (callback) => pendingDocs.forEach(callback),
+                        docs: pendingDocs
+                    };
+                    renderRequests(filteredSnap);
+                },
+                (error) => {
+                    console.error('Fallback query error:', error);
+                    container.innerHTML = `<p style="color:red;">Error loading requests (fallback): ${error.message}</p>`;
+                }
+            );
+    }
+
+    // Render the requests (shared by both methods)
+    function renderRequests(snap) {
+        const container = document.getElementById('pendingRequestsList');
+        let html = '';
+        if (snap.empty || snap.docs?.length === 0) {
+            html = '<p style="text-align:center; color:#888; padding:20px;">No pending requests.</p>';
+        } else {
+            html = '<table><tr><th>Date</th><th>Branch</th><th>Requested By</th><th>Items</th><th>Est. Total</th><th>Action</th></tr>';
+            snap.forEach(doc => {
+                const d = doc.data();
+                const total = d.items.reduce((sum, it) => sum + (it.quantity * (it.estimatedPrice || 0)), 0);
+                const itemsShort = d.items.map(it => `${it.itemName}(${it.quantity})`).join(", ").substring(0,40);
+                html += `<tr>
+                    <td>${d.requestedAt ? new Date(d.requestedAt.toDate()).toLocaleDateString() : ''}</td>
+                    <td>${d.branch}</td>
+                    <td>${d.requestedBy}</td>
+                    <td class="items-cell">${itemsShort}</td>
+                    <td class="cost-cell">₦${total.toLocaleString()}</td>
+                    <td>
+                        <button class="btn-sm btn-success" onclick="openApproveModal('${doc.id}')">✅ Approve</button>
+                        <button class="btn-sm btn-danger" onclick="rejectRequest('${doc.id}')">❌ Reject</button>
+                    </td>
+                </tr>`;
             });
+            html += '</table>';
+        }
+        container.innerHTML = html;
     }
 
     // ---- Approve / Reject / Draft ----
@@ -505,7 +561,7 @@
 
     window.openApproveModal = async function(requestId) {
         try {
-            const doc = await db.collection('invoiceRequests').doc(requestId).get();
+            const doc = await db2.collection('invoiceRequests').doc(requestId).get();
             if (!doc.exists) return;
             currentRequestId = requestId;
             currentRequestData = doc.data();
@@ -609,7 +665,7 @@
         }
 
         try {
-            const shipmentRef = await db.collection('shipments').add({
+            const shipmentRef = await db2.collection('shipments').add({
                 senderName,
                 destinationBranch: currentRequestData.branch,
                 supplierId: '',
@@ -625,13 +681,13 @@
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            await db.collection('invoiceRequests').doc(currentRequestId).update({
+            await db2.collection('invoiceRequests').doc(currentRequestId).update({
                 status: 'approved',
                 shipmentId: shipmentRef.id,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            await db.collection('activityLog').add({
+            await db2.collection('activityLog').add({
                 actionType: 'approve_request',
                 shipmentId: shipmentRef.id,
                 branch: currentRequestData.branch,
@@ -678,7 +734,7 @@
         }
 
         try {
-            const shipmentRef = await db.collection('shipments').add({
+            const shipmentRef = await db2.collection('shipments').add({
                 senderName,
                 destinationBranch: currentRequestData.branch,
                 supplierId: '',
@@ -694,13 +750,13 @@
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            await db.collection('invoiceRequests').doc(currentRequestId).update({
+            await db2.collection('invoiceRequests').doc(currentRequestId).update({
                 status: 'draft',
                 shipmentId: shipmentRef.id,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            await db.collection('activityLog').add({
+            await db2.collection('activityLog').add({
                 actionType: 'draft_request',
                 shipmentId: shipmentRef.id,
                 branch: currentRequestData.branch,
@@ -722,7 +778,7 @@
         if (!confirm('Reject this request?')) return;
         const reason = prompt('Reason for rejection (optional):');
         try {
-            await db.collection('invoiceRequests').doc(requestId).update({
+            await db2.collection('invoiceRequests').doc(requestId).update({
                 status: 'rejected',
                 rejectionReason: reason || 'No reason provided',
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -739,7 +795,7 @@
         if (!confirm('Reject this request?')) return;
         const reason = prompt('Reason for rejection:');
         try {
-            await db.collection('invoiceRequests').doc(currentRequestId).update({
+            await db2.collection('invoiceRequests').doc(currentRequestId).update({
                 status: 'rejected',
                 rejectionReason: reason || 'No reason provided',
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -751,6 +807,9 @@
             alert('Error rejecting: ' + error.message);
         }
     });
+
+    // ==================== Init ====================
+    console.log('NEVAMAK Dashboard loaded with vendor redirect and fixed invoice requests.');
 </script>
 </body>
 </html>
