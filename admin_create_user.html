@@ -10,7 +10,7 @@
     <style>
         * { font-family: 'Segoe UI', -apple-system, sans-serif; box-sizing: border-box; }
         body { background: #f0f2f5; margin: 0; padding: 16px; }
-        .card { max-width: 700px; margin: auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card { max-width: 900px; margin: auto; background: white; border-radius: 28px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         input, select, button { width: 100%; padding: 14px; margin: 8px 0; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; }
         button { background: #0a3d62; color: white; font-weight: bold; border: none; cursor: pointer; }
         .nav { display: flex; justify-content: space-between; margin-bottom: 20px; gap: 10px; flex-wrap: wrap; }
@@ -21,6 +21,9 @@
         .btn-edit { background: #f39c12; }
         .btn-disable { background: #e74c3c; }
         .btn-enable { background: #27ae60; }
+        .hidden { display: none; }
+        .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; }
+        .role-badge { background: #0a3d62; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
         @media (max-width: 500px) { .nav { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -34,14 +37,23 @@
     </div>
     <h2>👥 User Management</h2>
     <form id="createUserForm">
-        <input type="email" id="userEmail" placeholder="Email">
-        <input type="password" id="userPassword" placeholder="Password">
+        <input type="email" id="userEmail" placeholder="Email" required>
+        <input type="password" id="userPassword" placeholder="Password" required>
         <select id="userRole">
             <option value="lagos_sender">Lagos Sender</option>
             <option value="abuja_rep">Abuja Rep</option>
             <option value="ph_rep">PH Rep</option>
             <option value="admin">Admin</option>
+            <option value="vendor">External Vendor</option>
         </select>
+        <!-- Supplier dropdown (only for vendor role) -->
+        <div id="supplierField" class="hidden">
+            <label>Select Supplier / Vendor Company:</label>
+            <select id="supplierSelect">
+                <option value="">-- Select Supplier --</option>
+            </select>
+            <small style="display:block; color:#666; margin-top:-4px;">Required for External Vendor role</small>
+        </div>
         <button type="submit">➕ Create User</button>
         <div id="message"></div>
     </form>
@@ -63,44 +75,125 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    let currentUserRole = '';
+    let currentUid = '';
+
+    // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
+        currentUid = user.uid;
         const userDoc = await db.collection('users').doc(user.uid).get();
-        if (userDoc.data()?.role !== 'admin') {
-            alert('Only admin can access');
+        const data = userDoc.data();
+        if (!data || data.role !== 'admin') {
+            alert('Only admin can access this page.');
             window.location.href = 'index.html';
             return;
         }
+        currentUserRole = data.role;
+        await loadSuppliers();
         loadUsers();
     });
-    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
 
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    // ==================== Suppliers ====================
+    let suppliers = [];
+
+    async function loadSuppliers() {
+        try {
+            const snap = await db.collection('suppliers').get();
+            suppliers = [];
+            const sel = document.getElementById('supplierSelect');
+            sel.innerHTML = '<option value="">-- Select Supplier --</option>';
+            snap.forEach(doc => {
+                const s = doc.data();
+                suppliers.push({ id: doc.id, name: s.name });
+                const opt = document.createElement('option');
+                opt.value = doc.id;
+                opt.textContent = s.name;
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            console.error('Error loading suppliers:', err);
+        }
+    }
+
+    // ==================== Toggle Supplier Field ====================
+    document.getElementById('userRole').addEventListener('change', function() {
+        const role = this.value;
+        const supplierField = document.getElementById('supplierField');
+        if (role === 'vendor') {
+            supplierField.classList.remove('hidden');
+        } else {
+            supplierField.classList.add('hidden');
+        }
+    });
+
+    // ==================== Create User ====================
     document.getElementById('createUserForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('userEmail').value.trim();
         const password = document.getElementById('userPassword').value;
         const role = document.getElementById('userRole').value;
-        if (!email || !password) { document.getElementById('message').innerText = 'Fill all fields'; return; }
+        const supplierId = document.getElementById('supplierSelect').value;
+        const msg = document.getElementById('message');
+
+        if (!email || !password) {
+            msg.innerHTML = '<span style="color:red;">Fill all fields.</span>';
+            return;
+        }
+
+        // If role is vendor, supplier is required
+        if (role === 'vendor' && !supplierId) {
+            msg.innerHTML = '<span style="color:red;">Please select a supplier for External Vendor.</span>';
+            return;
+        }
+
         try {
-            const uc = await auth.createUserWithEmailAndPassword(email, password);
-            await db.collection('users').doc(uc.user.uid).set({ email, role, enabled: true, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-            document.getElementById('message').innerHTML = `<span style="color:green;">✅ ${email} created as ${role}</span>`;
+            const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+            const uid = userCredential.user.uid;
+            const userData = {
+                email,
+                role,
+                enabled: true,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+            if (role === 'vendor') {
+                // Find supplier name
+                const supplier = suppliers.find(s => s.id === supplierId);
+                userData.supplierId = supplierId;
+                userData.supplierName = supplier ? supplier.name : '';
+                userData.vendorName = supplier ? supplier.name : email.split('@')[0];
+            }
+            await db.collection('users').doc(uid).set(userData);
+
+            msg.innerHTML = `<span style="color:green;">✅ ${email} created as ${role} ${role === 'vendor' ? '(Supplier: ' + (supplierData?.name || '') + ')' : ''}</span>`;
             document.getElementById('userEmail').value = '';
             document.getElementById('userPassword').value = '';
+            document.getElementById('userRole').value = 'lagos_sender';
+            document.getElementById('supplierField').classList.add('hidden');
             loadUsers();
-        } catch(err) { document.getElementById('message').innerHTML = `<span style="color:red;">❌ ${err.message}</span>`; }
+        } catch (err) {
+            msg.innerHTML = `<span style="color:red;">❌ ${err.message}</span>`;
+        }
     });
 
+    // ==================== Load Users ====================
     async function loadUsers() {
         const snap = await db.collection('users').get();
-        let html = '<table class="user-table"><tr><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>';
+        let html = '<table class="user-table"><tr><th>Email</th><th>Role</th><th>Supplier</th><th>Status</th><th>Actions</th></tr>';
         snap.forEach(doc => {
             const u = doc.data();
             const uid = doc.id;
             const enabled = u.enabled !== false;
+            const supplierDisplay = u.supplierName ? u.supplierName : (u.supplierId ? 'Supplier ID: ' + u.supplierId : '—');
+            const roleDisplay = u.role === 'vendor' ? `<span class="badge" style="background:#6c5ce7;color:white;">Vendor</span>` : u.role;
             html += `<tr>
                 <td>${u.email}</td>
-                <td>${u.role}</td>
+                <td>${roleDisplay}</td>
+                <td>${supplierDisplay}</td>
                 <td>${enabled ? '✅ Active' : '❌ Disabled'}</td>
                 <td>
                     <button class="btn-edit" onclick="editUser('${uid}')">✏️ Edit</button>
@@ -114,22 +207,70 @@
         document.getElementById('userList').innerHTML = html;
     }
 
+    // ==================== Edit User ====================
     window.editUser = function(uid) {
-        const newRole = prompt('Enter new role (admin, lagos_sender, abuja_rep, ph_rep):');
-        if (newRole) {
-            db.collection('users').doc(uid).update({ role: newRole }).then(() => {
-                alert('Role updated');
-                loadUsers();
-            });
+        const newRole = prompt('Enter new role (admin, lagos_sender, abuja_rep, ph_rep, vendor):');
+        if (newRole === null) return;
+        // Validate role
+        const validRoles = ['admin', 'lagos_sender', 'abuja_rep', 'ph_rep', 'vendor'];
+        if (!validRoles.includes(newRole)) {
+            alert('Invalid role. Allowed: admin, lagos_sender, abuja_rep, ph_rep, vendor');
+            return;
         }
+
+        // If vendor, ask for supplier
+        let supplierId = null;
+        let supplierName = null;
+        if (newRole === 'vendor') {
+            const supplierList = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
+            const input = prompt(`Select supplier by entering the ID from the list:\n${supplierList}`);
+            if (input === null) return;
+            const selected = suppliers.find(s => s.id === input.trim());
+            if (!selected) {
+                alert('Supplier not found. Please use the exact ID from the list.');
+                return;
+            }
+            supplierId = selected.id;
+            supplierName = selected.name;
+        }
+
+        const updateData = { role: newRole };
+        if (supplierId) {
+            updateData.supplierId = supplierId;
+            updateData.supplierName = supplierName;
+            updateData.vendorName = supplierName;
+        } else {
+            // If role changed from vendor to something else, remove supplier fields
+            if (newRole !== 'vendor') {
+                // Optionally remove supplier fields
+                // updateData.supplierId = firebase.firestore.FieldValue.delete();
+                // updateData.supplierName = firebase.firestore.FieldValue.delete();
+                // updateData.vendorName = firebase.firestore.FieldValue.delete();
+                // For simplicity, we'll keep them but they won't be used.
+            }
+        }
+
+        db.collection('users').doc(uid).update(updateData).then(() => {
+            alert('User updated.');
+            loadUsers();
+        }).catch(err => {
+            alert('Error updating user: ' + err.message);
+        });
     };
 
+    // ==================== Toggle User ====================
     window.toggleUser = function(uid, enable) {
         db.collection('users').doc(uid).update({ enabled: enable }).then(() => {
             alert(enable ? 'User enabled' : 'User disabled');
             loadUsers();
+        }).catch(err => {
+            alert('Error toggling user: ' + err.message);
         });
     };
+
+    // ==================== Init ====================
+    // Also ensure suppliers are loaded when page loads
+    console.log('Admin page with external vendor support loaded.');
 </script>
 </body>
 </html>
