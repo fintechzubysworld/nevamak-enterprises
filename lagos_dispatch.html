@@ -11,7 +11,7 @@
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f4f7fc; margin: 0; padding: 12px; }
-        .container { max-width: 900px; margin: auto; }
+        .container { max-width: 1000px; margin: auto; }
         .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         h2 { margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
         input, select, textarea { width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
@@ -24,10 +24,14 @@
         .btn-sm { padding: 6px 16px; font-size: 0.85rem; }
         .nav { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
         .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
-        .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
-        .item-row input { flex: 1; margin: 0; }
-        .removeItem { background: #e74c3c; color: white; width: auto; padding: 10px 16px; border-radius: 40px; border: none; cursor: pointer; }
+        .item-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; align-items: center; padding: 8px; background: #f8f9fa; border-radius: 16px; border-left: 3px solid #0a3d62; }
+        .item-row input { flex: 1; margin: 0; min-width: 60px; }
+        .item-row .item-checkbox { flex: 0 0 30px; }
+        .removeItem { background: #e74c3c; color: white; width: auto; padding: 8px 14px; border-radius: 40px; border: none; cursor: pointer; }
+        .item-tax-fields { display: flex; flex-wrap: wrap; gap: 4px; flex: 2; }
+        .item-tax-fields input { flex: 1; min-width: 50px; }
         .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; }
+        .cost-breakdown { font-size: 0.9rem; color: #555; text-align: center; }
         .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .flex-row > * { flex: 1; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
@@ -35,7 +39,7 @@
         .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
         .stat-card .num { font-size: 1.5rem; font-weight: bold; margin: 0; color: #0a3d62; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 700px; width: 95%; max-height: 80vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 800px; width: 95%; max-height: 80vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.5rem; }
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.85rem; word-wrap: break-word; overflow-wrap: break-word; max-width: 150px; }
@@ -59,9 +63,15 @@
         .toast.show { opacity: 1; }
         .toast.success { background: #27ae60; }
         .toast.error { background: #e74c3c; }
-        @media (max-width: 500px) {
+        .transport-field { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+        .transport-field input { flex: 1; min-width: 120px; }
+        .transport-field label { font-weight: 600; }
+        .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
+        .bulk-actions button { width: auto; padding: 6px 16px; }
+        @media (max-width: 600px) {
             .flex-row { flex-direction: column; }
-            .item-row { flex-direction: column; }
+            .item-row { flex-direction: column; align-items: stretch; }
+            .item-tax-fields { flex-direction: column; }
             .item-row input { width: 100%; }
             td, th { font-size: 0.75rem; padding: 6px 4px; }
             .items-cell { max-width: 80px; }
@@ -118,23 +128,34 @@
                 <input type="text" id="trackingNo" placeholder="Tracking # (auto)" readonly>
             </div>
             <input type="text" id="barcodeInput" placeholder="📷 Scan Barcode / QR (or enter code)" class="barcode-input">
+
+            <!-- Transport Multiplier -->
+            <div class="transport-field">
+                <label>🚛 Transport Multiplier:</label>
+                <input type="number" id="transportMultiplier" placeholder="e.g., 1.05 = +5%" value="1.00" step="0.01" min="0.01">
+                <span class="hint">Multiplier applied to each item's unit price</span>
+            </div>
+
             <label>Items:</label>
             <div id="itemsContainer">
-                <div class="item-row">
-                    <input type="text" placeholder="Item name" class="itemName">
-                    <input type="number" placeholder="Qty" class="itemQty" min="0" step="1">
-                    <input type="number" placeholder="Price/unit" class="itemPrice" min="0" step="0.01">
-                    <button type="button" class="removeItem">✖</button>
-                    <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
-                </div>
+                <!-- initial row will be added by JS -->
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
                 <button type="button" id="addItemBtn" class="btn-success">+ Add product</button>
                 <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
                 <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
             </div>
+
+            <!-- Bulk Actions -->
+            <div class="bulk-actions">
+                <button type="button" id="applyToSelectedBtn" class="btn-warning">📋 Apply to Selected</button>
+                <button type="button" id="applyToAllBtn" class="btn-primary">📋 Apply to All</button>
+                <button type="button" id="clearTaxesBtn" class="btn-danger">🧹 Clear Taxes</button>
+            </div>
+
             <div id="importPreviewContainer" class="import-preview"></div>
             <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
+            <div id="taxBreakdown" class="cost-breakdown"></div>
             <textarea id="dispatchNotes" placeholder="Additional notes"></textarea>
             <div style="display:flex; gap:12px; flex-wrap:wrap;">
                 <button type="submit" id="dispatchSubmitBtn" class="btn-primary" style="flex:2;">🚛 Dispatch</button>
@@ -210,17 +231,23 @@
                 <input type="date" id="editExpectedDate">
                 <input type="text" id="editDriverName" placeholder="Driver Name">
                 <input type="text" id="editTrackingNo" placeholder="Tracking #" readonly>
-                <label>Items:</label>
-                <div id="editItemsContainer">
-                    <div class="item-row">
-                        <input type="text" placeholder="Item name" class="editItemName">
-                        <input type="number" placeholder="Qty" class="editItemQty" min="0" step="1">
-                        <input type="number" placeholder="Price/unit" class="editItemPrice" min="0" step="0.01">
-                        <button type="button" class="removeItem editRemoveItem">✖</button>
-                    </div>
+                <div class="transport-field">
+                    <label>🚛 Transport Multiplier:</label>
+                    <input type="number" id="editTransportMultiplier" value="1.00" step="0.01" min="0.01">
                 </div>
-                <button type="button" id="editAddItemBtn" class="btn-success">+ Add product</button>
+                <label>Items:</label>
+                <div id="editItemsContainer"></div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" id="editAddItemBtn" class="btn-success">+ Add product</button>
+                </div>
+                <!-- Bulk actions for edit draft -->
+                <div class="bulk-actions">
+                    <button type="button" id="editApplySelectedBtn" class="btn-warning">📋 Apply to Selected</button>
+                    <button type="button" id="editApplyAllBtn" class="btn-primary">📋 Apply to All</button>
+                    <button type="button" id="editClearTaxesBtn" class="btn-danger">🧹 Clear Taxes</button>
+                </div>
                 <div class="cost-summary" id="editCostPreview">Total goods value: ₦0</div>
+                <div id="editTaxBreakdown" class="cost-breakdown"></div>
                 <textarea id="editNotes" placeholder="Additional notes"></textarea>
                 <div style="display:flex; gap:12px; flex-wrap:wrap;">
                     <button type="submit" id="editUpdateBtn" class="btn-primary" style="flex:2;">💾 Update Draft</button>
@@ -230,9 +257,32 @@
             <div id="editMessage" style="color:red; margin-top:8px;"></div>
         </div>
     </div>
+
+    <!-- Bulk Apply Modal -->
+    <div id="bulkApplyModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('bulkApplyModal')">&times;</span>
+            <h3>📋 Bulk Apply to Selected Items</h3>
+            <p><span id="bulkItemCount">0</span> items selected.</p>
+            <div class="flex-row">
+                <input type="number" id="bulkDiscountPct" placeholder="Discount %" value="0" step="0.01" min="0" max="100">
+                <input type="number" id="bulkDiscountAmt" placeholder="Discount Amount (₦)" value="0" step="0.01" min="0">
+            </div>
+            <div class="flex-row">
+                <input type="number" id="bulkVAT" placeholder="VAT %" value="0" step="0.01" min="0" max="100">
+                <input type="number" id="bulkWHT" placeholder="WHT %" value="0" step="0.01" min="0" max="100">
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="bulkApplyConfirm" class="btn-success" style="flex:1;">✅ Apply</button>
+                <button onclick="closeModal('bulkApplyModal')" class="btn-danger" style="flex:1;">Cancel</button>
+            </div>
+            <div id="bulkMessage" style="color:red; margin-top:8px;"></div>
+        </div>
+    </div>
+
 </div>
 
-<!-- Toast container -->
+<!-- Toast -->
 <div id="toast" class="toast"></div>
 
 <script>
@@ -253,8 +303,6 @@
     let currentUser = null;
     let currentUserRole = '';
     let currentUserEmail = '';
-
-    // Listeners cleanup
     let shipmentsUnsubscribe = null;
     let statsUnsubscribe = null;
 
@@ -322,18 +370,15 @@
         loadSuppliers();
         loadShipments();
         loadStats();
-        updateUIBasedOnRole();
+        // init items
+        itemsContainer.innerHTML = '';
+        addItemRow();
+        updatePreview();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
         auth.signOut().then(() => window.location.href = 'login.html');
     });
-
-    function updateUIBasedOnRole() {
-        // Admin or Lagos sender can cancel/delete; others can't.
-        const isAuthorized = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-        // We'll handle visibility in the render.
-    }
 
     // ==================== Suppliers ====================
     async function loadSuppliers() {
@@ -367,9 +412,7 @@
         }
         try {
             await db.collection('suppliers').add({
-                name,
-                contact,
-                address,
+                name, contact, address,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             showToast('Supplier added', 'success');
@@ -413,54 +456,199 @@
 
     // ==================== Items Management ====================
     const itemsContainer = document.getElementById("itemsContainer");
+    const transportMultiplier = document.getElementById('transportMultiplier');
 
-    function createItemRow(itemName = '', qty = 1, price = 0) {
+    function addItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
+        const rowId = Date.now() + '_' + Math.random().toString(36).substring(2, 6);
         const div = document.createElement('div');
         div.className = 'item-row';
+        div.dataset.rowId = rowId;
         div.innerHTML = `
-            <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}">
-            <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" min="0" step="1">
-            <input type="number" placeholder="Price/unit" class="itemPrice" value="${Math.max(0, price)}" min="0" step="0.01">
+            <input type="checkbox" class="item-checkbox" data-row-id="${rowId}" style="width:auto; margin:0 4px;">
+            <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:1.5;">
+            <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" min="0" step="1" style="flex:0.8;">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${Math.max(0, price)}" min="0" step="0.01" style="flex:1;">
+            <div class="item-tax-fields">
+                <input type="number" placeholder="Disc %" class="itemDiscPct" value="${Math.max(0, discPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="Disc ₦" class="itemDiscAmt" value="${Math.max(0, discAmt)}" step="0.01" min="0">
+                <input type="number" placeholder="VAT %" class="itemVAT" value="${Math.max(0, vatPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="WHT %" class="itemWHT" value="${Math.max(0, whtPct)}" step="0.01" min="0" max="100">
+            </div>
             <button type="button" class="removeItem">✖</button>
             <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
         `;
+        itemsContainer.appendChild(div);
         div.querySelector('.removeItem').onclick = () => {
-            if (document.querySelectorAll('#itemsContainer .item-row').length <= 1) {
+            if (itemsContainer.querySelectorAll('.item-row').length <= 1) {
                 showToast('Cannot remove the last item row', 'error');
                 return;
             }
             div.remove();
             updatePreview();
         };
-        // Attach input validation
-        div.querySelectorAll('input[type="number"]').forEach(inp => {
+        // Attach input events
+        div.querySelectorAll('input').forEach(inp => {
             inp.addEventListener('input', updatePreview);
-            inp.addEventListener('blur', function() {
-                const min = parseFloat(this.min);
-                if (!isNaN(min) && parseFloat(this.value) < min) {
-                    this.value = min;
-                    updatePreview();
-                }
-            });
+            if (inp.type === 'number' && inp.min) {
+                inp.addEventListener('blur', function() {
+                    const min = parseFloat(this.min);
+                    if (!isNaN(min) && parseFloat(this.value) < min) {
+                        this.value = min;
+                        updatePreview();
+                    }
+                });
+            }
         });
-        return div;
+        updatePreview();
     }
 
     document.getElementById("addItemBtn").addEventListener("click", () => {
-        itemsContainer.appendChild(createItemRow());
-        updatePreview();
+        addItemRow();
     });
 
-    function updatePreview() {
-        let total = 0;
-        document.querySelectorAll("#itemsContainer .item-row").forEach(r => {
-            const qty = validateNumber(r.querySelector(".itemQty")?.value, 0) || 0;
-            const price = validateNumber(r.querySelector(".itemPrice")?.value, 0) || 0;
-            total += qty * price;
+    // ==================== Calculations ====================
+    function calculateTotals(containerId, multiplierId) {
+        const multiplier = validateNumber(document.getElementById(multiplierId).value, 0.01) || 1.00;
+        const items = [];
+        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
+
+        document.querySelectorAll(`#${containerId} .item-row`).forEach(row => {
+            const name = row.querySelector('.itemName')?.value.trim() || '';
+            const qty = validateNumber(row.querySelector('.itemQty')?.value, 0) || 0;
+            const price = validateNumber(row.querySelector('.itemPrice')?.value, 0) || 0;
+            const discPct = validateNumber(row.querySelector('.itemDiscPct')?.value, 0, 100) || 0;
+            const discAmt = validateNumber(row.querySelector('.itemDiscAmt')?.value, 0) || 0;
+            const vatPct = validateNumber(row.querySelector('.itemVAT')?.value, 0, 100) || 0;
+            const whtPct = validateNumber(row.querySelector('.itemWHT')?.value, 0, 100) || 0;
+
+            if (name && qty > 0 && price >= 0) {
+                const adjustedPrice = price * multiplier;
+                const itemSub = qty * adjustedPrice;
+                subtotal += itemSub;
+                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
+                totalDisc += itemDisc;
+                const afterDisc = itemSub - itemDisc;
+                const itemVAT = afterDisc * (vatPct / 100);
+                const itemWHT = afterDisc * (whtPct / 100);
+                totalVAT += itemVAT;
+                totalWHT += itemWHT;
+                const itemTotal = afterDisc + itemVAT - itemWHT;
+                grandTotal += itemTotal;
+                items.push({
+                    itemName: name,
+                    orderedQty: qty,
+                    unitPrice: price,
+                    adjustedUnitPrice: adjustedPrice,
+                    subtotal: itemSub,
+                    discountPercent: discPct,
+                    discountAmount: discAmt,
+                    discountTotal: itemDisc,
+                    vatPercent: vatPct,
+                    whtPercent: whtPct,
+                    vat: itemVAT,
+                    wht: itemWHT,
+                    total: itemTotal
+                });
+            }
         });
-        document.getElementById("costPreview").innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
+        return { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier };
     }
-    itemsContainer.addEventListener("input", updatePreview);
+
+    function updatePreview() {
+        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateTotals('itemsContainer', 'transportMultiplier');
+        document.getElementById('costPreview').innerHTML = `Total goods value: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('taxBreakdown').innerHTML = `
+            Subtotal: ₦${subtotal.toLocaleString()} |
+            Discount: ₦${totalDisc.toLocaleString()} |
+            VAT: ₦${totalVAT.toLocaleString()} |
+            WHT: ₦${totalWHT.toLocaleString()} |
+            Multiplier: ${multiplier.toFixed(2)} |
+            <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
+        `;
+    }
+    itemsContainer.addEventListener('input', updatePreview);
+    transportMultiplier.addEventListener('input', updatePreview);
+
+    // ==================== Bulk Actions ====================
+    // Apply to Selected
+    document.getElementById('applyToSelectedBtn').addEventListener('click', () => {
+        const selected = document.querySelectorAll('#itemsContainer .item-checkbox:checked');
+        if (selected.length === 0) {
+            showToast('Please select at least one item.', 'error');
+            return;
+        }
+        document.getElementById('bulkItemCount').textContent = selected.length;
+        document.getElementById('bulkDiscountPct').value = '0';
+        document.getElementById('bulkDiscountAmt').value = '0';
+        document.getElementById('bulkVAT').value = '0';
+        document.getElementById('bulkWHT').value = '0';
+        document.getElementById('bulkMessage').textContent = '';
+        document.getElementById('bulkApplyModal').style.display = 'flex';
+        document.getElementById('bulkApplyModal').dataset.target = 'itemsContainer';
+        document.getElementById('bulkApplyModal').dataset.selected = JSON.stringify(
+            Array.from(selected).map(cb => cb.dataset.rowId)
+        );
+    });
+
+    // Apply to All
+    document.getElementById('applyToAllBtn').addEventListener('click', () => {
+        const rows = document.querySelectorAll('#itemsContainer .item-row');
+        if (rows.length === 0) { showToast('No items to apply to.', 'error'); return; }
+        const discPct = prompt('Enter Discount % for all items (0-100):', '0');
+        if (discPct === null) return;
+        const discAmt = prompt('Enter Discount Amount (₦) for all items:', '0');
+        if (discAmt === null) return;
+        const vat = prompt('Enter VAT % for all items (0-100):', '0');
+        if (vat === null) return;
+        const wht = prompt('Enter WHT % for all items (0-100):', '0');
+        if (wht === null) return;
+
+        rows.forEach(row => {
+            row.querySelector('.itemDiscPct').value = Math.max(0, parseFloat(discPct) || 0);
+            row.querySelector('.itemDiscAmt').value = Math.max(0, parseFloat(discAmt) || 0);
+            row.querySelector('.itemVAT').value = Math.max(0, parseFloat(vat) || 0);
+            row.querySelector('.itemWHT').value = Math.max(0, parseFloat(wht) || 0);
+        });
+        updatePreview();
+        showToast('✅ Applied to all items.', 'success');
+    });
+
+    // Clear Taxes
+    document.getElementById('clearTaxesBtn').addEventListener('click', () => {
+        if (!confirm('Clear all tax/discount fields on all items?')) return;
+        document.querySelectorAll('#itemsContainer .item-row').forEach(row => {
+            row.querySelector('.itemDiscPct').value = '0';
+            row.querySelector('.itemDiscAmt').value = '0';
+            row.querySelector('.itemVAT').value = '0';
+            row.querySelector('.itemWHT').value = '0';
+        });
+        updatePreview();
+        showToast('🧹 Taxes cleared.', 'info');
+    });
+
+    // Bulk Apply Confirm
+    document.getElementById('bulkApplyConfirm').addEventListener('click', () => {
+        const targetId = document.getElementById('bulkApplyModal').dataset.target || 'itemsContainer';
+        const selectedIds = JSON.parse(document.getElementById('bulkApplyModal').dataset.selected || '[]');
+        const discPct = validateNumber(document.getElementById('bulkDiscountPct').value, 0, 100) || 0;
+        const discAmt = validateNumber(document.getElementById('bulkDiscountAmt').value, 0) || 0;
+        const vat = validateNumber(document.getElementById('bulkVAT').value, 0, 100) || 0;
+        const wht = validateNumber(document.getElementById('bulkWHT').value, 0, 100) || 0;
+
+        const rows = document.querySelectorAll(`#${targetId} .item-row`);
+        selectedIds.forEach(id => {
+            const row = Array.from(rows).find(r => r.dataset.rowId === String(id));
+            if (row) {
+                row.querySelector('.itemDiscPct').value = discPct;
+                row.querySelector('.itemDiscAmt').value = discAmt;
+                row.querySelector('.itemVAT').value = vat;
+                row.querySelector('.itemWHT').value = wht;
+            }
+        });
+        closeModal('bulkApplyModal');
+        updatePreview();
+        showToast('✅ Applied to ' + selectedIds.length + ' items.', 'success');
+    });
 
     // ==================== Import Excel ====================
     const importExcelBtn = document.getElementById('importExcelBtn');
@@ -483,20 +671,17 @@
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const json = XLSX.utils.sheet_to_json(firstSheet);
                 if (json.length === 0) {
-                    showToast('The Excel file is empty.', 'error');
+                    showToast('Excel file is empty.', 'error');
                     return;
                 }
                 const headers = Object.keys(json[0]);
-                // Improved header detection
                 const findColumn = (variations) => {
-                    // Exact match first
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
                             if (hLower === v.toLowerCase().trim()) return h;
                         }
                     }
-                    // Fuzzy
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
@@ -509,31 +694,45 @@
                     }
                     return null;
                 };
-                const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'description of goods', 'goods', 'name', 'particulars', 'details']);
-                const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered']);
-                const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit']);
+                const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'goods', 'name']);
+                const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit']);
+                const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost']);
+                const discPctCol = findColumn(['discount %', 'disc%', 'discount percent']);
+                const discAmtCol = findColumn(['discount amount', 'disc amt', 'discount ₦']);
+                const vatCol = findColumn(['vat %', 'vat%', 'value added tax']);
+                const whtCol = findColumn(['wht %', 'wht%', 'withholding tax']);
+
                 if (!itemCol || !qtyCol || !priceCol) {
                     showToast(`Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`, 'error');
                     return;
                 }
-                const parsedItems = [];
+                const parsed = [];
                 json.forEach(row => {
                     const name = String(row[itemCol] || '').trim();
                     let qty = parseFloat(row[qtyCol]) || 0;
                     let price = parseFloat(row[priceCol]) || 0;
                     if (name && qty > 0 && price >= 0) {
-                        parsedItems.push({ itemName: name, quantity: qty, unitPrice: price });
+                        const discPct = discPctCol ? parseFloat(row[discPctCol]) || 0 : 0;
+                        const discAmt = discAmtCol ? parseFloat(row[discAmtCol]) || 0 : 0;
+                        const vat = vatCol ? parseFloat(row[vatCol]) || 0 : 0;
+                        const wht = whtCol ? parseFloat(row[whtCol]) || 0 : 0;
+                        parsed.push({ itemName: name, quantity: qty, unitPrice: price,
+                            discountPercent: Math.min(100, Math.max(0, discPct)),
+                            discountAmount: Math.max(0, discAmt),
+                            vatPercent: Math.min(100, Math.max(0, vat)),
+                            whtPercent: Math.min(100, Math.max(0, wht)) });
                     }
                 });
-                if (parsedItems.length === 0) {
-                    showToast('No valid items found in Excel.', 'error');
+                if (parsed.length === 0) {
+                    showToast('No valid items found.', 'error');
                     return;
                 }
-                importedItems = parsedItems;
-                let previewHtml = `<p><strong>✅ ${parsedItems.length} items imported:</strong></p>
-                    <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Price</th></tr>`;
-                parsedItems.forEach(it => {
-                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                importedItems = parsed;
+                let previewHtml = `<p><strong>✅ ${parsed.length} items imported:</strong></p>
+                    <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th></tr>`;
+                parsed.forEach(it => {
+                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td>
+                        <td>${it.discountPercent}%</td><td>₦${it.discountAmount}</td><td>${it.vatPercent}%</td><td>${it.whtPercent}%</td></tr>`;
                 });
                 previewHtml += `</table></div>
                     <div style="display:flex; gap:8px; margin-top:8px;">
@@ -543,7 +742,7 @@
                 importPreviewContainer.innerHTML = previewHtml;
                 importPreviewContainer.style.display = 'block';
                 excelFileInput.value = '';
-                showToast(`✅ ${parsedItems.length} items imported`, 'success');
+                showToast(`✅ ${parsed.length} items imported`, 'success');
             } catch (err) {
                 showToast('Error reading Excel: ' + err.message, 'error');
             }
@@ -555,7 +754,8 @@
         if (importedItems.length === 0) return;
         itemsContainer.innerHTML = '';
         importedItems.forEach(it => {
-            itemsContainer.appendChild(createItemRow(it.itemName, it.quantity, it.unitPrice));
+            addItemRow(it.itemName, it.quantity, it.unitPrice,
+                it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent);
         });
         importPreviewContainer.style.display = 'none';
         importPreviewContainer.innerHTML = '';
@@ -586,9 +786,7 @@
     // ==================== Save Shipment ====================
     async function saveShipment(status) {
         const confirmMsg = status === 'Draft' ? 'save this draft' : 'dispatch this shipment';
-        if (!confirm(`Are you sure you want to ${confirmMsg}?`)) {
-            return;
-        }
+        if (!confirm(`Are you sure you want to ${confirmMsg}?`)) return;
 
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
@@ -599,28 +797,10 @@
         const driver = document.getElementById("driverName").value.trim();
         const trackingNo = document.getElementById("trackingNo").value.trim();
         const notes = document.getElementById("dispatchNotes").value.trim();
+        const multiplier = validateNumber(transportMultiplier.value, 0.01) || 1.00;
 
-        const items = [];
-        let hasError = false;
-        document.querySelectorAll("#itemsContainer .item-row").forEach(row => {
-            const name = row.querySelector(".itemName").value.trim();
-            const qty = validateNumber(row.querySelector(".itemQty").value, 0);
-            const price = validateNumber(row.querySelector(".itemPrice").value, 0);
-            if (!name || qty === null || price === null || qty <= 0 || price < 0) {
-                hasError = true;
-                return;
-            }
-            items.push({
-                itemName: name,
-                orderedQty: qty,
-                unitPrice: price,
-                totalItemCost: qty * price,
-                receivedQty: 0,
-                damageQty: 0
-            });
-        });
-
-        if (hasError || items.length === 0 || !senderName) {
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('itemsContainer', 'transportMultiplier');
+        if (items.length === 0 || !senderName) {
             showToast('Please fill all fields and add valid items.', 'error');
             return;
         }
@@ -642,7 +822,13 @@
                 trackingNo,
                 notes,
                 transportCost: 0,
-                items,
+                items: items,
+                transportMultiplier: multiplier,
+                subtotal,
+                totalDiscount: totalDisc,
+                totalVAT,
+                totalWHT,
+                total: grandTotal,
                 status: status,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
@@ -659,7 +845,7 @@
             // Reset form
             document.getElementById("dispatchForm").reset();
             itemsContainer.innerHTML = '';
-            itemsContainer.appendChild(createItemRow());
+            addItemRow();
             updatePreview();
             document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
             loadShipments();
@@ -679,15 +865,13 @@
         saveShipment('Draft');
     });
 
-    // ==================== Cancel Shipment ====================
+    // ==================== Cancel/Delete Shipment ====================
     window.cancelShipment = async function(id) {
         if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
-            showToast('You do not have permission to cancel shipments.', 'error');
+            showToast('Permission denied.', 'error');
             return;
         }
-        if (!confirm('⚠️ Are you sure you want to cancel this shipment? This action can be reversed by re-dispatching.')) {
-            return;
-        }
+        if (!confirm('Cancel this shipment?')) return;
         try {
             await db.collection('shipments').doc(id).update({
                 status: 'Cancelled',
@@ -705,29 +889,23 @@
             loadShipments();
             loadStats();
         } catch (err) {
-            showToast('Error cancelling shipment: ' + err.message, 'error');
+            showToast('Error: ' + err.message, 'error');
         }
     };
 
-    // ==================== Delete Shipment ====================
     window.deleteShipment = async function(id) {
         if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
-            showToast('You do not have permission to delete shipments.', 'error');
+            showToast('Permission denied.', 'error');
             return;
         }
         const doc = await db.collection('shipments').doc(id).get();
-        if (!doc.exists) {
-            showToast('Shipment not found.', 'error');
-            return;
-        }
+        if (!doc.exists) { showToast('Not found.', 'error'); return; }
         const status = doc.data().status;
         if (status !== 'Draft' && status !== 'Cancelled') {
-            showToast('Only Draft or Cancelled shipments can be deleted.', 'error');
+            showToast('Only Draft or Cancelled can be deleted.', 'error');
             return;
         }
-        if (!confirm('⚠️ Are you sure you want to permanently delete this shipment? This cannot be undone.')) {
-            return;
-        }
+        if (!confirm('Permanently delete?')) return;
         try {
             await db.collection('shipments').doc(id).delete();
             await db.collection('activityLog').add({
@@ -738,11 +916,11 @@
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 user: currentUserEmail
             });
-            showToast('✅ Shipment deleted.', 'success');
+            showToast('✅ Deleted.', 'success');
             loadShipments();
             loadStats();
         } catch (err) {
-            showToast('Error deleting shipment: ' + err.message, 'error');
+            showToast('Error: ' + err.message, 'error');
         }
     };
 
@@ -751,19 +929,13 @@
         const searchInput = document.getElementById('searchShipment');
         const filterSelect = document.getElementById('filterStatus');
 
-        if (shipmentsUnsubscribe) {
-            shipmentsUnsubscribe();
-            shipmentsUnsubscribe = null;
-        }
-
+        if (shipmentsUnsubscribe) shipmentsUnsubscribe();
         const tbody = document.querySelector("#shipmentsTable tbody");
         tbody.innerHTML = '<tr><td colspan="8"><div class="loading-spinner"></div> Loading...</td></tr>';
 
         let q = db.collection("shipments").orderBy("createdAt", "desc");
         const statusFilter = filterSelect.value;
-        if (statusFilter !== 'all') {
-            q = q.where("status", "==", statusFilter);
-        }
+        if (statusFilter !== 'all') q = q.where("status", "==", statusFilter);
 
         shipmentsUnsubscribe = q.onSnapshot(snap => {
             const search = searchInput.value.toLowerCase();
@@ -773,13 +945,11 @@
                 const text = (d.senderName + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
                 if (text.includes(search)) filtered.push({ id: doc.id, data: d });
             });
-
             let html = '';
-            if (filtered.length === 0) {
-                html = '<tr><td colspan="8">No shipments</td></tr>';
-            } else {
+            if (filtered.length === 0) html = '<tr><td colspan="8">No shipments</td></tr>';
+            else {
                 filtered.forEach(({id, data: d}) => {
-                    let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
+                    let goods = d.total || d.items?.reduce((s,i)=>s+(i.total||0),0) || 0;
                     const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
                     const supplierName = d.supplierId ? 'Supplier' : '-';
                     const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
@@ -789,7 +959,6 @@
                     const canDelete = (d.status === 'Draft' || d.status === 'Cancelled') &&
                                       (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
                     const canEdit = d.status === 'Draft';
-
                     html += `<tr>
                         <td><strong>${escapeHtml(id.slice(0,6))}</strong></td>
                         <td><span class="badge">${escapeHtml(d.destinationBranch)}</span></td>
@@ -812,8 +981,6 @@
             tbody.innerHTML = '<tr><td colspan="8">Error loading shipments: ' + escapeHtml(err.message) + '</td></tr>';
             showToast('Error loading shipments: ' + err.message, 'error');
         });
-
-        // Re-run on search/filter change
         searchInput.addEventListener('input', loadShipments);
         filterSelect.addEventListener('change', loadShipments);
     }
@@ -822,26 +989,25 @@
     window.viewShipment = async function(id) {
         try {
             const doc = await db.collection('shipments').doc(id).get();
-            if (!doc.exists) {
-                showToast('Shipment not found.', 'error');
-                return;
-            }
+            if (!doc.exists) { showToast('Not found.', 'error'); return; }
             const d = doc.data();
-            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty Ordered</th><th>Unit Price</th><th>Total</th><th>Received</th><th>Damaged</th></tr>';
+            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th><th>Total</th></tr>';
             if (d.items) {
                 d.items.forEach(it => {
                     itemsHtml += `<tr>
                         <td>${escapeHtml(it.itemName)}</td>
                         <td>${it.orderedQty}</td>
-                        <td>₦${(it.unitPrice||0).toLocaleString()}</td>
-                        <td>₦${(it.totalItemCost||0).toLocaleString()}</td>
-                        <td>${it.receivedQty || 0}</td>
-                        <td>${it.damageQty || 0}</td>
+                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                        <td>${it.discountPercent||0}%</td>
+                        <td>₦${(it.discountAmount||0).toFixed(2)}</td>
+                        <td>${it.vatPercent||0}%</td>
+                        <td>${it.whtPercent||0}%</td>
+                        <td>₦${(it.total||0).toFixed(2)}</td>
                     </tr>`;
                 });
             }
             itemsHtml += '</table></div>';
-            const totalGoods = d.items ? d.items.reduce((s,i)=>s+(i.totalItemCost||0),0) : 0;
+            const total = d.total || 0;
             const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
             const html = `
                 <p><strong>Shipment ID:</strong> ${escapeHtml(id.slice(0,8))}</p>
@@ -852,8 +1018,12 @@
                 <p><strong>Expected Date:</strong> ${escapeHtml(d.expectedDate || 'N/A')}</p>
                 <p><strong>Driver:</strong> ${escapeHtml(d.driver || 'N/A')}</p>
                 <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${escapeHtml(d.status)}</span></p>
-                <p><strong>Total Goods Value:</strong> ₦${totalGoods.toLocaleString()}</p>
-                <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
+                <p><strong>Total Value:</strong> ₦${total.toLocaleString()}</p>
+                <p><strong>Transport Multiplier:</strong> ${(d.transportMultiplier||1).toFixed(2)}</p>
+                <p><strong>Subtotal:</strong> ₦${(d.subtotal||0).toLocaleString()}</p>
+                <p><strong>Total Discount:</strong> ₦${(d.totalDiscount||0).toLocaleString()}</p>
+                <p><strong>Total VAT:</strong> ₦${(d.totalVAT||0).toLocaleString()}</p>
+                <p><strong>Total WHT:</strong> ₦${(d.totalWHT||0).toLocaleString()}</p>
                 <p><strong>Created:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleString() : ''}</p>
                 ${d.receivedDate ? `<p><strong>Received:</strong> ${new Date(d.receivedDate.toDate()).toLocaleString()}</p>` : ''}
                 ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
@@ -862,8 +1032,8 @@
             `;
             document.getElementById('viewShipmentContent').innerHTML = html;
             document.getElementById('viewShipmentModal').style.display = 'flex';
-        } catch (error) {
-            showToast('Error loading shipment details: ' + error.message, 'error');
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
         }
     };
 
@@ -873,15 +1043,9 @@
     window.editDraft = async function(id) {
         try {
             const doc = await db.collection('shipments').doc(id).get();
-            if (!doc.exists) {
-                showToast('Draft not found.', 'error');
-                return;
-            }
+            if (!doc.exists) { showToast('Not found.', 'error'); return; }
             const d = doc.data();
-            if (d.status !== 'Draft') {
-                showToast('Only draft shipments can be edited.', 'error');
-                return;
-            }
+            if (d.status !== 'Draft') { showToast('Only draft can be edited.', 'error'); return; }
             editDraftId = id;
 
             document.getElementById('editSenderName').value = d.senderName || '';
@@ -891,88 +1055,147 @@
             document.getElementById('editDriverName').value = d.driver || '';
             document.getElementById('editTrackingNo').value = d.trackingNo || 'NEV-' + Date.now().toString(36).toUpperCase();
             document.getElementById('editNotes').value = d.notes || '';
+            document.getElementById('editTransportMultiplier').value = d.transportMultiplier || 1.00;
 
             const container = document.getElementById('editItemsContainer');
             container.innerHTML = '';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
-                    const div = document.createElement('div');
-                    div.className = 'item-row';
-                    div.innerHTML = `
-                        <input type="text" placeholder="Item name" class="editItemName" value="${escapeHtml(it.itemName)}">
-                        <input type="number" placeholder="Qty" class="editItemQty" value="${Math.max(0, it.orderedQty)}" min="0" step="1">
-                        <input type="number" placeholder="Price/unit" class="editItemPrice" value="${Math.max(0, it.unitPrice)}" min="0" step="0.01">
-                        <button type="button" class="removeItem editRemoveItem">✖</button>
-                    `;
+                    const div = createEditItemRow(it.itemName, it.orderedQty, it.unitPrice,
+                        it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent);
                     container.appendChild(div);
-                    div.querySelector('.editRemoveItem').onclick = () => {
-                        if (container.querySelectorAll('.item-row').length <= 1) {
-                            showToast('Cannot remove last item', 'error');
-                            return;
-                        }
-                        div.remove();
-                        updateEditPreview();
-                    };
                 });
             } else {
-                const div = document.createElement('div');
-                div.className = 'item-row';
-                div.innerHTML = `
-                    <input type="text" placeholder="Item name" class="editItemName">
-                    <input type="number" placeholder="Qty" class="editItemQty" min="0" step="1">
-                    <input type="number" placeholder="Price/unit" class="editItemPrice" min="0" step="0.01">
-                    <button type="button" class="removeItem editRemoveItem">✖</button>
-                `;
-                container.appendChild(div);
-                div.querySelector('.editRemoveItem').onclick = () => div.remove();
+                container.appendChild(createEditItemRow());
             }
-            // Attach input events for preview
-            container.querySelectorAll('input[type="number"]').forEach(inp => {
-                inp.addEventListener('input', updateEditPreview);
-            });
             updateEditPreview();
             document.getElementById('editDraftModal').style.display = 'flex';
             document.getElementById('editMessage').textContent = '';
-        } catch (error) {
-            showToast('Error loading draft: ' + error.message, 'error');
+        } catch (err) {
+            showToast('Error loading draft: ' + err.message, 'error');
         }
     };
 
-    document.getElementById('editAddItemBtn').addEventListener('click', () => {
-        const container = document.getElementById('editItemsContainer');
+    function createEditItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
+        const rowId = 'edit_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
         const div = document.createElement('div');
         div.className = 'item-row';
+        div.dataset.rowId = rowId;
         div.innerHTML = `
-            <input type="text" placeholder="Item name" class="editItemName">
-            <input type="number" placeholder="Qty" class="editItemQty" min="0" step="1">
-            <input type="number" placeholder="Price/unit" class="editItemPrice" min="0" step="0.01">
+            <input type="checkbox" class="item-checkbox" data-row-id="${rowId}" style="width:auto; margin:0 4px;">
+            <input type="text" placeholder="Item name" class="editItemName" value="${escapeHtml(itemName)}" style="flex:1.5;">
+            <input type="number" placeholder="Qty" class="editItemQty" value="${Math.max(0, qty)}" min="0" step="1" style="flex:0.8;">
+            <input type="number" placeholder="Price/unit" class="editItemPrice" value="${Math.max(0, price)}" min="0" step="0.01" style="flex:1;">
+            <div class="item-tax-fields">
+                <input type="number" placeholder="Disc %" class="editItemDiscPct" value="${Math.max(0, discPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="Disc ₦" class="editItemDiscAmt" value="${Math.max(0, discAmt)}" step="0.01" min="0">
+                <input type="number" placeholder="VAT %" class="editItemVAT" value="${Math.max(0, vatPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="WHT %" class="editItemWHT" value="${Math.max(0, whtPct)}" step="0.01" min="0" max="100">
+            </div>
             <button type="button" class="removeItem editRemoveItem">✖</button>
         `;
-        container.appendChild(div);
-        div.querySelector('.editRemoveItem').onclick = () => div.remove();
-        div.querySelectorAll('input[type="number"]').forEach(inp => {
+        const container = document.getElementById('editItemsContainer');
+        div.querySelector('.editRemoveItem').onclick = () => {
+            if (container.querySelectorAll('.item-row').length <= 1) {
+                showToast('Cannot remove last item', 'error');
+                return;
+            }
+            div.remove();
+            updateEditPreview();
+        };
+        div.querySelectorAll('input').forEach(inp => {
             inp.addEventListener('input', updateEditPreview);
+            if (inp.type === 'number' && inp.min) {
+                inp.addEventListener('blur', function() {
+                    const min = parseFloat(this.min);
+                    if (!isNaN(min) && parseFloat(this.value) < min) {
+                        this.value = min;
+                        updateEditPreview();
+                    }
+                });
+            }
         });
+        return div;
+    }
+
+    document.getElementById('editAddItemBtn').addEventListener('click', () => {
+        const container = document.getElementById('editItemsContainer');
+        container.appendChild(createEditItemRow());
         updateEditPreview();
     });
 
-    function updateEditPreview() {
-        let total = 0;
-        document.querySelectorAll('#editItemsContainer .item-row').forEach(r => {
-            const qty = validateNumber(r.querySelector('.editItemQty')?.value, 0) || 0;
-            const price = validateNumber(r.querySelector('.editItemPrice')?.value, 0) || 0;
-            total += qty * price;
+    // Edit draft bulk actions
+    document.getElementById('editApplySelectedBtn').addEventListener('click', () => {
+        const selected = document.querySelectorAll('#editItemsContainer .item-checkbox:checked');
+        if (selected.length === 0) {
+            showToast('Please select at least one item.', 'error');
+            return;
+        }
+        document.getElementById('bulkItemCount').textContent = selected.length;
+        document.getElementById('bulkDiscountPct').value = '0';
+        document.getElementById('bulkDiscountAmt').value = '0';
+        document.getElementById('bulkVAT').value = '0';
+        document.getElementById('bulkWHT').value = '0';
+        document.getElementById('bulkMessage').textContent = '';
+        document.getElementById('bulkApplyModal').style.display = 'flex';
+        document.getElementById('bulkApplyModal').dataset.target = 'editItemsContainer';
+        document.getElementById('bulkApplyModal').dataset.selected = JSON.stringify(
+            Array.from(selected).map(cb => cb.dataset.rowId)
+        );
+    });
+
+    document.getElementById('editApplyAllBtn').addEventListener('click', () => {
+        const rows = document.querySelectorAll('#editItemsContainer .item-row');
+        if (rows.length === 0) { showToast('No items to apply to.', 'error'); return; }
+        const discPct = prompt('Enter Discount % for all items (0-100):', '0');
+        if (discPct === null) return;
+        const discAmt = prompt('Enter Discount Amount (₦) for all items:', '0');
+        if (discAmt === null) return;
+        const vat = prompt('Enter VAT % for all items (0-100):', '0');
+        if (vat === null) return;
+        const wht = prompt('Enter WHT % for all items (0-100):', '0');
+        if (wht === null) return;
+
+        rows.forEach(row => {
+            row.querySelector('.editItemDiscPct').value = Math.max(0, parseFloat(discPct) || 0);
+            row.querySelector('.editItemDiscAmt').value = Math.max(0, parseFloat(discAmt) || 0);
+            row.querySelector('.editItemVAT').value = Math.max(0, parseFloat(vat) || 0);
+            row.querySelector('.editItemWHT').value = Math.max(0, parseFloat(wht) || 0);
         });
-        document.getElementById('editCostPreview').innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
+        updateEditPreview();
+        showToast('✅ Applied to all items.', 'success');
+    });
+
+    document.getElementById('editClearTaxesBtn').addEventListener('click', () => {
+        if (!confirm('Clear all tax/discount fields on all items?')) return;
+        document.querySelectorAll('#editItemsContainer .item-row').forEach(row => {
+            row.querySelector('.editItemDiscPct').value = '0';
+            row.querySelector('.editItemDiscAmt').value = '0';
+            row.querySelector('.editItemVAT').value = '0';
+            row.querySelector('.editItemWHT').value = '0';
+        });
+        updateEditPreview();
+        showToast('🧹 Taxes cleared.', 'info');
+    });
+
+    function updateEditPreview() {
+        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateTotals('editItemsContainer', 'editTransportMultiplier');
+        document.getElementById('editCostPreview').innerHTML = `Total goods value: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('editTaxBreakdown').innerHTML = `
+            Subtotal: ₦${subtotal.toLocaleString()} |
+            Discount: ₦${totalDisc.toLocaleString()} |
+            VAT: ₦${totalVAT.toLocaleString()} |
+            WHT: ₦${totalWHT.toLocaleString()} |
+            Multiplier: ${multiplier.toFixed(2)} |
+            <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
+        `;
     }
     document.getElementById('editItemsContainer').addEventListener('input', updateEditPreview);
+    document.getElementById('editTransportMultiplier').addEventListener('input', updateEditPreview);
 
     document.getElementById('editDraftForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!editDraftId) {
-            showToast('No draft selected.', 'error');
-            return;
-        }
+        if (!editDraftId) { showToast('No draft selected.', 'error'); return; }
         const senderName = document.getElementById('editSenderName').value.trim();
         const destBranch = document.getElementById('editDestBranch').value;
         const vehicleNo = document.getElementById('editVehicleNo').value.trim();
@@ -980,27 +1203,10 @@
         const driver = document.getElementById('editDriverName').value.trim();
         const trackingNo = document.getElementById('editTrackingNo').value.trim();
         const notes = document.getElementById('editNotes').value.trim();
+        const multiplier = validateNumber(document.getElementById('editTransportMultiplier').value, 0.01) || 1.00;
 
-        const items = [];
-        let hasError = false;
-        document.querySelectorAll('#editItemsContainer .item-row').forEach(row => {
-            const name = row.querySelector('.editItemName').value.trim();
-            const qty = validateNumber(row.querySelector('.editItemQty').value, 0);
-            const price = validateNumber(row.querySelector('.editItemPrice').value, 0);
-            if (!name || qty === null || price === null || qty <= 0 || price < 0) {
-                hasError = true;
-                return;
-            }
-            items.push({
-                itemName: name,
-                orderedQty: qty,
-                unitPrice: price,
-                totalItemCost: qty * price,
-                receivedQty: 0,
-                damageQty: 0
-            });
-        });
-        if (hasError || items.length === 0 || !senderName) {
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('editItemsContainer', 'editTransportMultiplier');
+        if (items.length === 0 || !senderName) {
             document.getElementById('editMessage').innerText = 'Please fill all fields and add valid items.';
             return;
         }
@@ -1016,10 +1222,16 @@
                 driver,
                 trackingNo,
                 notes,
-                items,
+                transportMultiplier: multiplier,
+                items: items,
+                subtotal,
+                totalDiscount: totalDisc,
+                totalVAT,
+                totalWHT,
+                total: grandTotal,
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
-            showToast('Draft updated successfully.', 'success');
+            showToast('Draft updated.', 'success');
             closeModal('editDraftModal');
             loadShipments();
             loadStats();
@@ -1033,7 +1245,7 @@
 
     document.getElementById('editDeleteBtn').addEventListener('click', async () => {
         if (!editDraftId) return;
-        if (!confirm('Delete this draft permanently?')) return;
+        if (!confirm('Delete draft?')) return;
         try {
             await db.collection('shipments').doc(editDraftId).delete();
             showToast('Draft deleted.', 'success');
@@ -1047,10 +1259,7 @@
 
     // ==================== Stats ====================
     function loadStats() {
-        if (statsUnsubscribe) {
-            statsUnsubscribe();
-            statsUnsubscribe = null;
-        }
+        if (statsUnsubscribe) statsUnsubscribe();
         statsUnsubscribe = db.collection("shipments").onSnapshot(snap => {
             let total = 0, dispatched = 0, delivered = 0, drafts = 0, cancelled = 0, goods = 0;
             snap.forEach(doc => {
@@ -1060,7 +1269,7 @@
                 else if (d.status === 'Delivered') delivered++;
                 else if (d.status === 'Draft') drafts++;
                 else if (d.status === 'Cancelled') cancelled++;
-                if (d.items) d.items.forEach(i => goods += i.totalItemCost || 0);
+                goods += d.total || d.items?.reduce((s,i)=>s+(i.total||0),0) || 0;
             });
             document.getElementById('totalShipments').textContent = total;
             document.getElementById('dispatchedCount').textContent = dispatched;
@@ -1073,16 +1282,15 @@
         });
     }
 
-    // ==================== Cleanup on page unload ====================
+    // ==================== Cleanup ====================
     window.addEventListener('beforeunload', () => {
         if (shipmentsUnsubscribe) shipmentsUnsubscribe();
         if (statsUnsubscribe) statsUnsubscribe();
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dispatch loaded with security fixes.');
-    // Initial item row already exists.
-    updatePreview();
+    console.log('NEVAMAK Dispatch with discount, VAT, WHT, transport multiplier and bulk actions loaded.');
+    // Initial row already added via auth callback.
 </script>
 </body>
 </html>
