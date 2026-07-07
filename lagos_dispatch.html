@@ -68,6 +68,7 @@
         .transport-field label { font-weight: 600; }
         .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; align-items: center; }
         .bulk-actions button { width: auto; padding: 6px 16px; }
+        .reroute-btn { background: #6c5ce7; color: white; }
         @media (max-width: 600px) {
             .flex-row { flex-direction: column; }
             .item-row { flex-direction: column; align-items: stretch; }
@@ -100,7 +101,10 @@
     </div>
 
     <div class="card">
-        <h2>📦 Create Shipment</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <h2>📦 Create Shipment</h2>
+            <button id="openRerouteBtn" class="btn-primary reroute-btn">🔄 Reroute Invoice</button>
+        </div>
         <form id="dispatchForm">
             <div class="flex-row">
                 <input type="text" id="senderName" placeholder="Sender Name / Branch" required>
@@ -240,7 +244,6 @@
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <button type="button" id="editAddItemBtn" class="btn-success">+ Add product</button>
                 </div>
-                <!-- Bulk actions for edit draft -->
                 <div class="bulk-actions">
                     <button type="button" id="editApplySelectedBtn" class="btn-warning">📋 Apply to Selected</button>
                     <button type="button" id="editApplyAllBtn" class="btn-primary">📋 Apply to All</button>
@@ -258,7 +261,78 @@
         </div>
     </div>
 
-    <!-- Bulk Apply Modal -->
+    <!-- Reroute Modal -->
+    <div id="rerouteModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('rerouteModal')">&times;</span>
+            <h2>🔄 Reroute Invoice</h2>
+            <form id="rerouteForm">
+                <div class="flex-row">
+                    <div style="flex:1;">
+                        <label>Source Type:</label>
+                        <select id="sourceType">
+                            <option value="branch">Branch</option>
+                            <option value="vendor">Vendor / Supplier</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Source:</label>
+                        <select id="sourceSelect">
+                            <option value="Abuja">Abuja</option>
+                            <option value="Portharcourt">Port Harcourt</option>
+                            <option value="Lagos">Lagos</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex-row">
+                    <div style="flex:1;">
+                        <label>Destination Type:</label>
+                        <select id="destType">
+                            <option value="branch">Branch Rep</option>
+                            <option value="vendor">Vendor / Supplier</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Destination:</label>
+                        <select id="destSelect">
+                            <option value="Abuja">Abuja</option>
+                            <option value="Portharcourt">Port Harcourt</option>
+                            <option value="Lagos">Lagos</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex-row">
+                    <input type="text" id="rerouteReference" placeholder="Invoice # / Reference (optional)">
+                    <input type="date" id="rerouteDate">
+                </div>
+                <label>Items to reroute:</label>
+                <div id="rerouteItemsContainer">
+                    <!-- initial row will be added by JS -->
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" id="rerouteAddItemBtn" class="btn-success">+ Add product</button>
+                    <button type="button" id="rerouteImportExcelBtn" class="btn-info">📂 Import Excel</button>
+                    <input type="file" id="rerouteExcelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                </div>
+                <div class="bulk-actions">
+                    <button type="button" id="rerouteApplySelectedBtn" class="btn-warning">📋 Apply to Selected</button>
+                    <button type="button" id="rerouteApplyAllBtn" class="btn-primary">📋 Apply to All</button>
+                    <button type="button" id="rerouteClearTaxesBtn" class="btn-danger">🧹 Clear Taxes</button>
+                </div>
+                <div id="rerouteImportPreview" class="import-preview"></div>
+                <div class="cost-summary" id="rerouteCostPreview">Total goods value: ₦0</div>
+                <div id="rerouteTaxBreakdown" class="cost-breakdown"></div>
+                <textarea id="rerouteNotes" placeholder="Notes about rerouting"></textarea>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <button type="submit" id="rerouteSubmitBtn" class="btn-primary" style="flex:2;">✅ Reroute</button>
+                    <button type="button" onclick="closeModal('rerouteModal')" class="btn-danger" style="flex:1;">Cancel</button>
+                </div>
+                <div id="rerouteMessage" style="color:red; margin-top:8px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk Apply Modal (shared) -->
     <div id="bulkApplyModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('bulkApplyModal')">&times;</span>
@@ -374,6 +448,13 @@
         itemsContainer.innerHTML = '';
         addItemRow();
         updatePreview();
+        // Reroute init
+        rerouteItemsContainer.innerHTML = '';
+        addRerouteItemRow();
+        updateReroutePreview();
+        document.getElementById('rerouteDate').value = new Date().toISOString().slice(0,10);
+        // Populate source/dest selects with suppliers
+        populateRerouteSelects();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -393,9 +474,46 @@
                 opt.textContent = s.name;
                 sel.appendChild(opt);
             });
+            // Also populate reroute source/dest vendor selects
+            populateRerouteSelects();
         } catch (err) {
             showToast('Error loading suppliers: ' + err.message, 'error');
         }
+    }
+
+    function populateRerouteSelects() {
+        // For source and destination vendor options
+        const sourceSelect = document.getElementById('sourceSelect');
+        const destSelect = document.getElementById('destSelect');
+        // Preserve current values if possible
+        const currentSrc = sourceSelect.value;
+        const currentDest = destSelect.value;
+        // Clear and repopulate with branches + suppliers
+        const baseOptions = ['Abuja', 'Portharcourt', 'Lagos'];
+        db.collection('suppliers').get().then(snap => {
+            const supplierNames = [];
+            snap.forEach(doc => {
+                supplierNames.push(doc.data().name);
+            });
+            // Build options
+            const buildOptions = (select, current) => {
+                const opts = [];
+                // Add branches
+                baseOptions.forEach(b => opts.push({value: b, label: b}));
+                // Add suppliers
+                supplierNames.forEach(s => opts.push({value: s, label: 'Supplier: ' + s}));
+                select.innerHTML = '';
+                opts.forEach(opt => {
+                    const o = document.createElement('option');
+                    o.value = opt.value;
+                    o.textContent = opt.label;
+                    select.appendChild(o);
+                });
+                if (current && opts.some(o => o.value === current)) select.value = current;
+            };
+            buildOptions(sourceSelect, currentSrc);
+            buildOptions(destSelect, currentDest);
+        }).catch(err => console.warn('Error populating reroute selects:', err));
     }
 
     document.getElementById('addSupplierBtn').addEventListener('click', () => {
@@ -454,7 +572,7 @@
         }
     });
 
-    // ==================== Items Management ====================
+    // ==================== Items Management (Main) ====================
     const itemsContainer = document.getElementById("itemsContainer");
     const transportMultiplier = document.getElementById('transportMultiplier');
 
@@ -569,8 +687,7 @@
     itemsContainer.addEventListener('input', updatePreview);
     transportMultiplier.addEventListener('input', updatePreview);
 
-    // ==================== Bulk Actions ====================
-    // Apply to Selected
+    // ==================== Bulk Actions (Main) ====================
     document.getElementById('applyToSelectedBtn').addEventListener('click', () => {
         const selected = document.querySelectorAll('#itemsContainer .item-checkbox:checked');
         if (selected.length === 0) {
@@ -590,7 +707,6 @@
         );
     });
 
-    // Apply to All
     document.getElementById('applyToAllBtn').addEventListener('click', () => {
         const rows = document.querySelectorAll('#itemsContainer .item-row');
         if (rows.length === 0) { showToast('No items to apply to.', 'error'); return; }
@@ -613,7 +729,6 @@
         showToast('✅ Applied to all items.', 'success');
     });
 
-    // Clear Taxes
     document.getElementById('clearTaxesBtn').addEventListener('click', () => {
         if (!confirm('Clear all tax/discount fields on all items?')) return;
         document.querySelectorAll('#itemsContainer .item-row').forEach(row => {
@@ -626,7 +741,6 @@
         showToast('🧹 Taxes cleared.', 'info');
     });
 
-    // Bulk Apply Confirm
     document.getElementById('bulkApplyConfirm').addEventListener('click', () => {
         const targetId = document.getElementById('bulkApplyModal').dataset.target || 'itemsContainer';
         const selectedIds = JSON.parse(document.getElementById('bulkApplyModal').dataset.selected || '[]');
@@ -646,11 +760,13 @@
             }
         });
         closeModal('bulkApplyModal');
-        updatePreview();
+        if (targetId === 'itemsContainer') updatePreview();
+        else if (targetId === 'editItemsContainer') updateEditPreview();
+        else if (targetId === 'rerouteItemsContainer') updateReroutePreview();
         showToast('✅ Applied to ' + selectedIds.length + ' items.', 'success');
     });
 
-    // ==================== Import Excel ====================
+    // ==================== Import Excel (Main) ====================
     const importExcelBtn = document.getElementById('importExcelBtn');
     const excelFileInput = document.getElementById('excelFileInput');
     const importPreviewContainer = document.getElementById('importPreviewContainer');
@@ -1257,6 +1373,321 @@
         }
     });
 
+    // ==================== Reroute Feature ====================
+    const rerouteItemsContainer = document.getElementById('rerouteItemsContainer');
+    let rerouteImportedItems = [];
+
+    document.getElementById('openRerouteBtn').addEventListener('click', () => {
+        document.getElementById('rerouteModal').style.display = 'flex';
+        // Reset form fields if needed
+        document.getElementById('rerouteMessage').textContent = '';
+    });
+
+    function addRerouteItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
+        const rowId = 'reroute_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.dataset.rowId = rowId;
+        div.innerHTML = `
+            <input type="checkbox" class="item-checkbox" data-row-id="${rowId}" style="width:auto; margin:0 4px;">
+            <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:1.5;">
+            <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" min="0" step="1" style="flex:0.8;">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${Math.max(0, price)}" min="0" step="0.01" style="flex:1;">
+            <div class="item-tax-fields">
+                <input type="number" placeholder="Disc %" class="itemDiscPct" value="${Math.max(0, discPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="Disc ₦" class="itemDiscAmt" value="${Math.max(0, discAmt)}" step="0.01" min="0">
+                <input type="number" placeholder="VAT %" class="itemVAT" value="${Math.max(0, vatPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="WHT %" class="itemWHT" value="${Math.max(0, whtPct)}" step="0.01" min="0" max="100">
+            </div>
+            <button type="button" class="removeItem">✖</button>
+            <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
+        `;
+        rerouteItemsContainer.appendChild(div);
+        div.querySelector('.removeItem').onclick = () => {
+            if (rerouteItemsContainer.querySelectorAll('.item-row').length <= 1) {
+                showToast('Cannot remove the last item row', 'error');
+                return;
+            }
+            div.remove();
+            updateReroutePreview();
+        };
+        div.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('input', updateReroutePreview);
+            if (inp.type === 'number' && inp.min) {
+                inp.addEventListener('blur', function() {
+                    const min = parseFloat(this.min);
+                    if (!isNaN(min) && parseFloat(this.value) < min) {
+                        this.value = min;
+                        updateReroutePreview();
+                    }
+                });
+            }
+        });
+        updateReroutePreview();
+    }
+
+    document.getElementById('rerouteAddItemBtn').addEventListener('click', () => {
+        addRerouteItemRow();
+    });
+
+    function updateReroutePreview() {
+        // No multiplier in reroute, default 1.00
+        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateTotals('rerouteItemsContainer', 'dummyMultiplier');
+        document.getElementById('rerouteCostPreview').innerHTML = `Total goods value: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('rerouteTaxBreakdown').innerHTML = `
+            Subtotal: ₦${subtotal.toLocaleString()} |
+            Discount: ₦${totalDisc.toLocaleString()} |
+            VAT: ₦${totalVAT.toLocaleString()} |
+            WHT: ₦${totalWHT.toLocaleString()} |
+            <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
+        `;
+    }
+    // dummy multiplier for reroute (no transport multiplier needed)
+    document.getElementById('rerouteItemsContainer').addEventListener('input', updateReroutePreview);
+    // Add a hidden dummy multiplier input for calculateTotals to work
+    const dummyMultiplier = document.createElement('input');
+    dummyMultiplier.type = 'hidden';
+    dummyMultiplier.id = 'dummyMultiplier';
+    dummyMultiplier.value = '1.00';
+    document.body.appendChild(dummyMultiplier);
+
+    // Reroute bulk actions
+    document.getElementById('rerouteApplySelectedBtn').addEventListener('click', () => {
+        const selected = document.querySelectorAll('#rerouteItemsContainer .item-checkbox:checked');
+        if (selected.length === 0) {
+            showToast('Please select at least one item.', 'error');
+            return;
+        }
+        document.getElementById('bulkItemCount').textContent = selected.length;
+        document.getElementById('bulkDiscountPct').value = '0';
+        document.getElementById('bulkDiscountAmt').value = '0';
+        document.getElementById('bulkVAT').value = '0';
+        document.getElementById('bulkWHT').value = '0';
+        document.getElementById('bulkMessage').textContent = '';
+        document.getElementById('bulkApplyModal').style.display = 'flex';
+        document.getElementById('bulkApplyModal').dataset.target = 'rerouteItemsContainer';
+        document.getElementById('bulkApplyModal').dataset.selected = JSON.stringify(
+            Array.from(selected).map(cb => cb.dataset.rowId)
+        );
+    });
+
+    document.getElementById('rerouteApplyAllBtn').addEventListener('click', () => {
+        const rows = document.querySelectorAll('#rerouteItemsContainer .item-row');
+        if (rows.length === 0) { showToast('No items to apply to.', 'error'); return; }
+        const discPct = prompt('Enter Discount % for all items (0-100):', '0');
+        if (discPct === null) return;
+        const discAmt = prompt('Enter Discount Amount (₦) for all items:', '0');
+        if (discAmt === null) return;
+        const vat = prompt('Enter VAT % for all items (0-100):', '0');
+        if (vat === null) return;
+        const wht = prompt('Enter WHT % for all items (0-100):', '0');
+        if (wht === null) return;
+
+        rows.forEach(row => {
+            row.querySelector('.itemDiscPct').value = Math.max(0, parseFloat(discPct) || 0);
+            row.querySelector('.itemDiscAmt').value = Math.max(0, parseFloat(discAmt) || 0);
+            row.querySelector('.itemVAT').value = Math.max(0, parseFloat(vat) || 0);
+            row.querySelector('.itemWHT').value = Math.max(0, parseFloat(wht) || 0);
+        });
+        updateReroutePreview();
+        showToast('✅ Applied to all items.', 'success');
+    });
+
+    document.getElementById('rerouteClearTaxesBtn').addEventListener('click', () => {
+        if (!confirm('Clear all tax/discount fields on all items?')) return;
+        document.querySelectorAll('#rerouteItemsContainer .item-row').forEach(row => {
+            row.querySelector('.itemDiscPct').value = '0';
+            row.querySelector('.itemDiscAmt').value = '0';
+            row.querySelector('.itemVAT').value = '0';
+            row.querySelector('.itemWHT').value = '0';
+        });
+        updateReroutePreview();
+        showToast('🧹 Taxes cleared.', 'info');
+    });
+
+    // Reroute Excel import
+    document.getElementById('rerouteImportExcelBtn').addEventListener('click', () => {
+        document.getElementById('rerouteExcelFileInput').click();
+    });
+
+    document.getElementById('rerouteExcelFileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const previewContainer = document.getElementById('rerouteImportPreview');
+        previewContainer.style.display = 'none';
+        previewContainer.innerHTML = '';
+        const reader = new FileReader();
+        reader.onload = function(loadEvent) {
+            try {
+                const data = new Uint8Array(loadEvent.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(firstSheet);
+                if (json.length === 0) {
+                    showToast('Excel file is empty.', 'error');
+                    return;
+                }
+                const headers = Object.keys(json[0]);
+                const findColumn = (variations) => {
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const v of variations) {
+                            if (hLower === v.toLowerCase().trim()) return h;
+                        }
+                    }
+                    for (const h of headers) {
+                        const hLower = h.toLowerCase().trim();
+                        for (const v of variations) {
+                            const vLower = v.toLowerCase().trim();
+                            if (hLower.length > 2 && vLower.length > 2 &&
+                                (hLower.includes(vLower) || vLower.includes(hLower))) {
+                                return h;
+                            }
+                        }
+                    }
+                    return null;
+                };
+                const itemCol = findColumn(['item', 'product', 'product name', 'item name', 'description', 'goods', 'name']);
+                const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit']);
+                const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost']);
+                const discPctCol = findColumn(['discount %', 'disc%', 'discount percent']);
+                const discAmtCol = findColumn(['discount amount', 'disc amt', 'discount ₦']);
+                const vatCol = findColumn(['vat %', 'vat%', 'value added tax']);
+                const whtCol = findColumn(['wht %', 'wht%', 'withholding tax']);
+
+                if (!itemCol || !qtyCol || !priceCol) {
+                    showToast(`Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`, 'error');
+                    return;
+                }
+                const parsed = [];
+                json.forEach(row => {
+                    const name = String(row[itemCol] || '').trim();
+                    let qty = parseFloat(row[qtyCol]) || 0;
+                    let price = parseFloat(row[priceCol]) || 0;
+                    if (name && qty > 0 && price >= 0) {
+                        const discPct = discPctCol ? parseFloat(row[discPctCol]) || 0 : 0;
+                        const discAmt = discAmtCol ? parseFloat(row[discAmtCol]) || 0 : 0;
+                        const vat = vatCol ? parseFloat(row[vatCol]) || 0 : 0;
+                        const wht = whtCol ? parseFloat(row[whtCol]) || 0 : 0;
+                        parsed.push({ itemName: name, quantity: qty, unitPrice: price,
+                            discountPercent: Math.min(100, Math.max(0, discPct)),
+                            discountAmount: Math.max(0, discAmt),
+                            vatPercent: Math.min(100, Math.max(0, vat)),
+                            whtPercent: Math.min(100, Math.max(0, wht)) });
+                    }
+                });
+                if (parsed.length === 0) {
+                    showToast('No valid items found.', 'error');
+                    return;
+                }
+                rerouteImportedItems = parsed;
+                let previewHtml = `<p><strong>✅ ${parsed.length} items imported:</strong></p>
+                    <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th></tr>`;
+                parsed.forEach(it => {
+                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td>
+                        <td>${it.discountPercent}%</td><td>₦${it.discountAmount}</td><td>${it.vatPercent}%</td><td>${it.whtPercent}%</td></tr>`;
+                });
+                previewHtml += `</table></div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button onclick="applyRerouteImportedItems()" class="btn-success">✅ Apply</button>
+                        <button onclick="clearRerouteImportPreview()" class="btn-danger">❌ Cancel</button>
+                    </div>`;
+                previewContainer.innerHTML = previewHtml;
+                previewContainer.style.display = 'block';
+                document.getElementById('rerouteExcelFileInput').value = '';
+                showToast(`✅ ${parsed.length} items imported`, 'success');
+            } catch (err) {
+                showToast('Error reading Excel: ' + err.message, 'error');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    window.applyRerouteImportedItems = function() {
+        if (rerouteImportedItems.length === 0) return;
+        rerouteItemsContainer.innerHTML = '';
+        rerouteImportedItems.forEach(it => {
+            addRerouteItemRow(it.itemName, it.quantity, it.unitPrice,
+                it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent);
+        });
+        document.getElementById('rerouteImportPreview').style.display = 'none';
+        document.getElementById('rerouteImportPreview').innerHTML = '';
+        updateReroutePreview();
+        rerouteImportedItems = [];
+        showToast('Items applied successfully.', 'success');
+    };
+
+    window.clearRerouteImportPreview = function() {
+        document.getElementById('rerouteImportPreview').style.display = 'none';
+        document.getElementById('rerouteImportPreview').innerHTML = '';
+        rerouteImportedItems = [];
+    };
+
+    // Reroute form submit
+    document.getElementById('rerouteForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const sourceType = document.getElementById('sourceType').value;
+        const sourceSelect = document.getElementById('sourceSelect');
+        const source = sourceSelect.value;
+        const destType = document.getElementById('destType').value;
+        const destSelect = document.getElementById('destSelect');
+        const destination = destSelect.value;
+        const reference = document.getElementById('rerouteReference').value.trim();
+        const date = document.getElementById('rerouteDate').value;
+        const notes = document.getElementById('rerouteNotes').value.trim();
+
+        // Get items from reroute container
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('rerouteItemsContainer', 'dummyMultiplier');
+        if (items.length === 0) {
+            document.getElementById('rerouteMessage').innerText = 'Please add at least one item.';
+            return;
+        }
+
+        const submitBtn = document.getElementById('rerouteSubmitBtn');
+        setButtonLoading(submitBtn, true);
+
+        try {
+            await db.collection('reroutes').add({
+                sourceType,
+                source,
+                destinationType: destType,
+                destination,
+                reference,
+                date,
+                notes,
+                items: items,
+                subtotal,
+                totalDiscount: totalDisc,
+                totalVAT,
+                totalWHT,
+                total: grandTotal,
+                status: 'Rerouted',
+                createdBy: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await db.collection('activityLog').add({
+                actionType: 'reroute',
+                details: `Rerouted invoice from ${sourceType} ${source} to ${destType} ${destination}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+            showToast('✅ Reroute recorded successfully.', 'success');
+            closeModal('rerouteModal');
+            // Reset reroute form
+            rerouteItemsContainer.innerHTML = '';
+            addRerouteItemRow();
+            updateReroutePreview();
+            document.getElementById('rerouteReference').value = '';
+            document.getElementById('rerouteNotes').value = '';
+            // Optionally reload stats or shipments if needed
+        } catch (err) {
+            document.getElementById('rerouteMessage').innerText = 'Error: ' + err.message;
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(submitBtn, false);
+        }
+    });
+
     // ==================== Stats ====================
     function loadStats() {
         if (statsUnsubscribe) statsUnsubscribe();
@@ -1289,8 +1720,13 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dispatch with discount, VAT, WHT, transport multiplier and bulk actions loaded.');
-    // Initial row already added via auth callback.
+    console.log('NEVAMAK Dispatch with Reroute feature loaded.');
+    // Initial rows
+    // Main items already added via auth callback
+    // Reroute items
+    rerouteItemsContainer.innerHTML = '';
+    addRerouteItemRow();
+    updateReroutePreview();
 </script>
 </body>
 </html>
