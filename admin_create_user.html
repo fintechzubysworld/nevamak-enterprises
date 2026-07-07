@@ -66,7 +66,7 @@
     
     <div class="info-box" style="background:#f8d7da; border-color:#f5c6cb;">
         <strong>⚠️ Firestore Rules Check:</strong> Make sure your Firestore security rules allow reads/writes to the <code>users</code> collection. 
-        If users appear but have no role, click the "Fix" button to recreate their document.
+        If users appear but have no role, click the <strong>"Fix"</strong> button to recreate their document.
     </div>
 
     <form id="createUserForm">
@@ -207,12 +207,10 @@
             submitBtn.disabled = true;
 
             try {
-                // 1. Create Auth user
                 const userCred = await auth.createUserWithEmailAndPassword(email, password);
                 const uid = userCred.user.uid;
                 const newUser = userCred.user;
 
-                // 2. Firestore data
                 const userData = {
                     email,
                     role,
@@ -226,7 +224,7 @@
                     userData.vendorName = supplierName;
                 }
 
-                // 3. Write to Firestore with a check
+                // Write to Firestore
                 try {
                     await db.collection('users').doc(uid).set(userData);
                 } catch (firestoreError) {
@@ -235,10 +233,8 @@
                     return;
                 }
 
-                // 4. Send verification email
                 await newUser.sendEmailVerification();
 
-                // 5. Log
                 await db.collection('activityLog').add({
                     actionType: 'user_created',
                     details: `User ${email} created as ${role}`,
@@ -359,7 +355,7 @@
             }
         };
 
-        // Other functions (edit, toggle, resend) remain similar
+        // Edit, toggle, resend functions...
         window.editUser = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) { alert('User not found.'); return; }
