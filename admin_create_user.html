@@ -65,8 +65,7 @@
     <h2>👥 User Management</h2>
     
     <div class="info-box" style="background:#f8d7da; border-color:#f5c6cb;">
-        <strong>⚠️ Firestore Rules Check:</strong> Make sure your Firestore security rules allow reads/writes to the <code>users</code> collection. 
-        If users appear but have no role, click the <strong>"Fix"</strong> button to recreate their document.
+        <strong>⚠️ Missing Role?</strong> If a user cannot log in with <em>"User role not found"</em>, click the <strong>"Fix"</strong> button (🔧) below and re-enter their role. This will recreate their Firestore document.
     </div>
 
     <form id="createUserForm">
@@ -224,7 +223,6 @@
                     userData.vendorName = supplierName;
                 }
 
-                // Write to Firestore
                 try {
                     await db.collection('users').doc(uid).set(userData);
                 } catch (firestoreError) {
@@ -261,7 +259,7 @@
             }
         });
 
-        // Load Users with "Fix" button
+        // Load Users – Fix button is ALWAYS visible
         async function loadUsers() {
             userListDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Loading users...</div>';
             try {
@@ -278,7 +276,7 @@
                         usersCache.push({ uid, ...u });
                         const enabled = u.enabled !== false;
                         const verified = u.emailVerified === true;
-                        const hasRole = !!u.role;
+                        const hasRole = !!(u.role && u.role.trim() !== '');
                         const roleClass = 'role-' + (u.role || 'unknown');
                         const supplierDisplay = u.supplierName || (u.supplierId ? 'ID: ' + u.supplierId : '—');
                         const statusClass = hasRole ? (enabled ? 'status-active' : 'status-disabled') : 'status-missing';
@@ -292,7 +290,8 @@
                             <td>
                                 <button class="btn-sm btn-edit" onclick="editUser('${uid}')">✏️</button>
                                 <button class="btn-sm ${enabled ? 'btn-disable' : 'btn-enable'}" onclick="toggleUser('${uid}', ${!enabled})">${enabled ? '🔒' : '🔓'}</button>
-                                ${!hasRole ? `<button class="btn-sm btn-fix" onclick="fixUser('${uid}')">🔧 Fix</button>` : ''}
+                                <!-- Fix button always visible -->
+                                <button class="btn-sm btn-fix" onclick="fixUser('${uid}')">🔧 Fix</button>
                                 ${!verified ? `<button class="btn-sm btn-resend" onclick="resendVerification('${uid}')">📧</button>` : ''}
                             </td>
                         </tr>`;
@@ -306,7 +305,7 @@
             }
         }
 
-        // Fix missing document
+        // Fix User – Recreate document
         window.fixUser = async function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) {
@@ -314,11 +313,11 @@
                 return;
             }
             const email = user.email;
-            const role = prompt(`Enter role for ${email} (admin, lagos_sender, abuja_rep, ph_rep, vendor):`, 'lagos_sender');
+            const role = prompt(`Enter role for ${email}:\nValid: admin, lagos_sender, abuja_rep, ph_rep, vendor`, user.role || 'lagos_sender');
             if (!role) return;
             const valid = ['admin','lagos_sender','abuja_rep','ph_rep','vendor'];
-            if (!valid.includes(role)) {
-                alert('Invalid role.');
+            if (!valid.includes(role.toLowerCase())) {
+                alert('Invalid role. Use: admin, lagos_sender, abuja_rep, ph_rep, vendor');
                 return;
             }
             let supplierId = null, supplierName = null;
@@ -336,9 +335,9 @@
             }
             const data = {
                 email,
-                role,
+                role: role.toLowerCase(),
                 enabled: true,
-                emailVerified: false,
+                emailVerified: user.emailVerified || false,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             if (supplierId) {
@@ -348,21 +347,21 @@
             }
             try {
                 await db.collection('users').doc(uid).set(data);
-                alert('✅ User document recreated.');
+                alert('✅ User document recreated successfully.');
                 loadUsers();
             } catch (err) {
-                alert('Error: ' + err.message);
+                alert('❌ Error: ' + err.message);
             }
         };
 
-        // Edit, toggle, resend functions...
+        // Edit, toggle, resend functions
         window.editUser = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) { alert('User not found.'); return; }
             const valid = ['admin','lagos_sender','abuja_rep','ph_rep','vendor'];
             const newRole = prompt(`New role for ${user.email}:`, user.role || 'lagos_sender');
             if (!newRole) return;
-            if (!valid.includes(newRole)) {
+            if (!valid.includes(newRole.toLowerCase())) {
                 alert('Invalid role.');
                 return;
             }
@@ -376,7 +375,7 @@
                 supplierId = sel.id;
                 supplierName = sel.name;
             }
-            const update = { role: newRole };
+            const update = { role: newRole.toLowerCase() };
             if (supplierId) {
                 update.supplierId = supplierId;
                 update.supplierName = supplierName;
