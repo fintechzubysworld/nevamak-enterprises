@@ -18,10 +18,7 @@
         button:hover { background: #1e3799; }
         .error { color: #e74c3c; margin-top: 12px; text-align: center; font-size: 0.9rem; }
         .info { color: #27ae60; text-align: center; margin-top: 12px; font-size: 0.85rem; }
-        .setup-btn { background: #e67e22; }
-        .setup-btn:hover { background: #d35400; }
         .forgot-link { display: block; text-align: center; margin-top: 12px; color: #0a3d62; text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
-        .forgot-link:hover { color: #1e3799; }
         .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
         .hidden { display: none; }
     </style>
@@ -36,11 +33,10 @@
     <div id="message" class="error"></div>
     <a id="forgotPasswordLink" class="forgot-link">🔑 Forgot Password?</a>
     <div id="verificationMessage" class="info" style="display:none;"></div>
-    
+</div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-
         const firebaseConfig = {
             apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
             authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -54,65 +50,8 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // DOM refs
-        const setupContainer = document.getElementById('setupAdminContainer');
         const messageDiv = document.getElementById('message');
         const verificationMsg = document.getElementById('verificationMessage');
-
-        // Check admin exists
-        async function checkAdminExists() {
-            if (!setupContainer) return;
-            try {
-                const snap = await db.collection('users').where('role', '==', 'admin').limit(1).get();
-                setupContainer.style.display = snap.empty ? 'block' : 'none';
-            } catch (err) {
-                setupContainer.style.display = 'block';
-            }
-        }
-        checkAdminExists().catch(() => { if(setupContainer) setupContainer.style.display = 'block'; });
-
-        // Create admin
-        document.getElementById('setupAdminBtn')?.addEventListener('click', async () => {
-            const adminEmail = 'admin@nevamak.com';
-            const adminPassword = 'admin123';
-            const btn = document.getElementById('setupAdminBtn');
-            const originalText = btn.textContent;
-            btn.textContent = 'Creating...';
-            btn.disabled = true;
-
-            try {
-                let uid, user;
-                try {
-                    const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
-                    uid = userCred.user.uid;
-                    user = userCred.user;
-                    await user.sendEmailVerification();
-                } catch (err) {
-                    if (err.code === 'auth/email-already-in-use') {
-                        const userCred = await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
-                        uid = userCred.user.uid;
-                        user = userCred.user;
-                        await auth.signOut();
-                    } else {
-                        throw err;
-                    }
-                }
-                await db.collection('users').doc(uid).set({
-                    email: adminEmail,
-                    role: 'admin',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    enabled: true,
-                    emailVerified: user?.emailVerified || false
-                });
-                alert('✅ Admin account is ready!\nEmail: admin@nevamak.com\nPassword: admin123\nYou can sign in now.');
-                if (setupContainer) setupContainer.style.display = 'none';
-            } catch (err) {
-                alert('Error creating admin: ' + err.message);
-            } finally {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            }
-        });
 
         // Login
         document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -134,7 +73,6 @@
                 const userCred = await auth.signInWithEmailAndPassword(email, password);
                 const user = userCred.user;
 
-                // Optional email verification warning
                 if (!user.emailVerified && verificationMsg) {
                     verificationMsg.style.display = 'block';
                     verificationMsg.innerHTML = `⚠️ Your email (${email}) is not verified. You can still log in, but some features may require verification.
@@ -151,9 +89,10 @@
                     });
                 }
 
-                // Get user role
+                // Check Firestore document
                 const userDoc = await db.collection('users').doc(user.uid).get();
                 if (!userDoc.exists) {
+                    // Auto-create for admin default
                     if (email === 'admin@nevamak.com') {
                         await db.collection('users').doc(user.uid).set({
                             email: email,
@@ -170,10 +109,26 @@
                         }
                     }
                     await auth.signOut();
-                    if (messageDiv) messageDiv.innerText = 'User role not found. Please ask admin to create your account.';
+                    if (messageDiv) {
+                        messageDiv.innerHTML = `
+                            ❌ User role not found. 
+                            <br><small style="color:#666;">Your account exists but is missing configuration. Please contact your administrator to fix your account.</small>
+                            <br><small style="color:#666;">Admin: Go to User Management and click the "Fix" button for this user.</small>
+                        `;
+                    }
                     return;
                 }
                 const role = userDoc.data().role;
+                if (!role) {
+                    await auth.signOut();
+                    if (messageDiv) {
+                        messageDiv.innerHTML = `
+                            ❌ User role is missing.
+                            <br><small style="color:#666;">Your account is not properly configured. Please contact your administrator.</small>
+                        `;
+                    }
+                    return;
+                }
                 redirectUser(role);
             } catch (err) {
                 console.error('Login error:', err);
@@ -208,7 +163,6 @@
             }
         });
 
-        // ========== REDIRECT FUNCTION WITH VENDOR SUPPORT ==========
         function redirectUser(role) {
             if (role === 'admin' || role === 'lagos_sender') {
                 window.location.href = 'index.html';
@@ -223,14 +177,14 @@
             }
         }
 
-        // Auto-redirect if already logged in
+        // Auto-redirect
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 try {
                     const userDoc = await db.collection('users').doc(user.uid).get();
                     if (userDoc.exists) {
                         const role = userDoc.data().role;
-                        redirectUser(role);
+                        if (role) redirectUser(role);
                     }
                 } catch (err) {
                     console.warn('Auto-redirect error:', err);
@@ -238,14 +192,13 @@
             }
         });
 
-        // Enter key on password field
+        // Enter key
         document.getElementById('password').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 document.getElementById('loginBtn').click();
             }
         });
-
-    }); // end DOMContentLoaded
+    });
 </script>
 </body>
 </html>
