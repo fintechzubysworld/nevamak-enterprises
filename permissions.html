@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Permissions Manager</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1200px; margin: auto; }
+        .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: #0a3d62; }
+        .nav { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; }
+        .nav a, .logout-btn { background: #3c6382; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+        th { background: #f8f9fa; font-weight: 600; }
+        .role-badge { display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; color: white; }
+        .role-admin { background: #e74c3c; }
+        .role-lagos_sender { background: #0a3d62; }
+        .role-abuja_rep { background: #f39c12; }
+        .role-ph_rep { background: #27ae60; }
+        .role-vendor { background: #6c5ce7; }
+        .toggle-group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+        .toggle-item { display: flex; align-items: center; gap: 4px; margin-right: 8px; font-size: 0.8rem; }
+        .toggle-item input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .empty { text-align: center; color: #888; padding: 20px; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 40px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s ease; font-size: 0.95rem; max-width: 90%; text-align: center; }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .close { float: right; cursor: pointer; font-size: 1.8rem; }
+        @media (max-width: 600px) { .toggle-group { flex-direction: column; align-items: flex-start; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <span style="font-weight:bold;">🔐 Permissions Manager</span>
+        <div style="flex:1;"></div>
+        <a href="index.html">🏠 Dashboard</a>
+        <a href="admin_create_user.html">👑 Admin</a>
+        <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+    </div>
+
+    <div class="card">
+        <h2>👥 User Permissions</h2>
+        <p style="color:#666; font-size:0.9rem;">Manage permissions for each user. Checked = allowed. Changes are saved immediately.</p>
+        <div id="permissionsTableContainer">
+            <div style="text-align:center; padding:20px;"><div class="loading-spinner"></div> Loading users...</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>📋 Default Role Permissions</h2>
+        <p style="color:#666; font-size:0.9rem;">These are the default permissions for each role. They are applied when a new user is created or when a user's role is changed.</p>
+        <div id="defaultPermissionsContainer">
+            <div style="text-align:center; padding:20px;"><div class="loading-spinner"></div> Loading defaults...</div>
+        </div>
+        <button id="saveDefaultsBtn" class="btn-primary">💾 Save Defaults</button>
+        <span id="defaultsMessage" style="margin-left:12px;"></span>
+    </div>
+
+    <div class="card">
+        <h2>📊 Permission Definitions</h2>
+        <p style="color:#666; font-size:0.9rem;">The following permissions are used across the system:</p>
+        <ul style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap:8px; list-style:none; padding:0;">
+            <li><strong>viewDashboard</strong> – Access to main dashboard</li>
+            <li><strong>createDispatch</strong> – Create new shipments/dispatches</li>
+            <li><strong>viewShipments</strong> – View all shipments (filtered by branch)</li>
+            <li><strong>receiveAbuja</strong> – Receive goods in Abuja</li>
+            <li><strong>receivePH</strong> – Receive goods in Port Harcourt</li>
+            <li><strong>viewReports</strong> – Access reports & analytics</li>
+            <li><strong>manageUsers</strong> – Create/edit/disable users</li>
+            <li><strong>manageSuppliers</strong> – Add/edit suppliers</li>
+            <li><strong>manageInventory</strong> – Edit inventory</li>
+            <li><strong>viewInventory</strong> – View inventory</li>
+            <li><strong>rerouteInvoice</strong> – Reroute invoices to vendors</li>
+            <li><strong>requestInvoice</strong> – Request invoices from branches</li>
+            <li><strong>processReturns</strong> – Process returns</li>
+            <li><strong>viewInvoiceRepo</strong> – View invoice repository</li>
+            <li><strong>managePermissions</strong> – Edit permissions (this page)</li>
+            <li><strong>chat</strong> – Access chat</li>
+        </ul>
+    </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" class="toast"></div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ==================== Global State ====================
+    let currentUser = null;
+    let currentUserRole = '';
+    let currentUserUid = '';
+    let allUsers = [];
+    let defaultPermissions = {};
+    let permissionList = [];
+
+    // ==================== Helper Functions ====================
+    function showToast(message, type = 'info', duration = 3000) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type;
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => {
+            toast.classList.remove('show');
+        }, duration);
+    }
+
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+    }
+
+    // ==================== Auth ====================
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserUid = user.uid;
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (!userDoc.exists) {
+            alert('User document not found. Please contact admin.');
+            window.location.href = 'login.html';
+            return;
+        }
+        currentUserRole = userDoc.data().role || '';
+        // Check if user has managePermissions permission (either admin or explicit)
+        const perms = userDoc.data().permissions || {};
+        const canManage = perms.managePermissions || currentUserRole === 'admin';
+        if (!canManage) {
+            alert('You do not have permission to manage permissions.');
+            window.location.href = 'index.html';
+            return;
+        }
+        // Load data
+        await loadDefaultPermissions();
+        await loadAllUsers();
+        renderDefaultPermissions();
+        renderUsersTable();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    // ==================== Load Default Permissions ====================
+    const DEFAULT_PERMS_DOC = 'permissions/defaults';
+
+    async function loadDefaultPermissions() {
+        try {
+            const doc = await db.collection('permissions').doc('defaults').get();
+            if (doc.exists) {
+                defaultPermissions = doc.data();
+            } else {
+                // Create defaults if not exist
+                defaultPermissions = {
+                    admin: {
+                        viewDashboard: true, createDispatch: true, viewShipments: true,
+                        receiveAbuja: true, receivePH: true, viewReports: true,
+                        manageUsers: true, manageSuppliers: true, manageInventory: true,
+                        viewInventory: true, rerouteInvoice: true, requestInvoice: true,
+                        processReturns: true, viewInvoiceRepo: true, managePermissions: true,
+                        chat: true
+                    },
+                    lagos_sender: {
+                        viewDashboard: true, createDispatch: true, viewShipments: true,
+                        receiveAbuja: false, receivePH: false, viewReports: true,
+                        manageUsers: false, manageSuppliers: true, manageInventory: false,
+                        viewInventory: true, rerouteInvoice: true, requestInvoice: false,
+                        processReturns: false, viewInvoiceRepo: true, managePermissions: false,
+                        chat: true
+                    },
+                    abuja_rep: {
+                        viewDashboard: false, createDispatch: false, viewShipments: true,
+                        receiveAbuja: true, receivePH: false, viewReports: false,
+                        manageUsers: false, manageSuppliers: false, manageInventory: false,
+                        viewInventory: true, rerouteInvoice: false, requestInvoice: true,
+                        processReturns: true, viewInvoiceRepo: false, managePermissions: false,
+                        chat: true
+                    },
+                    ph_rep: {
+                        viewDashboard: false, createDispatch: false, viewShipments: true,
+                        receiveAbuja: false, receivePH: true, viewReports: false,
+                        manageUsers: false, manageSuppliers: false, manageInventory: false,
+                        viewInventory: true, rerouteInvoice: false, requestInvoice: true,
+                        processReturns: true, viewInvoiceRepo: false, managePermissions: false,
+                        chat: true
+                    },
+                    vendor: {
+                        viewDashboard: false, createDispatch: true, viewShipments: true,
+                        receiveAbuja: false, receivePH: false, viewReports: false,
+                        manageUsers: false, manageSuppliers: false, manageInventory: false,
+                        viewInventory: false, rerouteInvoice: false, requestInvoice: false,
+                        processReturns: false, viewInvoiceRepo: false, managePermissions: false,
+                        chat: true
+                    }
+                };
+                await db.collection('permissions').doc('defaults').set(defaultPermissions);
+            }
+            // Build permission list from admin defaults
+            const adminPerms = defaultPermissions.admin || {};
+            permissionList = Object.keys(adminPerms).filter(k => typeof adminPerms[k] === 'boolean');
+            if (permissionList.length === 0) {
+                // fallback hardcoded list
+                permissionList = [
+                    'viewDashboard', 'createDispatch', 'viewShipments', 'receiveAbuja', 'receivePH',
+                    'viewReports', 'manageUsers', 'manageSuppliers', 'manageInventory', 'viewInventory',
+                    'rerouteInvoice', 'requestInvoice', 'processReturns', 'viewInvoiceRepo', 'managePermissions', 'chat'
+                ];
+            }
+        } catch (error) {
+            console.error('Error loading default permissions:', error);
+            showToast('Error loading default permissions: ' + error.message, 'error');
+            // Use fallback
+            defaultPermissions = {
+                admin: { viewDashboard: true, createDispatch: true, viewShipments: true, receiveAbuja: true, receivePH: true, viewReports: true, manageUsers: true, manageSuppliers: true, manageInventory: true, viewInventory: true, rerouteInvoice: true, requestInvoice: true, processReturns: true, viewInvoiceRepo: true, managePermissions: true, chat: true },
+                lagos_sender: { viewDashboard: true, createDispatch: true, viewShipments: true, receiveAbuja: false, receivePH: false, viewReports: true, manageUsers: false, manageSuppliers: true, manageInventory: false, viewInventory: true, rerouteInvoice: true, requestInvoice: false, processReturns: false, viewInvoiceRepo: true, managePermissions: false, chat: true },
+                abuja_rep: { viewDashboard: false, createDispatch: false, viewShipments: true, receiveAbuja: true, receivePH: false, viewReports: false, manageUsers: false, manageSuppliers: false, manageInventory: false, viewInventory: true, rerouteInvoice: false, requestInvoice: true, processReturns: true, viewInvoiceRepo: false, managePermissions: false, chat: true },
+                ph_rep: { viewDashboard: false, createDispatch: false, viewShipments: true, receiveAbuja: false, receivePH: true, viewReports: false, manageUsers: false, manageSuppliers: false, manageInventory: false, viewInventory: true, rerouteInvoice: false, requestInvoice: true, processReturns: true, viewInvoiceRepo: false, managePermissions: false, chat: true },
+                vendor: { viewDashboard: false, createDispatch: true, viewShipments: true, receiveAbuja: false, receivePH: false, viewReports: false, manageUsers: false, manageSuppliers: false, manageInventory: false, viewInventory: false, rerouteInvoice: false, requestInvoice: false, processReturns: false, viewInvoiceRepo: false, managePermissions: false, chat: true }
+            };
+            permissionList = ['viewDashboard', 'createDispatch', 'viewShipments', 'receiveAbuja', 'receivePH', 'viewReports', 'manageUsers', 'manageSuppliers', 'manageInventory', 'viewInventory', 'rerouteInvoice', 'requestInvoice', 'processReturns', 'viewInvoiceRepo', 'managePermissions', 'chat'];
+        }
+    }
+
+    // ==================== Load All Users ====================
+    async function loadAllUsers() {
+        try {
+            const snap = await db.collection('users').get();
+            allUsers = [];
+            snap.forEach(doc => {
+                const data = doc.data();
+                allUsers.push({
+                    uid: doc.id,
+                    email: data.email || '',
+                    role: data.role || '',
+                    permissions: data.permissions || {},
+                    enabled: data.enabled !== false
+                });
+            });
+        } catch (error) {
+            console.error('Error loading users:', error);
+            showToast('Error loading users: ' + error.message, 'error');
+            allUsers = [];
+        }
+    }
+
+    // ==================== Render Default Permissions ====================
+    function renderDefaultPermissions() {
+        const container = document.getElementById('defaultPermissionsContainer');
+        let html = '<table><tr><th>Role</th>';
+        permissionList.forEach(p => html += `<th>${p}</th>`);
+        html += '</tr>';
+        const roles = ['admin', 'lagos_sender', 'abuja_rep', 'ph_rep', 'vendor'];
+        roles.forEach(role => {
+            const perms = defaultPermissions[role] || {};
+            html += `<tr><td><span class="role-badge role-${role}">${role}</span></td>`;
+            permissionList.forEach(p => {
+                const checked = perms[p] === true;
+                html += `<td><input type="checkbox" class="default-perm" data-role="${role}" data-perm="${p}" ${checked ? 'checked' : ''}></td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</table>';
+        container.innerHTML = html;
+        // Attach change listeners
+        document.querySelectorAll('.default-perm').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const role = this.dataset.role;
+                const perm = this.dataset.perm;
+                if (!defaultPermissions[role]) defaultPermissions[role] = {};
+                defaultPermissions[role][perm] = this.checked;
+                // Save automatically? We'll let user click save.
+            });
+        });
+    }
+
+    // ==================== Render Users Table ====================
+    function renderUsersTable() {
+        const container = document.getElementById('permissionsTableContainer');
+        if (!allUsers.length) {
+            container.innerHTML = '<p class="empty">No users found.</p>';
+            return;
+        }
+        let html = `<div class="scroll"><table>
+            <tr><th>Email</th><th>Role</th><th>Status</th>`;
+        permissionList.forEach(p => html += `<th>${p}</th>`);
+        html += `<th>Actions</th></tr>`;
+        allUsers.forEach(user => {
+            const perms = user.permissions || {};
+            const roleClass = 'role-' + (user.role || 'unknown');
+            const status = user.enabled ? '✅ Active' : '❌ Disabled';
+            html += `<tr>
+                <td>${escapeHtml(user.email)}</td>
+                <td><span class="role-badge ${roleClass}">${user.role}</span></td>
+                <td>${status}</td>`;
+            permissionList.forEach(p => {
+                const checked = perms[p] === true;
+                // If not explicitly set, use default based on role
+                const defaultVal = defaultPermissions[user.role] ? defaultPermissions[user.role][p] : false;
+                const isDefault = checked === defaultVal;
+                html += `<td><input type="checkbox" class="user-perm" data-uid="${user.uid}" data-perm="${p}" ${checked ? 'checked' : ''} data-default="${defaultVal}"> <span style="font-size:0.65rem; color:${isDefault ? '#888' : '#f39c12'};">${isDefault ? '✓ default' : '★ custom'}</span></td>`;
+            });
+            html += `<td>
+                <button class="btn-sm btn-warning" onclick="resetUserPermissions('${user.uid}')">↺ Reset to Default</button>
+                <button class="btn-sm btn-success" onclick="applyDefaultToUser('${user.uid}')">📋 Apply Defaults</button>
+            </td></tr>`;
+        });
+        html += '</table></div>';
+        container.innerHTML = html;
+
+        // Attach change listeners for user permissions
+        document.querySelectorAll('.user-perm').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const uid = this.dataset.uid;
+                const perm = this.dataset.perm;
+                const checked = this.checked;
+                const user = allUsers.find(u => u.uid === uid);
+                if (!user) return;
+                if (!user.permissions) user.permissions = {};
+                user.permissions[perm] = checked;
+                saveUserPermissions(uid, user.permissions);
+                // Update label
+                const defaultVal = defaultPermissions[user.role] ? defaultPermissions[user.role][perm] : false;
+                const label = this.parentElement.querySelector('span');
+                if (label) {
+                    const isDefault = checked === defaultVal;
+                    label.textContent = isDefault ? '✓ default' : '★ custom';
+                    label.style.color = isDefault ? '#888' : '#f39c12';
+                }
+            });
+        });
+    }
+
+    // ==================== Save User Permissions ====================
+    async function saveUserPermissions(uid, permissions) {
+        try {
+            await db.collection('users').doc(uid).update({ permissions: permissions });
+            showToast('Permissions updated for user.', 'success');
+        } catch (error) {
+            console.error('Error saving permissions:', error);
+            showToast('Error saving permissions: ' + error.message, 'error');
+        }
+    }
+
+    // ==================== Reset User to Default ====================
+    window.resetUserPermissions = async function(uid) {
+        if (!confirm('Reset permissions for this user to role defaults?')) return;
+        const user = allUsers.find(u => u.uid === uid);
+        if (!user) return;
+        const role = user.role;
+        const defaults = defaultPermissions[role] || {};
+        await saveUserPermissions(uid, {});
+        // Reload user data
+        await loadAllUsers();
+        renderUsersTable();
+        showToast('Permissions reset to defaults.', 'success');
+    };
+
+    window.applyDefaultToUser = async function(uid) {
+        if (!confirm('Apply default permissions for this user\'s role?')) return;
+        const user = allUsers.find(u => u.uid === uid);
+        if (!user) return;
+        const role = user.role;
+        const defaults = defaultPermissions[role] || {};
+        await saveUserPermissions(uid, defaults);
+        await loadAllUsers();
+        renderUsersTable();
+        showToast('Default permissions applied.', 'success');
+    };
+
+    // ==================== Save Defaults ====================
+    document.getElementById('saveDefaultsBtn').addEventListener('click', async () => {
+        try {
+            // Collect from checkboxes
+            const checkboxes = document.querySelectorAll('.default-perm');
+            checkboxes.forEach(cb => {
+                const role = cb.dataset.role;
+                const perm = cb.dataset.perm;
+                if (!defaultPermissions[role]) defaultPermissions[role] = {};
+                defaultPermissions[role][perm] = cb.checked;
+            });
+            await db.collection('permissions').doc('defaults').set(defaultPermissions);
+            showToast('Default permissions saved.', 'success');
+            document.getElementById('defaultsMessage').textContent = '✅ Saved at ' + new Date().toLocaleTimeString();
+            // Re-render user table to show updated defaults
+            await loadAllUsers();
+            renderUsersTable();
+        } catch (error) {
+            console.error('Error saving defaults:', error);
+            showToast('Error saving defaults: ' + error.message, 'error');
+        }
+    });
+
+    // ==================== Initial Render ====================
+    // The load functions are called from auth callback.
+    console.log('NEVAMAK Permissions Manager loaded.');
+</script>
+</body>
+</html>
