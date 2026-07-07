@@ -75,10 +75,16 @@
             <option value="admin">Admin</option>
             <option value="vendor">External Vendor</option>
         </select>
+        
+        <!-- Supplier dropdown – shown only when role = vendor -->
         <div id="supplierField" class="hidden">
             <label style="font-weight:600; font-size:0.9rem;">Select Supplier:</label>
-            <select id="supplierSelect"><option value="">-- Select --</option></select>
+            <select id="supplierSelect">
+                <option value="">-- Select Supplier --</option>
+            </select>
+            <div id="supplierStatus" style="font-size:0.8rem; color:#888; margin-top:4px;"></div>
         </div>
+
         <div style="display:flex; align-items:center; gap:10px; margin:8px 0;">
             <input type="checkbox" id="sendNotification" checked style="width:auto; margin:0;">
             <label for="sendNotification" style="font-weight:500; cursor:pointer;">📧 Send welcome email</label>
@@ -111,6 +117,7 @@
         const userRole = document.getElementById('userRole');
         const supplierSelect = document.getElementById('supplierSelect');
         const supplierField = document.getElementById('supplierField');
+        const supplierStatus = document.getElementById('supplierStatus');
         const messageDiv = document.getElementById('message');
         const userListDiv = document.getElementById('userList');
 
@@ -118,6 +125,7 @@
         let suppliers = [];
         let usersCache = [];
 
+        // ========== Auth ==========
         auth.onAuthStateChanged(async (user) => {
             if (!user) { window.location.href = 'login.html'; return; }
             const userDoc = await db.collection('users').doc(user.uid).get();
@@ -136,29 +144,48 @@
             auth.signOut().then(() => window.location.href = 'login.html');
         });
 
+        // ========== Load Suppliers ==========
         async function loadSuppliers() {
             try {
                 const snap = await db.collection('suppliers').get();
                 suppliers = [];
                 const sel = supplierSelect;
                 sel.innerHTML = '<option value="">-- Select Supplier --</option>';
-                snap.forEach(doc => {
-                    const s = doc.data();
-                    suppliers.push({ id: doc.id, name: s.name });
-                    const opt = document.createElement('option');
-                    opt.value = doc.id;
-                    opt.textContent = s.name;
-                    sel.appendChild(opt);
-                });
+                if (snap.empty) {
+                    supplierStatus.textContent = '⚠️ No suppliers found. Please add suppliers first.';
+                    supplierStatus.style.color = '#e67e22';
+                } else {
+                    snap.forEach(doc => {
+                        const s = doc.data();
+                        suppliers.push({ id: doc.id, name: s.name });
+                        const opt = document.createElement('option');
+                        opt.value = doc.id;
+                        opt.textContent = s.name;
+                        sel.appendChild(opt);
+                    });
+                    supplierStatus.textContent = `✅ ${suppliers.length} suppliers available.`;
+                    supplierStatus.style.color = '#27ae60';
+                }
             } catch (err) {
                 console.error('Error loading suppliers:', err);
+                supplierStatus.textContent = '❌ Error loading suppliers: ' + err.message;
+                supplierStatus.style.color = '#e74c3c';
+                suppliers = [];
             }
         }
 
+        // ========== Toggle Supplier Field ==========
         userRole.addEventListener('change', function() {
-            supplierField.classList.toggle('hidden', this.value !== 'vendor');
+            if (this.value === 'vendor') {
+                supplierField.classList.remove('hidden');
+                // Reload suppliers in case list changed
+                loadSuppliers();
+            } else {
+                supplierField.classList.add('hidden');
+            }
         });
 
+        // ========== Show Message ==========
         function showMessage(text, type) {
             messageDiv.textContent = text;
             messageDiv.className = 'message ' + type;
@@ -168,6 +195,7 @@
             }
         }
 
+        // ========== Create User ==========
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = userEmail.value.trim();
@@ -191,7 +219,11 @@
                     return;
                 }
                 const supplier = suppliers.find(s => s.id === supplierId);
-                supplierName = supplier ? supplier.name : '';
+                if (!supplier) {
+                    showMessage('Selected supplier not found. Please refresh and try again.', 'error');
+                    return;
+                }
+                supplierName = supplier.name;
             }
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
@@ -245,6 +277,7 @@
             }
         });
 
+        // ========== Load Users ==========
         async function loadUsers() {
             userListDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Loading...</div>';
             try {
@@ -289,7 +322,7 @@
             }
         }
 
-        // Fix User – with permission error handling
+        // ========== Fix User ==========
         window.fixUser = async function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) {
@@ -306,6 +339,12 @@
             }
             let supplierId = null, supplierName = null;
             if (role === 'vendor') {
+                // Reload suppliers to ensure fresh list
+                await loadSuppliers();
+                if (suppliers.length === 0) {
+                    alert('No suppliers found. Please add a supplier first.');
+                    return;
+                }
                 const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
                 const input = prompt(`Enter supplier ID:\n${list}`);
                 if (input === null) return;
@@ -342,6 +381,7 @@
             }
         };
 
+        // ========== Edit User ==========
         window.editUser = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) { alert('User not found.'); return; }
@@ -354,15 +394,28 @@
             }
             let supplierId = null, supplierName = null;
             if (newRole === 'vendor') {
-                const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
-                const input = prompt(`Enter supplier ID:\n${list}`);
-                if (input === null) return;
-                const sel = suppliers.find(s => s.id === input.trim());
-                if (!sel) { alert('Supplier not found.'); return; }
-                supplierId = sel.id;
-                supplierName = sel.name;
+                // Reload suppliers
+                loadSuppliers().then(() => {
+                    if (suppliers.length === 0) {
+                        alert('No suppliers found.');
+                        return;
+                    }
+                    const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
+                    const input = prompt(`Enter supplier ID:\n${list}`);
+                    if (input === null) return;
+                    const sel = suppliers.find(s => s.id === input.trim());
+                    if (!sel) { alert('Supplier not found.'); return; }
+                    supplierId = sel.id;
+                    supplierName = sel.name;
+                    proceedUpdate(uid, newRole, supplierId, supplierName);
+                });
+                return;
             }
-            const update = { role: newRole.toLowerCase() };
+            proceedUpdate(uid, newRole, null, null);
+        };
+
+        function proceedUpdate(uid, role, supplierId, supplierName) {
+            const update = { role: role.toLowerCase() };
             if (supplierId) {
                 update.supplierId = supplierId;
                 update.supplierName = supplierName;
@@ -377,8 +430,9 @@
                         alert('Error: ' + err.message);
                     }
                 });
-        };
+        }
 
+        // ========== Toggle User ==========
         window.toggleUser = function(uid, enable) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) return;
@@ -394,13 +448,14 @@
                 });
         };
 
+        // ========== Resend Verification ==========
         window.resendVerification = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) return;
             alert(`📧 Verification resend requested for ${user.email}.\nThe user should log in and click "Resend verification" on login page.`);
         };
 
-        // Show Firestore rules help
+        // ========== Show Firestore Rules Help ==========
         window.showRulesHelp = function() {
             alert(
 `Firestore Security Rules Example:
