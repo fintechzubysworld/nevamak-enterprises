@@ -41,6 +41,13 @@
         .draft-badge { background: #dfe6e9; color: #2d3436; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; }
         .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; margin-bottom: 12px; font-size: 0.9rem; color: #721c24; }
         .permission-error a { color: #0a3d62; font-weight: 600; }
+        .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-info { background: #3498db; color: white; }
+        .btn-secondary { background: #8e44ad; color: white; }
         @media (max-width: 500px) { .input-group { flex-direction: column; } .input-group input { width: 100%; } }
     </style>
 </head>
@@ -188,21 +195,6 @@
         });
     });
 
-    async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
     // ==================== Search ====================
     function setupSearch() {
         const searchInput = document.getElementById('searchItem');
@@ -309,7 +301,10 @@
                 }
                 html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div>
                          <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div>
-                         <button onclick="receiveShipment('${id}')">✅ Confirm Receipt</button>
+                         <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button onclick="receiveShipment('${id}')" style="flex:1;">✅ Confirm Receipt</button>
+                            <button onclick="receiveAll('${id}')" style="flex:1; background:#27ae60;">✅ Receive All</button>
+                         </div>
                          <button onclick="saveReceiveDraft('${id}')" style="background:#f39c12;">💾 Save Draft</button>
                          <button onclick="viewInvoice('${id}')" style="background:#3498db;">🧾 Preview Invoice</button>
                          </div>`;
@@ -320,6 +315,37 @@
             document.getElementById('shipmentsList').innerHTML = `<div class='card'>⚠️ Error loading shipments: ${error.message}</div>`;
         }
     }
+
+    // ==================== Receive All (New) ====================
+    window.receiveAll = async function(shipId) {
+        // Auto-fill all pending quantities and submit receipt
+        try {
+            const doc = await db.collection('shipments').doc(shipId).get();
+            if (!doc.exists) return;
+            const data = doc.data();
+            const items = data.items || [];
+            let hasPending = false;
+            for (let i = 0; i < items.length; i++) {
+                const it = items[i];
+                const pending = it.orderedQty - (it.receivedQty + it.damageQty);
+                if (pending > 0) {
+                    hasPending = true;
+                    const recvInput = document.getElementById(`recv_${shipId}_${i}`);
+                    const damInput = document.getElementById(`dam_${shipId}_${i}`);
+                    if (recvInput) recvInput.value = pending;
+                    if (damInput) damInput.value = 0;
+                }
+            }
+            if (!hasPending) {
+                alert('No pending items to receive. This shipment is already fully received.');
+                return;
+            }
+            // Now submit the receipt
+            receiveShipment(shipId);
+        } catch (error) {
+            alert('Error receiving all: ' + error.message);
+        }
+    };
 
     // ==================== Receive Shipment (Submit) ====================
     window.receiveShipment = async (shipId) => {
@@ -801,7 +827,6 @@ match /receiveDrafts/{document} {
         }
     }
 
-    
     document.getElementById('filterHistoryBtn').addEventListener('click', () => {
         const start = document.getElementById('historyStart').value;
         const end = document.getElementById('historyEnd').value;
