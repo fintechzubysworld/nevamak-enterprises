@@ -236,6 +236,22 @@
         }, (err) => console.error('Inventory stats error:', err));
     }
 
+    async function hasPermission(permName) {
+    const user = firebase.auth().currentUser;
+    if (!user) return false;
+    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
+    const data = doc.data();
+    const perms = data.permissions || {};
+    // If explicitly set, use that; else fallback to role default
+    if (perms.hasOwnProperty(permName)) return perms[permName];
+    // Get default role permissions
+    const role = data.role || '';
+    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
+    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
+    const roleDefaults = defaults[role] || {};
+    return roleDefaults[permName] || false;
+}
+
     async function loadShipments() {
         try {
             const snap = await db.collection("shipments")
