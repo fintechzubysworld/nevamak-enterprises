@@ -277,11 +277,7 @@
                     </div>
                     <div style="flex:1;">
                         <label>Source:</label>
-                        <select id="sourceSelect">
-                            <option value="Abuja">Abuja</option>
-                            <option value="Portharcourt">Port Harcourt</option>
-                            <option value="Lagos">Lagos</option>
-                        </select>
+                        <select id="sourceSelect"></select>
                     </div>
                 </div>
                 <div class="flex-row">
@@ -294,11 +290,7 @@
                     </div>
                     <div style="flex:1;">
                         <label>Destination:</label>
-                        <select id="destSelect">
-                            <option value="Abuja">Abuja</option>
-                            <option value="Portharcourt">Port Harcourt</option>
-                            <option value="Lagos">Lagos</option>
-                        </select>
+                        <select id="destSelect"></select>
                     </div>
                 </div>
                 <div class="flex-row">
@@ -380,6 +372,10 @@
     let shipmentsUnsubscribe = null;
     let statsUnsubscribe = null;
 
+    // ==================== Reroute Data ====================
+    const branches = ['Abuja', 'Portharcourt', 'Lagos'];
+    let suppliers = [];
+
     // ==================== Helpers ====================
     function escapeHtml(text) {
         if (text === null || text === undefined) return '';
@@ -441,7 +437,7 @@
             document.getElementById('senderName').value = user.email.split('@')[0] + ' (' + currentUserRole + ')';
         }
         document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
-        loadSuppliers();
+        await loadSuppliers();
         loadShipments();
         loadStats();
         // init items
@@ -453,8 +449,9 @@
         addRerouteItemRow();
         updateReroutePreview();
         document.getElementById('rerouteDate').value = new Date().toISOString().slice(0,10);
-        // Populate source/dest selects with suppliers
-        populateRerouteSelects();
+        // Initialize reroute dropdowns
+        updateRerouteSourceOptions();
+        updateRerouteDestOptions();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -465,56 +462,70 @@
     async function loadSuppliers() {
         try {
             const snap = await db.collection('suppliers').get();
+            suppliers = [];
             const sel = document.getElementById('supplierSelect');
             sel.innerHTML = '<option value="">-- Select Supplier --</option>';
             snap.forEach(doc => {
                 const s = doc.data();
+                suppliers.push(s.name);
                 const opt = document.createElement('option');
                 opt.value = doc.id;
                 opt.textContent = s.name;
                 sel.appendChild(opt);
             });
-            // Also populate reroute source/dest vendor selects
-            populateRerouteSelects();
+            // Update reroute dropdowns if they exist
+            updateRerouteSourceOptions();
+            updateRerouteDestOptions();
         } catch (err) {
             showToast('Error loading suppliers: ' + err.message, 'error');
         }
     }
 
-    function populateRerouteSelects() {
-        // For source and destination vendor options
-        const sourceSelect = document.getElementById('sourceSelect');
-        const destSelect = document.getElementById('destSelect');
-        // Preserve current values if possible
-        const currentSrc = sourceSelect.value;
-        const currentDest = destSelect.value;
-        // Clear and repopulate with branches + suppliers
-        const baseOptions = ['Abuja', 'Portharcourt', 'Lagos'];
-        db.collection('suppliers').get().then(snap => {
-            const supplierNames = [];
-            snap.forEach(doc => {
-                supplierNames.push(doc.data().name);
-            });
-            // Build options
-            const buildOptions = (select, current) => {
-                const opts = [];
-                // Add branches
-                baseOptions.forEach(b => opts.push({value: b, label: b}));
-                // Add suppliers
-                supplierNames.forEach(s => opts.push({value: s, label: 'Supplier: ' + s}));
-                select.innerHTML = '';
-                opts.forEach(opt => {
-                    const o = document.createElement('option');
-                    o.value = opt.value;
-                    o.textContent = opt.label;
-                    select.appendChild(o);
-                });
-                if (current && opts.some(o => o.value === current)) select.value = current;
-            };
-            buildOptions(sourceSelect, currentSrc);
-            buildOptions(destSelect, currentDest);
-        }).catch(err => console.warn('Error populating reroute selects:', err));
+    // ==================== Reroute Dynamic Dropdowns ====================
+    function updateRerouteSourceOptions() {
+        const type = document.getElementById('sourceType').value;
+        const select = document.getElementById('sourceSelect');
+        const currentVal = select.value;
+        select.innerHTML = '';
+        let options = [];
+        if (type === 'branch') {
+            options = branches;
+        } else {
+            options = suppliers;
+        }
+        options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            select.appendChild(o);
+        });
+        if (options.includes(currentVal)) select.value = currentVal;
+        else if (options.length > 0) select.value = options[0];
     }
+
+    function updateRerouteDestOptions() {
+        const type = document.getElementById('destType').value;
+        const select = document.getElementById('destSelect');
+        const currentVal = select.value;
+        select.innerHTML = '';
+        let options = [];
+        if (type === 'branch') {
+            options = branches;
+        } else {
+            options = suppliers;
+        }
+        options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            select.appendChild(o);
+        });
+        if (options.includes(currentVal)) select.value = currentVal;
+        else if (options.length > 0) select.value = options[0];
+    }
+
+    document.getElementById('sourceType').addEventListener('change', updateRerouteSourceOptions);
+    document.getElementById('destType').addEventListener('change', updateRerouteDestOptions);
 
     document.getElementById('addSupplierBtn').addEventListener('click', () => {
         document.getElementById('supplierModal').style.display = 'flex';
@@ -1381,6 +1392,9 @@
         document.getElementById('rerouteModal').style.display = 'flex';
         // Reset form fields if needed
         document.getElementById('rerouteMessage').textContent = '';
+        // Ensure dropdowns reflect current supplier list
+        updateRerouteSourceOptions();
+        updateRerouteDestOptions();
     });
 
     function addRerouteItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
@@ -1442,7 +1456,6 @@
             <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
         `;
     }
-    // dummy multiplier for reroute (no transport multiplier needed)
     document.getElementById('rerouteItemsContainer').addEventListener('input', updateReroutePreview);
     // Add a hidden dummy multiplier input for calculateTotals to work
     const dummyMultiplier = document.createElement('input');
@@ -1720,13 +1733,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dispatch with Reroute feature loaded.');
-    // Initial rows
-    // Main items already added via auth callback
-    // Reroute items
-    rerouteItemsContainer.innerHTML = '';
-    addRerouteItemRow();
-    updateReroutePreview();
+    console.log('NEVAMAK Dispatch with Reroute and external vendor support loaded.');
 </script>
 </body>
 </html>
