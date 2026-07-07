@@ -7,7 +7,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <!-- SheetJS for Excel import -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
@@ -52,8 +51,14 @@
         .cost-cell { font-family: monospace; font-weight: bold; white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
         .scroll { overflow-x: auto; }
         .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; display: none; }
-        /* Word-wrap for items column */
         .items-cell { word-wrap: break-word; overflow-wrap: break-word; max-width: 120px; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .btn-loading { opacity: 0.7; pointer-events: none; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 40px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s ease; font-size: 0.95rem; max-width: 90%; text-align: center; }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
         @media (max-width: 500px) {
             .flex-row { flex-direction: column; }
             .item-row { flex-direction: column; }
@@ -117,8 +122,8 @@
             <div id="itemsContainer">
                 <div class="item-row">
                     <input type="text" placeholder="Item name" class="itemName">
-                    <input type="number" placeholder="Qty" class="itemQty">
-                    <input type="number" placeholder="Price/unit" class="itemPrice">
+                    <input type="number" placeholder="Qty" class="itemQty" min="0" step="1">
+                    <input type="number" placeholder="Price/unit" class="itemPrice" min="0" step="0.01">
                     <button type="button" class="removeItem">✖</button>
                     <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
                 </div>
@@ -132,7 +137,7 @@
             <div class="cost-summary" id="costPreview">Total goods value: ₦0</div>
             <textarea id="dispatchNotes" placeholder="Additional notes"></textarea>
             <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                <button type="submit" class="btn-primary" style="flex:2;">🚛 Dispatch</button>
+                <button type="submit" id="dispatchSubmitBtn" class="btn-primary" style="flex:2;">🚛 Dispatch</button>
                 <button type="button" id="saveDraftBtn" class="btn-warning" style="flex:1;">💾 Save Draft</button>
             </div>
         </form>
@@ -155,7 +160,7 @@
         <div class="scroll">
             <table id="shipmentsTable">
                 <thead><tr><th>ID</th><th>Dest</th><th>Supplier</th><th>Items</th><th>Goods</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-                <tbody><tr><td colspan="8">Loading...</td></tr></tbody>
+                <tbody><tr><td colspan="8"><div class="loading-spinner"></div> Loading...</td></tr></tbody>
             </table>
         </div>
     </div>
@@ -209,8 +214,8 @@
                 <div id="editItemsContainer">
                     <div class="item-row">
                         <input type="text" placeholder="Item name" class="editItemName">
-                        <input type="number" placeholder="Qty" class="editItemQty">
-                        <input type="number" placeholder="Price/unit" class="editItemPrice">
+                        <input type="number" placeholder="Qty" class="editItemQty" min="0" step="1">
+                        <input type="number" placeholder="Price/unit" class="editItemPrice" min="0" step="0.01">
                         <button type="button" class="removeItem editRemoveItem">✖</button>
                     </div>
                 </div>
@@ -218,15 +223,17 @@
                 <div class="cost-summary" id="editCostPreview">Total goods value: ₦0</div>
                 <textarea id="editNotes" placeholder="Additional notes"></textarea>
                 <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                    <button type="submit" class="btn-primary" style="flex:2;">💾 Update Draft</button>
+                    <button type="submit" id="editUpdateBtn" class="btn-primary" style="flex:2;">💾 Update Draft</button>
                     <button type="button" id="editDeleteBtn" class="btn-danger" style="flex:1;">🗑️ Delete Draft</button>
                 </div>
             </form>
             <div id="editMessage" style="color:red; margin-top:8px;"></div>
         </div>
     </div>
-
 </div>
+
+<!-- Toast container -->
+<div id="toast" class="toast"></div>
 
 <script>
     // ==================== Firebase Config ====================
@@ -245,11 +252,67 @@
 
     let currentUser = null;
     let currentUserRole = '';
+    let currentUserEmail = '';
+
+    // Listeners cleanup
+    let shipmentsUnsubscribe = null;
+    let statsUnsubscribe = null;
+
+    // ==================== Helpers ====================
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+    }
+
+    function showToast(message, type = 'info', duration = 3000) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type;
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => {
+            toast.classList.remove('show');
+        }, duration);
+    }
+
+    function setButtonLoading(btn, loading) {
+        if (!btn) return;
+        if (loading) {
+            btn._originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="loading-spinner"></span> Processing...';
+            btn.classList.add('btn-loading');
+            btn.disabled = true;
+        } else {
+            if (btn._originalText) btn.innerHTML = btn._originalText;
+            btn.classList.remove('btn-loading');
+            btn.disabled = false;
+        }
+    }
+
+    function validateNumber(val, min = 0, max = Infinity) {
+        const num = parseFloat(val);
+        if (isNaN(num) || num < min || num > max) return null;
+        return num;
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+    window.closeModal = closeModal;
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+        }
+    };
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
+        currentUserEmail = user.email;
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
@@ -259,67 +322,92 @@
         loadSuppliers();
         loadShipments();
         loadStats();
+        updateUIBasedOnRole();
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    function updateUIBasedOnRole() {
+        // Admin or Lagos sender can cancel/delete; others can't.
+        const isAuthorized = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+        // We'll handle visibility in the render.
+    }
 
     // ==================== Suppliers ====================
     async function loadSuppliers() {
-        const snap = await db.collection('suppliers').get();
-        const sel = document.getElementById('supplierSelect');
-        sel.innerHTML = '<option value="">-- Select Supplier --</option>';
-        snap.forEach(doc => {
-            const s = doc.data();
-            const opt = document.createElement('option');
-            opt.value = doc.id;
-            opt.textContent = s.name;
-            sel.appendChild(opt);
-        });
+        try {
+            const snap = await db.collection('suppliers').get();
+            const sel = document.getElementById('supplierSelect');
+            sel.innerHTML = '<option value="">-- Select Supplier --</option>';
+            snap.forEach(doc => {
+                const s = doc.data();
+                const opt = document.createElement('option');
+                opt.value = doc.id;
+                opt.textContent = s.name;
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            showToast('Error loading suppliers: ' + err.message, 'error');
+        }
     }
 
     document.getElementById('addSupplierBtn').addEventListener('click', () => {
         document.getElementById('supplierModal').style.display = 'flex';
     });
+
     document.getElementById('saveSupplierBtn').addEventListener('click', async () => {
         const name = document.getElementById('newSupplierName').value.trim();
         const contact = document.getElementById('newSupplierContact').value.trim();
         const address = document.getElementById('newSupplierAddress').value.trim();
-        if (!name) return alert('Supplier name required');
-        await db.collection('suppliers').add({ name, contact, address, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        alert('Supplier added');
-        closeModal('supplierModal');
-        loadSuppliers();
-        document.getElementById('newSupplierName').value = '';
-        document.getElementById('newSupplierContact').value = '';
-        document.getElementById('newSupplierAddress').value = '';
-    });
-
-    function closeModal(id) {
-        document.getElementById(id).style.display = 'none';
-    }
-    window.onclick = function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
+        if (!name) {
+            showToast('Supplier name required', 'error');
+            return;
         }
-    };
+        try {
+            await db.collection('suppliers').add({
+                name,
+                contact,
+                address,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast('Supplier added', 'success');
+            closeModal('supplierModal');
+            loadSuppliers();
+            document.getElementById('newSupplierName').value = '';
+            document.getElementById('newSupplierContact').value = '';
+            document.getElementById('newSupplierAddress').value = '';
+        } catch (err) {
+            showToast('Error adding supplier: ' + err.message, 'error');
+        }
+    });
 
     // ==================== Inventory Check ====================
     document.addEventListener('click', function(e) {
         if (e.target.classList.contains('checkStockBtn')) {
             const row = e.target.closest('.item-row');
             const itemName = row.querySelector('.itemName').value.trim();
-            if (!itemName) return alert('Enter item name first');
-            document.getElementById('invItemName').innerText = itemName;
+            if (!itemName) {
+                showToast('Enter item name first', 'error');
+                return;
+            }
+            document.getElementById('invItemName').textContent = itemName;
             document.getElementById('inventoryModal').style.display = 'flex';
-            db.collection('inventory').where('itemName', '==', itemName).get().then(snap => {
-                let html = '<table><tr><th>Branch</th><th>Stock</th><th>Location</th></tr>';
-                snap.forEach(doc => {
-                    const d = doc.data();
-                    html += `<tr><td>${d.branch}</td><td>${d.stock}</td><td>${d.location||'N/A'}</td></tr>`;
+            db.collection('inventory').where('itemName', '==', itemName).get()
+                .then(snap => {
+                    let html = '<table><tr><th>Branch</th><th>Stock</th><th>Location</th></tr>';
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        html += `<tr><td>${escapeHtml(d.branch)}</td><td>${d.stock}</td><td>${escapeHtml(d.location||'N/A')}</td></tr>`;
+                    });
+                    html += '</table>';
+                    document.getElementById('invResult').innerHTML = html || '<p>No stock found</p>';
+                })
+                .catch(err => {
+                    document.getElementById('invResult').innerHTML = '<p style="color:red;">Error: ' + escapeHtml(err.message) + '</p>';
+                    showToast('Error checking stock', 'error');
                 });
-                html += '</table>';
-                document.getElementById('invResult').innerHTML = html || 'No stock found';
-            });
         }
     });
 
@@ -330,16 +418,31 @@
         const div = document.createElement('div');
         div.className = 'item-row';
         div.innerHTML = `
-            <input type="text" placeholder="Item name" class="itemName" value="${itemName}">
-            <input type="number" placeholder="Qty" class="itemQty" value="${qty}">
-            <input type="number" placeholder="Price/unit" class="itemPrice" value="${price}">
+            <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}">
+            <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" min="0" step="1">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${Math.max(0, price)}" min="0" step="0.01">
             <button type="button" class="removeItem">✖</button>
             <button type="button" class="btn-sm btn-warning checkStockBtn" style="width:auto;">📊 Stock</button>
         `;
         div.querySelector('.removeItem').onclick = () => {
+            if (document.querySelectorAll('#itemsContainer .item-row').length <= 1) {
+                showToast('Cannot remove the last item row', 'error');
+                return;
+            }
             div.remove();
             updatePreview();
         };
+        // Attach input validation
+        div.querySelectorAll('input[type="number"]').forEach(inp => {
+            inp.addEventListener('input', updatePreview);
+            inp.addEventListener('blur', function() {
+                const min = parseFloat(this.min);
+                if (!isNaN(min) && parseFloat(this.value) < min) {
+                    this.value = min;
+                    updatePreview();
+                }
+            });
+        });
         return div;
     }
 
@@ -351,8 +454,8 @@
     function updatePreview() {
         let total = 0;
         document.querySelectorAll("#itemsContainer .item-row").forEach(r => {
-            const qty = parseInt(r.querySelector(".itemQty")?.value || 0);
-            const price = parseFloat(r.querySelector(".itemPrice")?.value || 0);
+            const qty = validateNumber(r.querySelector(".itemQty")?.value, 0) || 0;
+            const price = validateNumber(r.querySelector(".itemPrice")?.value, 0) || 0;
             total += qty * price;
         });
         document.getElementById("costPreview").innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
@@ -379,19 +482,27 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const json = XLSX.utils.sheet_to_json(firstSheet);
-                if (json.length === 0) { alert('The Excel file is empty.'); return; }
+                if (json.length === 0) {
+                    showToast('The Excel file is empty.', 'error');
+                    return;
+                }
                 const headers = Object.keys(json[0]);
+                // Improved header detection
                 const findColumn = (variations) => {
+                    // Exact match first
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
                             if (hLower === v.toLowerCase().trim()) return h;
                         }
                     }
+                    // Fuzzy
                     for (const h of headers) {
                         const hLower = h.toLowerCase().trim();
                         for (const v of variations) {
-                            if (hLower.includes(v.toLowerCase().trim()) || v.toLowerCase().trim().includes(hLower)) {
+                            const vLower = v.toLowerCase().trim();
+                            if (hLower.length > 2 && vLower.length > 2 &&
+                                (hLower.includes(vLower) || vLower.includes(hLower))) {
                                 return h;
                             }
                         }
@@ -402,7 +513,7 @@
                 const qtyCol = findColumn(['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered']);
                 const priceCol = findColumn(['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit']);
                 if (!itemCol || !qtyCol || !priceCol) {
-                    alert(`Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`);
+                    showToast(`Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`, 'error');
                     return;
                 }
                 const parsedItems = [];
@@ -410,21 +521,32 @@
                     const name = String(row[itemCol] || '').trim();
                     let qty = parseFloat(row[qtyCol]) || 0;
                     let price = parseFloat(row[priceCol]) || 0;
-                    if (name && qty > 0) {
+                    if (name && qty > 0 && price >= 0) {
                         parsedItems.push({ itemName: name, quantity: qty, unitPrice: price });
                     }
                 });
-                if (parsedItems.length === 0) { alert('No valid items found.'); return; }
+                if (parsedItems.length === 0) {
+                    showToast('No valid items found in Excel.', 'error');
+                    return;
+                }
                 importedItems = parsedItems;
-                let previewHtml = `<p><strong>✅ ${parsedItems.length} items imported:</strong></p><table><tr><th>Item</th><th>Qty</th><th>Price</th></tr>`;
+                let previewHtml = `<p><strong>✅ ${parsedItems.length} items imported:</strong></p>
+                    <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Price</th></tr>`;
                 parsedItems.forEach(it => {
-                    previewHtml += `<tr><td>${it.itemName}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
                 });
-                previewHtml += `</table><div style="display:flex; gap:8px; margin-top:8px;"><button onclick="applyImportedItems()" class="btn-success">✅ Apply</button><button onclick="clearImportPreview()" class="btn-danger">❌ Cancel</button></div>`;
+                previewHtml += `</table></div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <button onclick="applyImportedItems()" class="btn-success">✅ Apply</button>
+                        <button onclick="clearImportPreview()" class="btn-danger">❌ Cancel</button>
+                    </div>`;
                 importPreviewContainer.innerHTML = previewHtml;
                 importPreviewContainer.style.display = 'block';
                 excelFileInput.value = '';
-            } catch (err) { alert('Error reading Excel: ' + err.message); }
+                showToast(`✅ ${parsedItems.length} items imported`, 'success');
+            } catch (err) {
+                showToast('Error reading Excel: ' + err.message, 'error');
+            }
         };
         reader.readAsArrayBuffer(file);
     });
@@ -439,7 +561,7 @@
         importPreviewContainer.innerHTML = '';
         updatePreview();
         importedItems = [];
-        alert('Items imported successfully.');
+        showToast('Items applied successfully.', 'success');
     };
 
     window.clearImportPreview = function() {
@@ -452,19 +574,22 @@
     document.getElementById('barcodeInput').addEventListener('change', function() {
         const code = this.value.trim();
         if (code) {
-            alert('Barcode scanned: ' + code);
+            showToast('Barcode scanned: ' + code, 'info');
             const firstRow = document.querySelector('.item-row');
             if (firstRow) {
                 firstRow.querySelector('.itemName').value = 'Product-' + code;
+                updatePreview();
             }
         }
     });
 
     // ==================== Save Shipment ====================
     async function saveShipment(status) {
-        if (!confirm(`Are you sure you want to ${status === 'Draft' ? 'save this draft' : 'dispatch this shipment'}?`)) {
+        const confirmMsg = status === 'Draft' ? 'save this draft' : 'dispatch this shipment';
+        if (!confirm(`Are you sure you want to ${confirmMsg}?`)) {
             return;
         }
+
         const senderName = document.getElementById("senderName").value.trim();
         const destBranch = document.getElementById("destBranch").value;
         const supplierId = document.getElementById("supplierSelect").value;
@@ -474,54 +599,76 @@
         const driver = document.getElementById("driverName").value.trim();
         const trackingNo = document.getElementById("trackingNo").value.trim();
         const notes = document.getElementById("dispatchNotes").value.trim();
-        const transportCost = 0;
+
         const items = [];
+        let hasError = false;
         document.querySelectorAll("#itemsContainer .item-row").forEach(row => {
             const name = row.querySelector(".itemName").value.trim();
-            const qty = parseInt(row.querySelector(".itemQty").value);
-            const price = parseFloat(row.querySelector(".itemPrice").value);
-            if(name && qty>0 && price>=0) items.push({
+            const qty = validateNumber(row.querySelector(".itemQty").value, 0);
+            const price = validateNumber(row.querySelector(".itemPrice").value, 0);
+            if (!name || qty === null || price === null || qty <= 0 || price < 0) {
+                hasError = true;
+                return;
+            }
+            items.push({
                 itemName: name,
                 orderedQty: qty,
                 unitPrice: price,
-                totalItemCost: qty*price,
+                totalItemCost: qty * price,
                 receivedQty: 0,
                 damageQty: 0
             });
         });
-        if (!items.length || !senderName) return alert("Fill all fields");
-        await db.collection("shipments").add({
-            senderName,
-            destinationBranch: destBranch,
-            supplierId,
-            vehicleNo,
-            expectedDate,
-            route,
-            driver,
-            trackingNo,
-            notes,
-            transportCost,
-            items,
-            status: status,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        await db.collection('activityLog').add({
-            actionType: status === 'Draft' ? 'draft' : 'dispatch',
-            shipmentId: 'new',
-            branch: 'Lagos',
-            details: `${status} shipment to ${destBranch} by ${senderName}`,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            user: currentUser.email
-        });
-        alert(`${status} created`);
-        document.getElementById("dispatchForm").reset();
-        itemsContainer.innerHTML = '';
-        itemsContainer.appendChild(createItemRow());
-        updatePreview();
-        loadShipments();
-        loadStats();
-        document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
+
+        if (hasError || items.length === 0 || !senderName) {
+            showToast('Please fill all fields and add valid items.', 'error');
+            return;
+        }
+
+        const submitBtn = document.getElementById('dispatchSubmitBtn');
+        const draftBtn = document.getElementById('saveDraftBtn');
+        const btn = status === 'Draft' ? draftBtn : submitBtn;
+        setButtonLoading(btn, true);
+
+        try {
+            await db.collection("shipments").add({
+                senderName,
+                destinationBranch: destBranch,
+                supplierId,
+                vehicleNo,
+                expectedDate,
+                route,
+                driver,
+                trackingNo,
+                notes,
+                transportCost: 0,
+                items,
+                status: status,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await db.collection('activityLog').add({
+                actionType: status === 'Draft' ? 'draft' : 'dispatch',
+                shipmentId: 'new',
+                branch: 'Lagos',
+                details: `${status} shipment to ${destBranch} by ${senderName}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+            showToast(`${status} created successfully`, 'success');
+            // Reset form
+            document.getElementById("dispatchForm").reset();
+            itemsContainer.innerHTML = '';
+            itemsContainer.appendChild(createItemRow());
+            updatePreview();
+            document.getElementById('trackingNo').value = 'NEV-' + Date.now().toString(36).toUpperCase();
+            loadShipments();
+            loadStats();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
     }
 
     document.getElementById("dispatchForm").addEventListener("submit", (e) => {
@@ -535,7 +682,7 @@
     // ==================== Cancel Shipment ====================
     window.cancelShipment = async function(id) {
         if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
-            alert('You do not have permission to cancel shipments.');
+            showToast('You do not have permission to cancel shipments.', 'error');
             return;
         }
         if (!confirm('⚠️ Are you sure you want to cancel this shipment? This action can be reversed by re-dispatching.')) {
@@ -550,33 +697,35 @@
                 actionType: 'cancel',
                 shipmentId: id,
                 branch: 'Lagos',
-                details: `Shipment ${id} cancelled by ${currentUser.email}`,
+                details: `Shipment ${id} cancelled by ${currentUserEmail}`,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUser.email
+                user: currentUserEmail
             });
-            alert('✅ Shipment cancelled.');
+            showToast('✅ Shipment cancelled.', 'success');
             loadShipments();
             loadStats();
         } catch (err) {
-            alert('Error cancelling shipment: ' + err.message);
+            showToast('Error cancelling shipment: ' + err.message, 'error');
         }
     };
 
     // ==================== Delete Shipment ====================
     window.deleteShipment = async function(id) {
         if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
-            alert('You do not have permission to delete shipments.');
+            showToast('You do not have permission to delete shipments.', 'error');
             return;
         }
-        // Check current status – only allow deletion of Draft or Cancelled
         const doc = await db.collection('shipments').doc(id).get();
-        if (!doc.exists) { alert('Shipment not found.'); return; }
+        if (!doc.exists) {
+            showToast('Shipment not found.', 'error');
+            return;
+        }
         const status = doc.data().status;
         if (status !== 'Draft' && status !== 'Cancelled') {
-            alert('Only Draft or Cancelled shipments can be deleted.');
+            showToast('Only Draft or Cancelled shipments can be deleted.', 'error');
             return;
         }
-        if (!confirm('⚠️ Are you sure you want to permanently delete this shipment? This action cannot be undone.')) {
+        if (!confirm('⚠️ Are you sure you want to permanently delete this shipment? This cannot be undone.')) {
             return;
         }
         try {
@@ -585,15 +734,15 @@
                 actionType: 'delete',
                 shipmentId: id,
                 branch: 'Lagos',
-                details: `Shipment ${id} deleted by ${currentUser.email}`,
+                details: `Shipment ${id} deleted by ${currentUserEmail}`,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUser.email
+                user: currentUserEmail
             });
-            alert('✅ Shipment deleted.');
+            showToast('✅ Shipment deleted.', 'success');
             loadShipments();
             loadStats();
         } catch (err) {
-            alert('Error deleting shipment: ' + err.message);
+            showToast('Error deleting shipment: ' + err.message, 'error');
         }
     };
 
@@ -602,43 +751,21 @@
         const searchInput = document.getElementById('searchShipment');
         const filterSelect = document.getElementById('filterStatus');
 
-        function renderSnap(snap) {
-            let html = '';
-            snap.forEach(doc => {
-                const d = doc.data();
-                let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
-                const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
-                const supplierName = d.supplierId ? 'Supplier' : '-';
-                const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
-                const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
-                const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered');
-                const canDelete = (d.status === 'Draft' || d.status === 'Cancelled');
-                const isAdmin = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-                html += `<tr>
-                    <td><strong>${doc.id.slice(0,6)}</strong></td>
-                    <td><span class="badge">${d.destinationBranch}</span></td>
-                    <td>${supplierName}</td>
-                    <td class="items-cell">${itemsShort}</td>
-                    <td class="cost-cell">₦${goods.toLocaleString()}</td>
-                    <td><span class="status-badge ${statusClass}">${d.status}</span></td>
-                    <td>${date}</td>
-                    <td>
-                        <button class="btn-sm btn-primary" onclick="viewShipment('${doc.id}')">👁️ View</button>
-                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${doc.id}')">✏️ Edit</button>` : ''}
-                        ${isAdmin && canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${doc.id}')">❌ Cancel</button>` : ''}
-                        ${isAdmin && canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${doc.id}')">🗑️ Delete</button>` : ''}
-                    </td>
-                </tr>`;
-            });
-            document.querySelector("#shipmentsTable tbody").innerHTML = html || "<tr><td colspan='8'>No shipments</td></tr>";
+        if (shipmentsUnsubscribe) {
+            shipmentsUnsubscribe();
+            shipmentsUnsubscribe = null;
         }
+
+        const tbody = document.querySelector("#shipmentsTable tbody");
+        tbody.innerHTML = '<tr><td colspan="8"><div class="loading-spinner"></div> Loading...</td></tr>';
 
         let q = db.collection("shipments").orderBy("createdAt", "desc");
         const statusFilter = filterSelect.value;
         if (statusFilter !== 'all') {
             q = q.where("status", "==", statusFilter);
         }
-        q.onSnapshot(snap => {
+
+        shipmentsUnsubscribe = q.onSnapshot(snap => {
             const search = searchInput.value.toLowerCase();
             let filtered = [];
             snap.forEach(doc => {
@@ -646,94 +773,113 @@
                 const text = (d.senderName + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
                 if (text.includes(search)) filtered.push({ id: doc.id, data: d });
             });
+
             let html = '';
-            filtered.forEach(({id, data: d}) => {
-                let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
-                const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
-                const supplierName = d.supplierId ? 'Supplier' : '-';
-                const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
-                const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
-                const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered');
-                const canDelete = (d.status === 'Draft' || d.status === 'Cancelled');
-                const isAdmin = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-                html += `<tr>
-                    <td><strong>${id.slice(0,6)}</strong></td>
-                    <td><span class="badge">${d.destinationBranch}</span></td>
-                    <td>${supplierName}</td>
-                    <td class="items-cell">${itemsShort}</td>
-                    <td class="cost-cell">₦${goods.toLocaleString()}</td>
-                    <td><span class="status-badge ${statusClass}">${d.status}</span></td>
-                    <td>${date}</td>
-                    <td>
-                        <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️ View</button>
-                        ${d.status === 'Draft' ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️ Edit</button>` : ''}
-                        ${isAdmin && canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${id}')">❌ Cancel</button>` : ''}
-                        ${isAdmin && canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${id}')">🗑️ Delete</button>` : ''}
-                    </td>
-                </tr>`;
-            });
-            document.querySelector("#shipmentsTable tbody").innerHTML = html || "<tr><td colspan='8'>No shipments</td></tr>";
+            if (filtered.length === 0) {
+                html = '<tr><td colspan="8">No shipments</td></tr>';
+            } else {
+                filtered.forEach(({id, data: d}) => {
+                    let goods = d.items?.reduce((s,i)=>s+(i.totalItemCost||0),0)||0;
+                    const itemsShort = d.items?.slice(0,2).map(i=>`${i.itemName}(${i.orderedQty})`).join(", ")+(d.items?.length>2?"...":"");
+                    const supplierName = d.supplierId ? 'Supplier' : '-';
+                    const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+                    const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
+                    const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered') &&
+                                      (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+                    const canDelete = (d.status === 'Draft' || d.status === 'Cancelled') &&
+                                      (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+                    const canEdit = d.status === 'Draft';
+
+                    html += `<tr>
+                        <td><strong>${escapeHtml(id.slice(0,6))}</strong></td>
+                        <td><span class="badge">${escapeHtml(d.destinationBranch)}</span></td>
+                        <td>${escapeHtml(supplierName)}</td>
+                        <td class="items-cell">${escapeHtml(itemsShort)}</td>
+                        <td class="cost-cell">₦${goods.toLocaleString()}</td>
+                        <td><span class="status-badge ${statusClass}">${escapeHtml(d.status)}</span></td>
+                        <td>${escapeHtml(date)}</td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️ View</button>
+                            ${canEdit ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️ Edit</button>` : ''}
+                            ${canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${id}')">❌ Cancel</button>` : ''}
+                            ${canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${id}')">🗑️ Delete</button>` : ''}
+                        </td>
+                    </tr>`;
+                });
+            }
+            tbody.innerHTML = html;
+        }, err => {
+            tbody.innerHTML = '<tr><td colspan="8">Error loading shipments: ' + escapeHtml(err.message) + '</td></tr>';
+            showToast('Error loading shipments: ' + err.message, 'error');
         });
 
-        searchInput.addEventListener('input', () => loadShipments());
-        filterSelect.addEventListener('change', () => loadShipments());
+        // Re-run on search/filter change
+        searchInput.addEventListener('input', loadShipments);
+        filterSelect.addEventListener('change', loadShipments);
     }
 
-    // ==================== View Shipment Modal ====================
+    // ==================== View Shipment ====================
     window.viewShipment = async function(id) {
         try {
             const doc = await db.collection('shipments').doc(id).get();
-            if (!doc.exists) return alert('Shipment not found.');
+            if (!doc.exists) {
+                showToast('Shipment not found.', 'error');
+                return;
+            }
             const d = doc.data();
-            let itemsHtml = '<table><tr><th>Item</th><th>Qty Ordered</th><th>Unit Price</th><th>Total</th><th>Received</th><th>Damaged</th></tr>';
+            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty Ordered</th><th>Unit Price</th><th>Total</th><th>Received</th><th>Damaged</th></tr>';
             if (d.items) {
                 d.items.forEach(it => {
                     itemsHtml += `<tr>
-                        <td>${it.itemName}</td>
+                        <td>${escapeHtml(it.itemName)}</td>
                         <td>${it.orderedQty}</td>
-                        <td>₦${it.unitPrice?.toLocaleString()}</td>
+                        <td>₦${(it.unitPrice||0).toLocaleString()}</td>
                         <td>₦${(it.totalItemCost||0).toLocaleString()}</td>
                         <td>${it.receivedQty || 0}</td>
                         <td>${it.damageQty || 0}</td>
                     </tr>`;
                 });
             }
+            itemsHtml += '</table></div>';
             const totalGoods = d.items ? d.items.reduce((s,i)=>s+(i.totalItemCost||0),0) : 0;
             const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
             const html = `
-                <p><strong>Shipment ID:</strong> ${id.slice(0,8)}</p>
-                <p><strong>Sender:</strong> ${d.senderName}</p>
-                <p><strong>Destination:</strong> ${d.destinationBranch}</p>
-                <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
-                <p><strong>Tracking #:</strong> ${d.trackingNo || 'N/A'}</p>
-                <p><strong>Expected Date:</strong> ${d.expectedDate || 'N/A'}</p>
-                <p><strong>Driver:</strong> ${d.driver || 'N/A'}</p>
-                <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${d.status}</span></p>
+                <p><strong>Shipment ID:</strong> ${escapeHtml(id.slice(0,8))}</p>
+                <p><strong>Sender:</strong> ${escapeHtml(d.senderName)}</p>
+                <p><strong>Destination:</strong> ${escapeHtml(d.destinationBranch)}</p>
+                <p><strong>Vehicle:</strong> ${escapeHtml(d.vehicleNo || 'N/A')}</p>
+                <p><strong>Tracking #:</strong> ${escapeHtml(d.trackingNo || 'N/A')}</p>
+                <p><strong>Expected Date:</strong> ${escapeHtml(d.expectedDate || 'N/A')}</p>
+                <p><strong>Driver:</strong> ${escapeHtml(d.driver || 'N/A')}</p>
+                <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${escapeHtml(d.status)}</span></p>
                 <p><strong>Total Goods Value:</strong> ₦${totalGoods.toLocaleString()}</p>
                 <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
                 <p><strong>Created:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleString() : ''}</p>
                 ${d.receivedDate ? `<p><strong>Received:</strong> ${new Date(d.receivedDate.toDate()).toLocaleString()}</p>` : ''}
-                ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
                 <h4>Items</h4>
                 ${itemsHtml}
             `;
             document.getElementById('viewShipmentContent').innerHTML = html;
             document.getElementById('viewShipmentModal').style.display = 'flex';
         } catch (error) {
-            alert('Error loading shipment details: ' + error.message);
+            showToast('Error loading shipment details: ' + error.message, 'error');
         }
     };
 
-    // ==================== Edit Draft Modal ====================
+    // ==================== Edit Draft ====================
     let editDraftId = null;
 
     window.editDraft = async function(id) {
         try {
             const doc = await db.collection('shipments').doc(id).get();
-            if (!doc.exists) return alert('Draft not found.');
+            if (!doc.exists) {
+                showToast('Draft not found.', 'error');
+                return;
+            }
             const d = doc.data();
             if (d.status !== 'Draft') {
-                alert('Only draft shipments can be edited.');
+                showToast('Only draft shipments can be edited.', 'error');
                 return;
             }
             editDraftId = id;
@@ -753,30 +899,42 @@
                     const div = document.createElement('div');
                     div.className = 'item-row';
                     div.innerHTML = `
-                        <input type="text" placeholder="Item name" class="editItemName" value="${it.itemName}">
-                        <input type="number" placeholder="Qty" class="editItemQty" value="${it.orderedQty}">
-                        <input type="number" placeholder="Price/unit" class="editItemPrice" value="${it.unitPrice}">
+                        <input type="text" placeholder="Item name" class="editItemName" value="${escapeHtml(it.itemName)}">
+                        <input type="number" placeholder="Qty" class="editItemQty" value="${Math.max(0, it.orderedQty)}" min="0" step="1">
+                        <input type="number" placeholder="Price/unit" class="editItemPrice" value="${Math.max(0, it.unitPrice)}" min="0" step="0.01">
                         <button type="button" class="removeItem editRemoveItem">✖</button>
                     `;
                     container.appendChild(div);
-                    div.querySelector('.editRemoveItem').onclick = () => div.remove();
+                    div.querySelector('.editRemoveItem').onclick = () => {
+                        if (container.querySelectorAll('.item-row').length <= 1) {
+                            showToast('Cannot remove last item', 'error');
+                            return;
+                        }
+                        div.remove();
+                        updateEditPreview();
+                    };
                 });
             } else {
                 const div = document.createElement('div');
                 div.className = 'item-row';
                 div.innerHTML = `
                     <input type="text" placeholder="Item name" class="editItemName">
-                    <input type="number" placeholder="Qty" class="editItemQty">
-                    <input type="number" placeholder="Price/unit" class="editItemPrice">
+                    <input type="number" placeholder="Qty" class="editItemQty" min="0" step="1">
+                    <input type="number" placeholder="Price/unit" class="editItemPrice" min="0" step="0.01">
                     <button type="button" class="removeItem editRemoveItem">✖</button>
                 `;
                 container.appendChild(div);
                 div.querySelector('.editRemoveItem').onclick = () => div.remove();
             }
+            // Attach input events for preview
+            container.querySelectorAll('input[type="number"]').forEach(inp => {
+                inp.addEventListener('input', updateEditPreview);
+            });
             updateEditPreview();
             document.getElementById('editDraftModal').style.display = 'flex';
+            document.getElementById('editMessage').textContent = '';
         } catch (error) {
-            alert('Error loading draft: ' + error.message);
+            showToast('Error loading draft: ' + error.message, 'error');
         }
     };
 
@@ -786,20 +944,23 @@
         div.className = 'item-row';
         div.innerHTML = `
             <input type="text" placeholder="Item name" class="editItemName">
-            <input type="number" placeholder="Qty" class="editItemQty">
-            <input type="number" placeholder="Price/unit" class="editItemPrice">
+            <input type="number" placeholder="Qty" class="editItemQty" min="0" step="1">
+            <input type="number" placeholder="Price/unit" class="editItemPrice" min="0" step="0.01">
             <button type="button" class="removeItem editRemoveItem">✖</button>
         `;
         container.appendChild(div);
         div.querySelector('.editRemoveItem').onclick = () => div.remove();
+        div.querySelectorAll('input[type="number"]').forEach(inp => {
+            inp.addEventListener('input', updateEditPreview);
+        });
         updateEditPreview();
     });
 
     function updateEditPreview() {
         let total = 0;
         document.querySelectorAll('#editItemsContainer .item-row').forEach(r => {
-            const qty = parseInt(r.querySelector('.editItemQty')?.value || 0);
-            const price = parseFloat(r.querySelector('.editItemPrice')?.value || 0);
+            const qty = validateNumber(r.querySelector('.editItemQty')?.value, 0) || 0;
+            const price = validateNumber(r.querySelector('.editItemPrice')?.value, 0) || 0;
             total += qty * price;
         });
         document.getElementById('editCostPreview').innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
@@ -808,7 +969,10 @@
 
     document.getElementById('editDraftForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!editDraftId) return alert('No draft selected.');
+        if (!editDraftId) {
+            showToast('No draft selected.', 'error');
+            return;
+        }
         const senderName = document.getElementById('editSenderName').value.trim();
         const destBranch = document.getElementById('editDestBranch').value;
         const vehicleNo = document.getElementById('editVehicleNo').value.trim();
@@ -816,26 +980,33 @@
         const driver = document.getElementById('editDriverName').value.trim();
         const trackingNo = document.getElementById('editTrackingNo').value.trim();
         const notes = document.getElementById('editNotes').value.trim();
+
         const items = [];
+        let hasError = false;
         document.querySelectorAll('#editItemsContainer .item-row').forEach(row => {
             const name = row.querySelector('.editItemName').value.trim();
-            const qty = parseInt(row.querySelector('.editItemQty').value);
-            const price = parseFloat(row.querySelector('.editItemPrice').value);
-            if (name && qty > 0 && price >= 0) {
-                items.push({
-                    itemName: name,
-                    orderedQty: qty,
-                    unitPrice: price,
-                    totalItemCost: qty * price,
-                    receivedQty: 0,
-                    damageQty: 0
-                });
+            const qty = validateNumber(row.querySelector('.editItemQty').value, 0);
+            const price = validateNumber(row.querySelector('.editItemPrice').value, 0);
+            if (!name || qty === null || price === null || qty <= 0 || price < 0) {
+                hasError = true;
+                return;
             }
+            items.push({
+                itemName: name,
+                orderedQty: qty,
+                unitPrice: price,
+                totalItemCost: qty * price,
+                receivedQty: 0,
+                damageQty: 0
+            });
         });
-        if (!items.length || !senderName) {
-            document.getElementById('editMessage').innerText = 'Please fill all required fields and add items.';
+        if (hasError || items.length === 0 || !senderName) {
+            document.getElementById('editMessage').innerText = 'Please fill all fields and add valid items.';
             return;
         }
+
+        const updateBtn = document.getElementById('editUpdateBtn');
+        setButtonLoading(updateBtn, true);
         try {
             await db.collection('shipments').doc(editDraftId).update({
                 senderName,
@@ -848,12 +1019,15 @@
                 items,
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
-            alert('Draft updated successfully.');
+            showToast('Draft updated successfully.', 'success');
             closeModal('editDraftModal');
             loadShipments();
             loadStats();
         } catch (error) {
             document.getElementById('editMessage').innerText = 'Error: ' + error.message;
+            showToast('Error updating draft: ' + error.message, 'error');
+        } finally {
+            setButtonLoading(updateBtn, false);
         }
     });
 
@@ -862,18 +1036,22 @@
         if (!confirm('Delete this draft permanently?')) return;
         try {
             await db.collection('shipments').doc(editDraftId).delete();
-            alert('Draft deleted.');
+            showToast('Draft deleted.', 'success');
             closeModal('editDraftModal');
             loadShipments();
             loadStats();
         } catch (error) {
-            alert('Error deleting draft: ' + error.message);
+            showToast('Error deleting draft: ' + error.message, 'error');
         }
     });
 
     // ==================== Stats ====================
     function loadStats() {
-        db.collection("shipments").onSnapshot(snap => {
+        if (statsUnsubscribe) {
+            statsUnsubscribe();
+            statsUnsubscribe = null;
+        }
+        statsUnsubscribe = db.collection("shipments").onSnapshot(snap => {
             let total = 0, dispatched = 0, delivered = 0, drafts = 0, cancelled = 0, goods = 0;
             snap.forEach(doc => {
                 const d = doc.data();
@@ -884,14 +1062,27 @@
                 else if (d.status === 'Cancelled') cancelled++;
                 if (d.items) d.items.forEach(i => goods += i.totalItemCost || 0);
             });
-            document.getElementById('totalShipments').innerText = total;
-            document.getElementById('dispatchedCount').innerText = dispatched;
-            document.getElementById('deliveredCount').innerText = delivered;
-            document.getElementById('draftCount').innerText = drafts;
-            document.getElementById('cancelledCount').innerText = cancelled;
-            document.getElementById('totalGoods').innerText = '₦' + goods.toLocaleString();
+            document.getElementById('totalShipments').textContent = total;
+            document.getElementById('dispatchedCount').textContent = dispatched;
+            document.getElementById('deliveredCount').textContent = delivered;
+            document.getElementById('draftCount').textContent = drafts;
+            document.getElementById('cancelledCount').textContent = cancelled;
+            document.getElementById('totalGoods').textContent = '₦' + goods.toLocaleString();
+        }, err => {
+            showToast('Error loading stats: ' + err.message, 'error');
         });
     }
+
+    // ==================== Cleanup on page unload ====================
+    window.addEventListener('beforeunload', () => {
+        if (shipmentsUnsubscribe) shipmentsUnsubscribe();
+        if (statsUnsubscribe) statsUnsubscribe();
+    });
+
+    // ==================== Init ====================
+    console.log('NEVAMAK Dispatch loaded with security fixes.');
+    // Initial item row already exists.
+    updatePreview();
 </script>
 </body>
 </html>
