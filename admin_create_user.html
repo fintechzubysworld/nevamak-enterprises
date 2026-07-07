@@ -62,8 +62,8 @@
     <h2>👥 User Management</h2>
     
     <div class="info-box" style="background:#f8d7da; border-color:#f5c6cb;">
-        <strong>⚠️ Permission Error?</strong> If you see <em>"Missing or insufficient permissions"</em> when loading suppliers,
-        update your Firestore security rules. <a href="#" onclick="showRulesHelp(); return false;" style="color:#0a3d62;">Click here for rules example</a>
+        <strong>⚠️ User role missing?</strong> Click the <strong>"Fix"</strong> button (🔧) for the user and enter the correct role. 
+        Ensure the role is one of: <code>admin</code>, <code>lagos_sender</code>, <code>abuja_rep</code>, <code>ph_rep</code>, <code>vendor</code>.
     </div>
 
     <form id="createUserForm">
@@ -77,14 +77,12 @@
             <option value="vendor">External Vendor</option>
         </select>
         
-        <!-- Supplier dropdown – shown only when role = vendor -->
         <div id="supplierField" class="hidden">
             <label style="font-weight:600; font-size:0.9rem;">Select Supplier:</label>
             <select id="supplierSelect">
                 <option value="">-- Select Supplier --</option>
             </select>
             <div id="supplierStatus" style="font-size:0.8rem; color:#888; margin-top:4px;"></div>
-            <!-- Fallback: manual entry if dropdown fails -->
             <div id="supplierFallback" class="hidden fallback-input">
                 <label style="font-size:0.85rem;">Or enter Supplier ID manually:</label>
                 <input type="text" id="manualSupplierId" placeholder="Supplier Document ID">
@@ -135,7 +133,6 @@
         let usersCache = [];
         let suppliersLoaded = false;
 
-        // ========== Auth ==========
         auth.onAuthStateChanged(async (user) => {
             if (!user) { window.location.href = 'login.html'; return; }
             const userDoc = await db.collection('users').doc(user.uid).get();
@@ -154,7 +151,6 @@
             auth.signOut().then(() => window.location.href = 'login.html');
         });
 
-        // ========== Load Suppliers ==========
         async function loadSuppliers() {
             try {
                 const snap = await db.collection('suppliers').get();
@@ -164,7 +160,6 @@
                 if (snap.empty) {
                     supplierStatus.textContent = '⚠️ No suppliers found. Please add suppliers first.';
                     supplierStatus.style.color = '#e67e22';
-                    // Show fallback
                     supplierFallback.classList.remove('hidden');
                 } else {
                     snap.forEach(doc => {
@@ -177,7 +172,7 @@
                     });
                     supplierStatus.textContent = `✅ ${suppliers.length} suppliers available.`;
                     supplierStatus.style.color = '#27ae60';
-                    supplierFallback.classList.add('hidden'); // hide fallback
+                    supplierFallback.classList.add('hidden');
                 }
                 suppliersLoaded = true;
             } catch (err) {
@@ -186,27 +181,20 @@
                 supplierStatus.style.color = '#e74c3c';
                 suppliers = [];
                 suppliersLoaded = false;
-                // Show fallback for manual entry
                 supplierFallback.classList.remove('hidden');
-                // Show instructions to update rules
                 supplierStatus.innerHTML += ' <a href="#" onclick="showRulesHelp(); return false;" style="color:#0a3d62;">Update Firestore rules</a>';
             }
         }
 
-        // ========== Toggle Supplier Field ==========
         userRole.addEventListener('change', function() {
             if (this.value === 'vendor') {
                 supplierField.classList.remove('hidden');
-                // Reload suppliers if not loaded yet or refresh
-                if (!suppliersLoaded) {
-                    loadSuppliers();
-                }
+                if (!suppliersLoaded) loadSuppliers();
             } else {
                 supplierField.classList.add('hidden');
             }
         });
 
-        // ========== Show Message ==========
         function showMessage(text, type) {
             messageDiv.textContent = text;
             messageDiv.className = 'message ' + type;
@@ -216,7 +204,6 @@
             }
         }
 
-        // ========== Create User ==========
         document.getElementById('createUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = userEmail.value.trim();
@@ -235,20 +222,13 @@
 
             let supplierName = '';
             if (role === 'vendor') {
-                // If dropdown failed, check manual entry
                 if (!supplierId && manualSupplierId.value.trim()) {
                     supplierId = manualSupplierId.value.trim();
-                    // Try to find supplier name from the loaded list, otherwise prompt
                     const found = suppliers.find(s => s.id === supplierId);
-                    if (found) {
-                        supplierName = found.name;
-                    } else {
-                        // Ask user for supplier name
+                    if (found) supplierName = found.name;
+                    else {
                         const name = prompt('Enter supplier name for this ID:');
-                        if (!name) {
-                            showMessage('Supplier name required.', 'error');
-                            return;
-                        }
+                        if (!name) { showMessage('Supplier name required.', 'error'); return; }
                         supplierName = name;
                     }
                 }
@@ -256,7 +236,6 @@
                     showMessage('Please select a supplier or enter a valid Supplier ID.', 'error');
                     return;
                 }
-                // If we still don't have supplierName, try to get from list
                 if (!supplierName) {
                     const found = suppliers.find(s => s.id === supplierId);
                     if (found) supplierName = found.name;
@@ -315,7 +294,6 @@
             }
         });
 
-        // ========== Load Users ==========
         async function loadUsers() {
             userListDiv.innerHTML = '<div style="text-align:center; padding:20px; color:#888;">Loading...</div>';
             try {
@@ -360,11 +338,11 @@
             }
         }
 
-        // ========== Fix User ==========
+        // FIX USER - Improved version with merge and verification
         window.fixUser = async function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) {
-                alert('User not found.');
+                alert('User not found in cache.');
                 return;
             }
             const email = user.email;
@@ -377,51 +355,98 @@
             }
             let supplierId = null, supplierName = null;
             if (role === 'vendor') {
-                // Try to reload suppliers, but if fails, ask manually
-                await loadSuppliers();
-                if (suppliers.length === 0) {
-                    // Manual entry
-                    const id = prompt('Enter Supplier ID (document ID):');
-                    if (!id) return;
-                    const name = prompt('Enter Supplier Name:');
-                    if (!name) return;
-                    supplierId = id;
-                    supplierName = name;
+                // Try to use existing supplier if available
+                if (user.supplierId) {
+                    const confirmUse = confirm(`Use existing supplier: ${user.supplierName || user.supplierId}? Click Cancel to change.`);
+                    if (confirmUse) {
+                        supplierId = user.supplierId;
+                        supplierName = user.supplierName || 'Unknown';
+                    } else {
+                        // Get new supplier
+                        await loadSuppliers();
+                        if (suppliers.length === 0) {
+                            const id = prompt('Enter Supplier ID (document ID):');
+                            if (!id) return;
+                            const name = prompt('Enter Supplier Name:');
+                            if (!name) return;
+                            supplierId = id;
+                            supplierName = name;
+                        } else {
+                            const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
+                            const input = prompt(`Enter supplier ID:\n${list}`);
+                            if (input === null) return;
+                            const sel = suppliers.find(s => s.id === input.trim());
+                            if (!sel) {
+                                // manual fallback
+                                const id = prompt('Enter Supplier ID manually:');
+                                if (!id) return;
+                                const name = prompt('Enter Supplier Name:');
+                                if (!name) return;
+                                supplierId = id;
+                                supplierName = name;
+                            } else {
+                                supplierId = sel.id;
+                                supplierName = sel.name;
+                            }
+                        }
+                    }
                 } else {
-                    const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
-                    const input = prompt(`Enter supplier ID:\n${list}`);
-                    if (input === null) return;
-                    const sel = suppliers.find(s => s.id === input.trim());
-                    if (!sel) {
-                        alert('Supplier not found. You can enter manually.');
-                        const id = prompt('Enter Supplier ID manually:');
+                    // No supplier, ask for one
+                    await loadSuppliers();
+                    if (suppliers.length === 0) {
+                        const id = prompt('Enter Supplier ID (document ID):');
                         if (!id) return;
                         const name = prompt('Enter Supplier Name:');
                         if (!name) return;
                         supplierId = id;
                         supplierName = name;
                     } else {
-                        supplierId = sel.id;
-                        supplierName = sel.name;
+                        const list = suppliers.map(s => `${s.id}: ${s.name}`).join('\n');
+                        const input = prompt(`Enter supplier ID:\n${list}`);
+                        if (input === null) return;
+                        const sel = suppliers.find(s => s.id === input.trim());
+                        if (!sel) {
+                            const id = prompt('Enter Supplier ID manually:');
+                            if (!id) return;
+                            const name = prompt('Enter Supplier Name:');
+                            if (!name) return;
+                            supplierId = id;
+                            supplierName = name;
+                        } else {
+                            supplierId = sel.id;
+                            supplierName = sel.name;
+                        }
                     }
                 }
             }
+
             const data = {
-                email,
+                email: email,
                 role: role.toLowerCase(),
                 enabled: true,
+                // Preserve existing emailVerified if possible
                 emailVerified: user.emailVerified || false,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                // Update timestamp
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             };
             if (supplierId) {
                 data.supplierId = supplierId;
                 data.supplierName = supplierName;
                 data.vendorName = supplierName;
             }
+
             try {
-                await db.collection('users').doc(uid).set(data);
-                alert('✅ User document recreated successfully.');
-                loadUsers();
+                // Use set with merge to preserve other fields
+                await db.collection('users').doc(uid).set(data, { merge: true });
+                // Verify by reading back
+                const verify = await db.collection('users').doc(uid).get();
+                if (verify.exists) {
+                    const vData = verify.data();
+                    alert(`✅ User document fixed.\nEmail: ${vData.email}\nRole: ${vData.role}\nSupplier: ${vData.supplierName || 'N/A'}`);
+                    loadUsers();
+                } else {
+                    alert('⚠️ Document was written but could not be verified. Please refresh the page.');
+                }
             } catch (err) {
                 if (err.code === 'permission-denied') {
                     alert(`❌ Permission denied.\n\nPlease update Firestore security rules to allow admin writes to users collection.\n\nExample rule:\n\nallow write: if request.auth != null && (request.auth.uid == userId || request.auth.token.email == '${currentUserEmail}');`);
@@ -431,7 +456,7 @@
             }
         };
 
-        // ========== Edit User ==========
+        // Other functions (edit, toggle, resend) remain similar but with merge for edit
         window.editUser = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) { alert('User not found.'); return; }
@@ -444,7 +469,6 @@
             }
             let supplierId = null, supplierName = null;
             if (newRole === 'vendor') {
-                // Similar fallback
                 loadSuppliers().then(() => {
                     if (suppliers.length === 0) {
                         const id = prompt('Enter Supplier ID:');
@@ -459,8 +483,7 @@
                         const input = prompt(`Enter supplier ID:\n${list}`);
                         if (input === null) return;
                         const sel = suppliers.find(s => s.id === input.trim());
-                        if (!sel) { 
-                            // Manual fallback
+                        if (!sel) {
                             const id = prompt('Enter Supplier ID manually:');
                             if (!id) return;
                             const name = prompt('Enter Supplier Name:');
@@ -497,7 +520,6 @@
                 });
         }
 
-        // ========== Toggle User ==========
         window.toggleUser = function(uid, enable) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) return;
@@ -513,14 +535,12 @@
                 });
         };
 
-        // ========== Resend Verification ==========
         window.resendVerification = function(uid) {
             const user = usersCache.find(u => u.uid === uid);
             if (!user) return;
             alert(`📧 Verification resend requested for ${user.email}.\nThe user should log in and click "Resend verification" on login page.`);
         };
 
-        // ========== Show Firestore Rules Help ==========
         window.showRulesHelp = function() {
             alert(
 `Firestore Security Rules Example:
@@ -528,17 +548,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read/write their own data
     match /users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && 
         (request.auth.uid == userId || 
          request.auth.token.email == '${currentUserEmail}');
     }
-    // Allow read access to suppliers for authenticated users
     match /suppliers/{supplierId} {
       allow read: if request.auth != null;
-      // Only admin can write
       allow write: if request.auth != null && 
         request.auth.token.email == '${currentUserEmail}';
     }
