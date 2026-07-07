@@ -56,6 +56,8 @@
         .btn-warning { background: #f39c12; color: white; }
         .btn-info { background: #3498db; color: white; }
         .items-cell { word-wrap: break-word; overflow-wrap: break-word; max-width: 150px; }
+        .rules-help { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; font-size: 0.8rem; margin-top: 8px; }
+        .rules-help pre { background: #1e1e1e; color: #d4d4d4; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 0.75rem; margin: 8px 0; }
         @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } .stat-card .number { font-size: 1.3rem; } header { flex-direction: column; text-align: center; } }
     </style>
 </head>
@@ -458,7 +460,7 @@
         }
     };
 
-    // ==================== Pending Invoice Requests (Fixed) ====================
+    // ==================== Pending Invoice Requests (Fixed with Permission Handling) ====================
     function loadPendingRequests() {
         const container = document.getElementById('pendingRequestsList');
         container.innerHTML = '<div style="text-align:center; padding:10px; color:#888;">Loading requests...</div>';
@@ -472,8 +474,11 @@
                     renderRequests(snap);
                 },
                 (error) => {
-                    // If index missing, show help and offer fallback
+                    console.error('Invoice requests error:', error);
+                    
+                    // Handle different error types
                     if (error.message && error.message.includes('requires an index')) {
+                        // Missing composite index
                         const match = error.message.match(/https:\/\/console\.firebase\.google\.com\/.*/);
                         const indexUrl = match ? match[0] : '#';
                         container.innerHTML = `
@@ -488,14 +493,48 @@
                         document.getElementById('fallbackQueryBtn')?.addEventListener('click', function() {
                             loadPendingRequestsFallback();
                         });
+                    } else if (error.code === 'permission-denied' || error.message.includes('permission')) {
+                        // Permission error - show helpful message with security rules
+                        container.innerHTML = `
+                            <div style="background:#f8d7da; padding:12px; border-radius:8px; margin:8px 0; border:1px solid #f5c6cb;">
+                                <strong>🔒 Permission Denied</strong>
+                                <p>You don't have permission to view pending invoice requests.</p>
+                                <p style="font-size:0.85rem; color:#666;">This is a security configuration issue. Please ask your administrator to update Firestore security rules.</p>
+                                <button onclick="showRulesHelp()" class="btn-sm btn-info" style="margin-top:8px; background:#3498db; color:white;">Show required security rules</button>
+                            </div>
+                        `;
                     } else {
-                        // Other error (permissions, etc.)
-                        console.error('Error loading requests:', error);
+                        // Generic error
                         container.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
                     }
                 }
             );
     }
+
+    // Show security rules help
+    window.showRulesHelp = function() {
+        alert(
+`Firestore Security Rules Required for invoiceRequests:
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow admins and Lagos senders to read invoice requests
+    match /invoiceRequests/{requestId} {
+      allow read: if request.auth != null && 
+        (request.auth.token.email == 'admin@nevamak.com' || 
+         request.auth.token.email == 'YOUR_ADMIN_EMAIL' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'lagos_sender']);
+      allow write: if request.auth != null;
+    }
+  }
+}
+
+Note: Replace 'YOUR_ADMIN_EMAIL' with your actual admin email.
+If you're using custom claims, you can simplify the rule.
+`
+        );
+    };
 
     // Fallback: fetch all and filter client-side (no composite index needed)
     function loadPendingRequestsFallback() {
@@ -518,10 +557,25 @@
                         docs: pendingDocs
                     };
                     renderRequests(filteredSnap);
+                    // Show a note that fallback is active
+                    const note = document.createElement('div');
+                    note.style.cssText = 'font-size:0.75rem; color:#888; text-align:center; margin-top:8px;';
+                    note.textContent = 'ℹ️ Using fallback query (all requests loaded, filtered client-side).';
+                    container.appendChild(note);
                 },
                 (error) => {
                     console.error('Fallback query error:', error);
-                    container.innerHTML = `<p style="color:red;">Error loading requests (fallback): ${error.message}</p>`;
+                    if (error.code === 'permission-denied') {
+                        container.innerHTML = `
+                            <div style="background:#f8d7da; padding:12px; border-radius:8px; margin:8px 0;">
+                                <strong>🔒 Permission Denied</strong>
+                                <p>You don't have permission to view invoice requests.</p>
+                                <p>Please update Firestore security rules to allow reads for admin and lagos_sender.</p>
+                            </div>
+                        `;
+                    } else {
+                        container.innerHTML = `<p style="color:red;">Error loading requests (fallback): ${error.message}</p>`;
+                    }
                 }
             );
     }
@@ -809,7 +863,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dashboard loaded with vendor redirect and fixed invoice requests.');
+    console.log('NEVAMAK Dashboard loaded with enhanced permission handling for invoice requests.');
 </script>
 </body>
 </html>
