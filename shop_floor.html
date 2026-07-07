@@ -134,7 +134,7 @@
     let unsubscribeFloor = null; // listener reference
     let returnItemData = {};
 
-    // ==================== Auth (FIXED: added async) ====================
+    // ==================== Auth (FIXED) ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
@@ -178,18 +178,23 @@
                     <div class="permission-error">
                         <strong>🔒 Permission Denied</strong>
                         <p>You don't have permission to view the shop floor inventory.</p>
-                        <p>Add the following rule to your Firestore database:</p>
-                        <pre style="background:#f0f0f0; padding:8px; border-radius:8px; font-size:0.8rem;">
+                        <p><strong>Solution:</strong> Update your Firestore security rules to allow reads for authenticated users.</p>
+                        <p>Add this rule to your <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">Firestore Rules</a>:</p>
+                        <pre style="background:#1e1e1e; color:#d4d4d4; padding:12px; border-radius:8px; font-size:0.8rem; overflow-x:auto;">
 match /shopFloor/{document} {
   allow read, write: if request.auth != null;
 }</pre>
-                        <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">🔗 Click here to open Firestore Rules</a></p>
+                        <p style="margin-top:8px;">After adding the rule, click <strong>Publish</strong> and refresh this page.</p>
+                        <hr style="margin:12px 0;">
+                        <p><strong>Alternative:</strong> If you don't have data yet, you can <a href="warehouse.html" style="color:#0a3d62;">move items from warehouse to shop floor</a> to populate the collection.</p>
                     </div>
                 `;
             } else {
                 errorHtml = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
             }
             document.getElementById('floorList').innerHTML = errorHtml;
+            // Update stats to 0
+            updateStats([]);
         });
     }
 
@@ -447,7 +452,7 @@ match /shopFloor/{document} {
         link.click();
     }
 
-    console.log('NEVAMAK Shop Floor loaded – fixed async error.');
+    console.log('NEVAMAK Shop Floor loaded.');
 </script>
 </body>
 </html>
