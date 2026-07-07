@@ -76,6 +76,7 @@
             <a href="invoice_repo.html">🧾 Invoice Repo</a>
             <a href="returns.html">🔄 Returns</a>
             <a href="admin_create_user.html" id="adminPanelLink" style="display:none;">👑 Admin</a>
+            <a href="permissions.html" id="permissionsLink" style="display:none;">🔐 Permissions</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -239,8 +240,14 @@
         const userDoc = await db2.collection('users').doc(user.uid).get();
         currentRole = userDoc.data()?.role || '';
         document.getElementById('roleBadge').innerText = `Role: ${currentRole}`;
-        if (currentRole === 'admin') document.getElementById('adminPanelLink').style.display = 'inline-block';
+        if (currentRole === 'admin') {
+            document.getElementById('adminPanelLink').style.display = 'inline-block';
+            document.getElementById('permissionsLink').style.display = 'inline-block';
+        } else if (currentRole === 'lagos_sender') {
+            document.getElementById('permissionsLink').style.display = 'inline-block';
+        }
 
+        // Show pending requests only for admin or lagos_sender
         if (currentRole === 'admin' || currentRole === 'lagos_sender') {
             document.getElementById('pendingRequestsSection').style.display = 'block';
             loadPendingRequests();
@@ -274,7 +281,16 @@
 
     // ---- Listeners ----
     function startListeners() {
-        db2.collection("shipments").onSnapshot((snapshot) => {
+        // Build shipments query based on role
+        let q = db2.collection("shipments").orderBy("createdAt", "desc");
+        if (currentRole === 'abuja_rep') {
+            q = db2.collection("shipments").where("destinationBranch", "==", "Abuja").orderBy("createdAt", "desc");
+        } else if (currentRole === 'ph_rep') {
+            q = db2.collection("shipments").where("destinationBranch", "==", "Portharcourt").orderBy("createdAt", "desc");
+        }
+        // For admin/lagos_sender, no filter needed
+
+        q.onSnapshot((snapshot) => {
             let total=0, abuja=0, ph=0, delivered=0, totalGoods=0, totalTrans=0, rows=[];
             let chartData = {};
             snapshot.forEach(doc => {
@@ -327,22 +343,7 @@
             document.getElementById("returnsBody").innerHTML = returnRows || "<tr><td colspan='7'>No returns</td></tr>";
         }, err => console.error('Returns listener error:', err));
     }
-async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
-    
+
     // ---- Inventory ----
     async function loadInventory() {
         try {
@@ -475,127 +476,62 @@ async function hasPermission(permName) {
         }
     };
 
-    // ==================== Pending Invoice Requests (Fixed with Permission Handling) ====================
+    // ==================== Pending Invoice Requests (Fixed with Role-Based Filtering) ====================
     function loadPendingRequests() {
         const container = document.getElementById('pendingRequestsList');
         container.innerHTML = '<div style="text-align:center; padding:10px; color:#888;">Loading requests...</div>';
 
-        // Try the indexed query first
-        db2.collection('invoiceRequests')
-            .where('status', '==', 'pending')
-            .orderBy('requestedAt', 'desc')
-            .onSnapshot(
-                (snap) => {
-                    renderRequests(snap);
-                },
-                (error) => {
-                    console.error('Invoice requests error:', error);
-                    
-                    // Handle different error types
-                    if (error.message && error.message.includes('requires an index')) {
-                        // Missing composite index
-                        const match = error.message.match(/https:\/\/console\.firebase\.google\.com\/.*/);
-                        const indexUrl = match ? match[0] : '#';
-                        container.innerHTML = `
-                            <div style="background:#fff3cd; padding:12px; border-radius:8px; margin:8px 0;">
-                                <strong>⚠️ Missing Firestore Index</strong>
-                                <p>To load pending invoice requests, you need to create a composite index.</p>
-                                <p><a href="${indexUrl}" target="_blank" style="color:#0a3d62; font-weight:bold;">Click here to create the required index</a></p>
-                                <p style="font-size:0.8rem; color:#666;">Alternatively, the system can fallback to a simpler query (may be slower).</p>
-                                <button id="fallbackQueryBtn" class="btn-sm btn-primary" style="margin-top:8px;">Use fallback query</button>
-                            </div>
-                        `;
-                        document.getElementById('fallbackQueryBtn')?.addEventListener('click', function() {
-                            loadPendingRequestsFallback();
-                        });
-                    } else if (error.code === 'permission-denied' || error.message.includes('permission')) {
-                        // Permission error - show helpful message with security rules
-                        container.innerHTML = `
-                            <div style="background:#f8d7da; padding:12px; border-radius:8px; margin:8px 0; border:1px solid #f5c6cb;">
-                                <strong>🔒 Permission Denied</strong>
-                                <p>You don't have permission to view pending invoice requests.</p>
-                                <p style="font-size:0.85rem; color:#666;">This is a security configuration issue. Please ask your administrator to update Firestore security rules.</p>
-                                <button onclick="showRulesHelp()" class="btn-sm btn-info" style="margin-top:8px; background:#3498db; color:white;">Show required security rules</button>
-                            </div>
-                        `;
-                    } else {
-                        // Generic error
-                        container.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
-                    }
+        // Build query based on role
+        let q = db2.collection('invoiceRequests');
+        if (currentRole === 'admin' || currentRole === 'lagos_sender') {
+            // Admins and Lagos senders can see all pending requests
+            q = q.where('status', '==', 'pending').orderBy('requestedAt', 'desc');
+        } else if (currentRole === 'abuja_rep') {
+            // Abuja rep sees only Abuja requests
+            q = q.where('status', '==', 'pending').where('branch', '==', 'Abuja').orderBy('requestedAt', 'desc');
+        } else if (currentRole === 'ph_rep') {
+            // PH rep sees only PH requests
+            q = q.where('status', '==', 'pending').where('branch', '==', 'Portharcourt').orderBy('requestedAt', 'desc');
+        } else {
+            // Others (vendors, etc.) don't see pending requests
+            container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">You do not have permission to view pending requests.</p>';
+            return;
+        }
+
+        q.onSnapshot(
+            (snap) => {
+                renderRequests(snap);
+            },
+            (error) => {
+                console.error('Invoice requests error:', error);
+                // Handle different error types
+                if (error.message && error.message.includes('requires an index')) {
+                    const match = error.message.match(/https:\/\/console\.firebase\.google\.com\/.*/);
+                    const indexUrl = match ? match[0] : '#';
+                    container.innerHTML = `
+                        <div style="background:#fff3cd; padding:12px; border-radius:8px; margin:8px 0;">
+                            <strong>⚠️ Missing Firestore Index</strong>
+                            <p>To load pending invoice requests, you need to create a composite index.</p>
+                            <p><a href="${indexUrl}" target="_blank" style="color:#0a3d62; font-weight:bold;">Click here to create the required index</a></p>
+                            <p style="font-size:0.8rem; color:#666;">After creating the index, refresh this page.</p>
+                        </div>
+                    `;
+                } else if (error.code === 'permission-denied' || error.message.includes('permission')) {
+                    container.innerHTML = `
+                        <div style="background:#f8d7da; padding:12px; border-radius:8px; margin:8px 0; border:1px solid #f5c6cb;">
+                            <strong>🔒 Permission Denied</strong>
+                            <p>You don't have permission to view pending invoice requests.</p>
+                            <p style="font-size:0.85rem; color:#666;">This is a security configuration issue. Please ask your administrator to update Firestore security rules.</p>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
                 }
-            );
-    }
-
-    // Show security rules help
-    window.showRulesHelp = function() {
-        alert(
-`Firestore Security Rules Required for invoiceRequests:
-
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Allow admins and Lagos senders to read invoice requests
-    match /invoiceRequests/{requestId} {
-      allow read: if request.auth != null && 
-        (request.auth.token.email == 'admin@nevamak.com' || 
-         request.auth.token.email == 'YOUR_ADMIN_EMAIL' ||
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'lagos_sender']);
-      allow write: if request.auth != null;
-    }
-  }
-}
-
-Note: Replace 'YOUR_ADMIN_EMAIL' with your actual admin email.
-If you're using custom claims, you can simplify the rule.
-`
+            }
         );
-    };
-
-    // Fallback: fetch all and filter client-side (no composite index needed)
-    function loadPendingRequestsFallback() {
-        const container = document.getElementById('pendingRequestsList');
-        container.innerHTML = '<div style="text-align:center; padding:10px; color:#888;">Loading requests (fallback mode)...</div>';
-
-        db2.collection('invoiceRequests')
-            .orderBy('requestedAt', 'desc')
-            .onSnapshot(
-                (snap) => {
-                    const pendingDocs = [];
-                    snap.forEach(doc => {
-                        if (doc.data().status === 'pending') {
-                            pendingDocs.push(doc);
-                        }
-                    });
-                    const filteredSnap = {
-                        empty: pendingDocs.length === 0,
-                        forEach: (callback) => pendingDocs.forEach(callback),
-                        docs: pendingDocs
-                    };
-                    renderRequests(filteredSnap);
-                    // Show a note that fallback is active
-                    const note = document.createElement('div');
-                    note.style.cssText = 'font-size:0.75rem; color:#888; text-align:center; margin-top:8px;';
-                    note.textContent = 'ℹ️ Using fallback query (all requests loaded, filtered client-side).';
-                    container.appendChild(note);
-                },
-                (error) => {
-                    console.error('Fallback query error:', error);
-                    if (error.code === 'permission-denied') {
-                        container.innerHTML = `
-                            <div style="background:#f8d7da; padding:12px; border-radius:8px; margin:8px 0;">
-                                <strong>🔒 Permission Denied</strong>
-                                <p>You don't have permission to view invoice requests.</p>
-                                <p>Please update Firestore security rules to allow reads for admin and lagos_sender.</p>
-                            </div>
-                        `;
-                    } else {
-                        container.innerHTML = `<p style="color:red;">Error loading requests (fallback): ${error.message}</p>`;
-                    }
-                }
-            );
     }
 
-    // Render the requests (shared by both methods)
+    // Render the requests
     function renderRequests(snap) {
         const container = document.getElementById('pendingRequestsList');
         let html = '';
@@ -878,7 +814,7 @@ If you're using custom claims, you can simplify the rule.
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dashboard loaded with enhanced permission handling for invoice requests.');
+    console.log('NEVAMAK Dashboard loaded with role-based filtering for shipments and invoice requests.');
 </script>
 </body>
 </html>
