@@ -20,6 +20,248 @@
         .info { color: #27ae60; text-align: center; margin-top: 12px; font-size: 0.85rem; }
         .forgot-link { display: block; text-align: center; margin-top: 12px; color: #0a3d62; text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
         .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
+        .debug-box { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; text-align: left; color: #333; border: 1px solid #ddd; }
+        .debug-box strong { color: #0a3d62; }
+        .fix-link { color: #0a3d62; text-decoration: underline; cursor: pointer; font-weight: bold; }
+        .fix-link:hover { color: #1e3799; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🚛 NEVAMAK</h1>
+    <div class="sub">Supply Chain Portal</div>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button id="loginBtn">Sign In</button>
+    <div id="message" class="error"></div>
+    <a id="forgotPasswordLink" class="forgot-link">🔑 Forgot Password?</a>
+    <div id="verificationMessage" class="info" style="display:none;"></div>
+    <div id="debugInfo" class="debug-box hidden"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const firebaseConfig = {
+            apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+            authDomain: "nevamak-enterprises.firebaseapp.com",
+            projectId: "nevamak-enterprises",
+            storageBucket: "nevamak-enterprises.firebasestorage.app",
+            messagingSenderId: "144324172534",
+            appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+            measurementId: "G-MZ8NT6KK8N"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const messageDiv = document.getElementById('message');
+        const verificationMsg = document.getElementById('verificationMessage');
+        const debugDiv = document.getElementById('debugInfo');
+
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            
+            messageDiv.innerText = '';
+            verificationMsg.style.display = 'none';
+            verificationMsg.innerText = '';
+            debugDiv.classList.add('hidden');
+            debugDiv.innerHTML = '';
+
+            if (!email || !password) {
+                messageDiv.innerText = 'Please enter email and password.';
+                return;
+            }
+
+            try {
+                const userCred = await auth.signInWithEmailAndPassword(email, password);
+                const user = userCred.user;
+
+                if (!user.emailVerified && verificationMsg) {
+                    verificationMsg.style.display = 'block';
+                    verificationMsg.innerHTML = `⚠️ Your email (${email}) is not verified. You can still log in, but some features may require verification.
+                        <span id="resendVerification" style="color:#0a3d62; text-decoration:underline; cursor:pointer; display:block; margin-top:4px;">Resend verification email</span>`;
+                    document.getElementById('resendVerification')?.addEventListener('click', async () => {
+                        try {
+                            await user.sendEmailVerification();
+                            verificationMsg.innerHTML = `✅ Verification email resent to ${email}. Please check your spam folder.`;
+                        } catch (err) {
+                            alert('Error resending: ' + err.message);
+                        }
+                    });
+                }
+
+                // Get user document
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                if (!userDoc.exists) {
+                    // Auto-create for admin default
+                    if (email === 'admin@nevamak.com') {
+                        await db.collection('users').doc(user.uid).set({
+                            email: email,
+                            role: 'admin',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            enabled: true,
+                            emailVerified: user.emailVerified
+                        });
+                        const newDoc = await db.collection('users').doc(user.uid).get();
+                        if (newDoc.exists) {
+                            const role = newDoc.data().role;
+                            redirectUser(role);
+                            return;
+                        }
+                    }
+                    await auth.signOut();
+                    messageDiv.innerHTML = `
+                        ❌ User role not found. 
+                        <br><small style="color:#666;">Your account exists but is missing configuration. Please contact your administrator to fix your account.</small>
+                        <br><small style="color:#666;">Admin: Go to User Management and click the "Fix" button for this user.</small>
+                    `;
+                    return;
+                }
+
+                const data = userDoc.data();
+                const role = data.role;
+
+                if (!role) {
+                    // Role is empty or null
+                    await auth.signOut();
+                    // Show debug info
+                    debugDiv.classList.remove('hidden');
+                    debugDiv.innerHTML = `
+                        <strong>📄 User Document Data:</strong><br>
+                        <pre style="background:#f0f0f0; padding:8px; border-radius:4px; font-size:0.75rem; overflow:auto;">${JSON.stringify(data, null, 2)}</pre>
+                        <p><strong>Problem:</strong> The document exists but <code>role</code> field is missing or empty.</p>
+                        <p><span class="fix-link" onclick="attemptFixRole('${user.uid}', '${email}')">🔧 Click here to attempt auto-fix (if you are admin)</span></p>
+                        <p style="font-size:0.75rem; color:#888;">If you are not admin, please ask your administrator to fix your account.</p>
+                    `;
+                    messageDiv.innerHTML = `
+                        ❌ User role is missing.
+                        <br><small style="color:#666;">Your account is not properly configured. See debug info below.</small>
+                    `;
+                    return;
+                }
+
+                // Role exists, proceed
+                redirectUser(role);
+            } catch (err) {
+                console.error('Login error:', err);
+                let msg = err.message;
+                if (err.code === 'auth/user-not-found') msg = 'User not found. Please check your email or create an account.';
+                else if (err.code === 'auth/wrong-password') msg = 'Incorrect password. Please try again.';
+                else if (err.code === 'auth/invalid-email') msg = 'Invalid email format.';
+                else if (err.code === 'auth/too-many-requests') msg = 'Too many failed attempts. Please try again later.';
+                else if (err.code === 'auth/user-disabled') msg = 'This account has been disabled. Please contact admin.';
+                messageDiv.innerText = '❌ ' + msg;
+            }
+        });
+
+        // Forgot password
+        document.getElementById('forgotPasswordLink').addEventListener('click', async () => {
+            const email = document.getElementById('email').value.trim();
+            if (!email) {
+                messageDiv.innerText = 'Please enter your email address first.';
+                return;
+            }
+            try {
+                await auth.sendPasswordResetEmail(email);
+                messageDiv.innerHTML = `<span style="color:#27ae60;">✅ Password reset email sent to ${email}. Please check your inbox.</span>`;
+            } catch (err) {
+                let msg = err.message;
+                if (err.code === 'auth/user-not-found') msg = 'No user found with this email address.';
+                messageDiv.innerHTML = `<span style="color:#e74c3c;">❌ ${msg}</span>`;
+            }
+        });
+
+        // Function to attempt auto-fix from login (if admin)
+        window.attemptFixRole = async function(uid, email) {
+            // This will only work if the user is an admin (or has proper permissions)
+            // We'll re-authenticate with the current user (which may have been signed out)
+            // So we need to sign in again.
+            const password = prompt('Please enter your admin password to authorize this fix:');
+            if (!password) return;
+            try {
+                const cred = await auth.signInWithEmailAndPassword(currentAdminEmail || email, password);
+                // Check if this user is admin
+                const adminDoc = await db.collection('users').doc(cred.user.uid).get();
+                if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
+                    alert('You are not authorized to fix roles. Only admins can.');
+                    await auth.signOut();
+                    return;
+                }
+                // Now fix the target user
+                const role = prompt('Enter role for user (admin, lagos_sender, abuja_rep, ph_rep, vendor):', 'lagos_sender');
+                if (!role) return;
+                const valid = ['admin','lagos_sender','abuja_rep','ph_rep','vendor'];
+                if (!valid.includes(role)) { alert('Invalid role.'); return; }
+                await db.collection('users').doc(uid).set({ role, enabled: true }, { merge: true });
+                alert(`✅ Role set to ${role}. Please refresh and log in again.`);
+                window.location.reload();
+            } catch (err) {
+                alert('Fix failed: ' + err.message);
+            }
+        };
+
+        function redirectUser(role) {
+            if (role === 'admin' || role === 'lagos_sender') {
+                window.location.href = 'index.html';
+            } else if (role === 'abuja_rep') {
+                window.location.href = 'receive_abuja.html';
+            } else if (role === 'ph_rep') {
+                window.location.href = 'receive_ph.html';
+            } else if (role === 'vendor' || role === 'external_vendor') {
+                window.location.href = 'external_vendor.html';
+            } else {
+                alert('Unknown role: ' + role);
+            }
+        }
+
+        // Auto-redirect
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    if (userDoc.exists) {
+                        const role = userDoc.data().role;
+                        if (role) redirectUser(role);
+                    }
+                } catch (err) {
+                    console.warn('Auto-redirect error:', err);
+                }
+            }
+        });
+
+        // Enter key
+        document.getElementById('password').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('loginBtn').click();
+            }
+        });
+    });
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Login</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: linear-gradient(135deg, #0a3d62, #3c6382); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; padding: 16px; }
+        .card { background: white; max-width: 500px; width: 100%; padding: 24px 20px; border-radius: 32px; box-shadow: 0 20px 35px rgba(0,0,0,0.2); }
+        h1 { color: #0a3d62; margin: 0 0 5px; font-size: 1.8rem; text-align: center; }
+        .sub { color: #555; margin-bottom: 25px; font-size: 0.9rem; text-align: center; }
+        input { width: 100%; padding: 14px 16px; margin: 8px 0; border: 1px solid #ccc; border-radius: 48px; font-size: 1rem; }
+        button { width: 100%; padding: 14px; background: #0a3d62; color: white; border: none; border-radius: 48px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 12px; }
+        button:hover { background: #1e3799; }
+        .error { color: #e74c3c; margin-top: 12px; text-align: center; font-size: 0.9rem; }
+        .info { color: #27ae60; text-align: center; margin-top: 12px; font-size: 0.85rem; }
+        .forgot-link { display: block; text-align: center; margin-top: 12px; color: #0a3d62; text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
+        .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
         .hidden { display: none; }
     </style>
 </head>
