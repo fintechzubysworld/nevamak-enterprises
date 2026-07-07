@@ -1,793 +1,268 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>NEVAMAK – Port Harcourt Receiving</title>
-    <!-- (same head and styles as Abuja, but with PH colours) -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <style>
-        /* use PH styles – same as previous, but with #e67e22 accents */
-        * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; box-sizing: border-box; }
-        body { background: #eef2fa; margin: 0; padding: 12px; }
-        .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .shipment-card { border-left: 6px solid #e67e22; background: #fef9e6; }
-        button { background: #e67e22; color: white; padding: 12px 20px; border-radius: 48px; border: none; font-size: 1rem; width: 100%; margin-top: 8px; cursor: pointer; }
-        input, select, textarea { padding: 10px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin: 4px 0; }
-        .nav { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-        .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
-        .item-row { background: #fef9e6; padding: 12px; border-radius: 20px; margin-bottom: 12px; }
-        .cost-info { background: #fff0db; padding: 8px; border-radius: 16px; margin: 8px 0; }
-        .input-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .input-group input, .input-group select { flex: 1; min-width: 80px; }
-        h2 { font-size: 1.3rem; color: #e67e22; }
-        .quality-check { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .quality-check label { font-size: 0.9rem; font-weight: 600; }
-        .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-        .tab-btn { background: #ccc; color: #333; width: auto; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; }
-        .tab-btn.active { background: #e67e22; color: white; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
-        .stat-card { background: white; border-radius: 20px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #e67e22; }
-        .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; }
-        .stat-card .num { font-size: 1.5rem; font-weight: bold; color: #e67e22; }
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
-        .close { float: right; cursor: pointer; font-size: 1.5rem; }
-        .search-box { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-        .search-box input { flex: 1; }
-        .search-box button { width: auto; padding: 8px 20px; }
-        .draft-badge { background: #dfe6e9; color: #2d3436; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; }
-        .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; font-size: 0.9rem; color: #721c24; }
-        .permission-error a { color: #0a3d62; font-weight: 600; }
-        @media (max-width: 500px) { .input-group { flex-direction: column; } .input-group input { width: 100%; } }
-    </style>
-</head>
-<body>
-<div class="nav">
-    <a href="index.html">🏠 Dashboard</a>
-    <a href="chat.html">💬 Chat</a>
-    <a href="reports.html">📊 Reports</a>
-    <a href="warehouse.html">🏚️ Warehouse</a>
-    <a href="returns.html">🔄 Returns</a>
-    <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
-</div>
-<h2>🌊 Port Harcourt Receiving</h2>
+<!DOCTYPE html><html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes"> <title>NEVAMAK – Port Harcourt Receiving</title> <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script> <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script> <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script> <style> * { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; box-sizing: border-box; } body { background: #eef2fa; margin: 0; padding: 12px; } .card { background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); } .shipment-card { border-left: 6px solid #e67e22; background: #fef9e6; } button { background: #e67e22; color: white; padding: 12px 20px; border-radius: 48px; border: none; font-size: 1rem; width: 100%; margin-top: 8px; cursor: pointer; } input, select, textarea { padding: 10px; border-radius: 40px; border: 1px solid #ccc; width: 100%; margin: 4px 0; } .nav { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; } .nav a, .logout-btn { background: #2c3e50; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; } .item-row { background: #fef9e6; padding: 12px; border-radius: 20px; margin-bottom: 12px; } .cost-info { background: #fff0db; padding: 8px; border-radius: 16px; margin: 8px 0; } .input-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; } .input-group input, .input-group select { flex: 1; min-width: 80px; } h2 { font-size: 1.3rem; color: #e67e22; } .quality-check { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .quality-check label { font-size: 0.9rem; font-weight: 600; } .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; } .tab-btn { background: #ccc; color: #333; width: auto; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; } .tab-btn.active { background: #e67e22; color: white; } .tab-content { display: none; } .tab-content.active { display: block; } .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; } .stat-card { background: white; border-radius: 20px; padding: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); border-left: 4px solid #e67e22; } .stat-card h4 { margin: 0 0 4px; font-size: 0.8rem; color: #555; } .stat-card .num { font-size: 1.5rem; font-weight: bold; color: #e67e22; } .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; } .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; } .close { float: right; cursor: pointer; font-size: 1.5rem; } .search-box { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; } .search-box input { flex: 1; } .search-box button { width: auto; padding: 8px 20px; } .draft-badge { background: #dfe6e9; color: #2d3436; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; margin-left: 6px; } .permission-error { background: #fde8e8; border-left: 4px solid #e74c3c; padding: 12px; border-radius: 12px; font-size: 0.9rem; color: #721c24; } .permission-error a { color: #0a3d62; font-weight: 600; } .btn-sm { padding: 4px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; } .btn-success { background: #27ae60; color: white; } .btn-danger { background: #e74c3c; color: white; } .btn-primary { background: #0a3d62; color: white; } .btn-warning { background: #f39c12; color: white; } .btn-info { background: #3498db; color: white; } .btn-secondary { background: #8e44ad; color: white; } @media (max-width: 500px) { .input-group { flex-direction: column; } .input-group input { width: 100%; } } </style> </head> <body> <div class="nav"> <a href="index.html">🏠 Dashboard</a> <a href="chat.html">💬 Chat</a> <a href="reports.html">📊 Reports</a> <a href="warehouse.html">🏚️ Warehouse</a> <a href="returns.html">🔄 Returns</a> <button id="logoutBtn" class="logout-btn">🚪 Logout</button> </div> <h2>🌊 Port Harcourt Receiving</h2><!-- Stats --><div class="stats-grid" id="statsGrid"> <div class="stat-card"><h4>Received</h4><div class="num" id="receivedCount">-</div></div> <div class="stat-card"><h4>Pending</h4><div class="num" id="pendingCount">-</div></div> <div class="stat-card"><h4>Returned</h4><div class="num" id="returnedCount">-</div></div> <div class="stat-card"><h4>Total Goods (₦)</h4><div class="num" id="totalGoods">-</div></div> <div class="stat-card"><h4>Stock Value</h4><div class="num" id="stockValue">-</div></div> </div><!-- Tabs --><div class="tabs"> <button class="tab-btn active" data-tab="receive">📦 Receive Goods</button> <button class="tab-btn" data-tab="drafts">📝 Drafts</button> <button class="tab-btn" data-tab="returns">🔄 Returns</button> <button class="tab-btn" data-tab="inventory">📊 Inventory</button> <button class="tab-btn" data-tab="history">📜 Activity</button> </div><!-- Tab: Receive Goods --><div id="tab-receive" class="tab-content active"> <div class="search-box"> <input type="text" id="searchItem" placeholder="🔍 Search by item description..."> <button id="searchBtn" class="btn-primary">Search</button> <button id="clearSearchBtn" class="btn-secondary">Clear</button> </div> <div id="shipmentsList" class="card">Loading...</div> </div><!-- Tab: Drafts --><div id="tab-drafts" class="tab-content"> <div id="draftsList" class="card">Loading drafts...</div> </div><!-- Tab: Returns --><div id="tab-returns" class="tab-content"> <div class="card"> <h3>Record Return</h3> <select id="returnShipmentSelect"><option value="">-- Select Shipment --</option></select> <select id="returnItemSelect"><option value="">-- Select Item --</option></select> <input type="number" id="returnQty" placeholder="Quantity to return"> <textarea id="returnReason" placeholder="Reason"></textarea> <button id="recordReturnBtn">📤 Record Return</button> <div id="returnMessage"></div> </div> <div class="card"> <h3>Past Returns</h3> <div id="pastReturnsList">Loading...</div> </div> </div><!-- Tab: Inventory --><div id="tab-inventory" class="tab-content"> <div class="card"> <h3>Current Stock</h3> <input type="text" id="invSearch" placeholder="🔍 Search by item..."> <div id="inventoryList">Loading...</div> </div> </div><!-- Tab: Activity --><div id="tab-history" class="tab-content"> <div class="card"> <h3>Activity Log</h3> <div style="display:flex; gap:8px; flex-wrap:wrap;"> <input type="date" id="historyStart"> <input type="date" id="historyEnd"> <button id="filterHistoryBtn" style="width:auto; padding:10px 20px;">Filter</button> </div> <div id="activityList">Loading...</div> </div> </div><!-- Modal: Invoice/GRN Preview --><div id="invoiceModal" class="modal"> <div class="modal-content"> <span class="close" onclick="closeModal('invoiceModal')">&times;</span> <div id="invoiceContent"></div> <button id="printInvoiceBtn" onclick="window.print()">🖨️ Print</button> </div> </div><script> // ==================== Firebase Config ==================== const firebaseConfig = { apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI", authDomain: "nevamak-enterprises.firebaseapp.com", projectId: "nevamak-enterprises", storageBucket: "nevamak-enterprises.firebasestorage.app", messagingSenderId: "144324172534", appId: "1:144324172534:web:4b6dd31754c79fd830aad7", measurementId: "G-MZ8NT6KK8N" }; firebase.initializeApp(firebaseConfig); const auth = firebase.auth(); const db = firebase.firestore(); let currentUserEmail = ""; const BRANCH = "Portharcourt"; let currentUserId = ""; // ==================== Auth ==================== auth.onAuthStateChanged(async (user) => { if (!user) { window.location.href = 'login.html'; return; } currentUserId = user.uid; const userDoc = await db.collection('users').doc(user.uid).get(); const role = userDoc.data()?.role || ''; if (!['admin', 'lagos_sender', 'ph_rep'].includes(role)) { window.location.href = 'index.html'; return; } currentUserEmail = user.email; loadShipments(); loadReturnShipmentsDropdown(); loadPastReturns(); loadActivityHistory(); loadInventory(); loadStats(); loadDrafts(); setupSearch(); }); document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html')); // ==================== Tab Switching ==================== document.querySelectorAll('.tab-btn').forEach(btn => { btn.addEventListener('click', () => { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active')); document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active'); }); }); // ==================== Search ==================== function setupSearch() { const searchInput = document.getElementById('searchItem'); const searchBtn = document.getElementById('searchBtn'); const clearBtn = document.getElementById('clearSearchBtn'); function filterShipments() { const query = searchInput.value.toLowerCase().trim(); const cards = document.querySelectorAll('.shipment-card'); cards.forEach(card => { const text = card.innerText.toLowerCase(); card.style.display = text.includes(query) ? '' : 'none'; }); } searchBtn.addEventListener('click', filterShipments); clearBtn.addEventListener('click', () => { searchInput.value = ''; filterShipments(); }); searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') filterShipments(); }); } // ==================== Stats ==================== function loadStats() { db.collection("shipments").where("destinationBranch", "==", BRANCH).onSnapshot((snap) => { let received = 0, pending = 0, totalGoods = 0; snap.forEach(doc => { const d = doc.data(); if (d.status === 'Delivered' || d.status === 'Partially Delivered') received++; if (d.status === 'Dispatched' || d.status === 'Partially Delivered') pending++; if (d.items) d.items.forEach(i => totalGoods += i.totalItemCost || 0); }); document.getElementById('receivedCount').innerText = received; document.getElementById('pendingCount').innerText = pending; document.getElementById('totalGoods').innerText = '₦' + totalGoods.toLocaleString(); }, (err) => console.error('Stats error:', err)); db.collection("returns").where("branch", "==", BRANCH).onSnapshot((snap) => { document.getElementById('returnedCount').innerText = snap.size; }, (err) => console.error('Returns stats error:', err)); db.collection("inventory").where("branch", "==", BRANCH).onSnapshot((snap) => { let val = 0; snap.forEach(doc => { const d = doc.data(); val += (d.stock || 0) * (d.unitPrice || 0); }); document.getElementById('stockValue').innerText = '₦' + val.toLocaleString(); }, (err) => console.error('Inventory stats error:', err)); } // ==================== Receive Shipments ==================== async function loadShipments() { try { const snap = await db.collection("shipments") .where("destinationBranch", "==", BRANCH) .where("status", "in", ["Dispatched", "Partially Delivered"]) .get(); const container = document.getElementById("shipmentsList"); if (snap.empty) { container.innerHTML = "<div class='card'>✅ No pending shipments</div>"; return; } let docs = []; snap.forEach(d => docs.push({ id: d.id, data: d.data() })); docs.sort((a, b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0)); let html = ""; for (const { id, data: ship } of docs) { const items = ship.items; const totalGoods = items.reduce((s, i) => s + (i.totalItemCost || 0), 0); html += `<div class="shipment-card" id="ship-${id}"> <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName} | Expected: ${ship.expectedDate||'N/A'}</h3> <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div> <div class="quality-check"> <label>Quality Check:</label> <select id="quality_${id}"> <option value="Pass">Pass</option> <option value="Fail">Fail</option> <option value="Partial">Partial</option> </select> <button class="btn-sm btn-danger" onclick="rejectShipment('${id}')" style="width:auto; background:#e74c3c; padding:6px 16px; border-radius:40px; border:none; color:white; cursor:pointer;">❌ Reject</button> </div>`; for (let idx = 0; idx < items.length; idx++) { const it = items[idx]; const pending = it.orderedQty - (it.receivedQty + it.damageQty); html += `<div class="item-row"> <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit)<br> Ordered: ${it.orderedQty} | OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending} <div class="input-group"> <input type="number" id="recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}"> <input type="number" id="dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}"> <select id="location_${id}_${idx}"> <option value="Shelf A">Shelf A</option> <option value="Shelf B">Shelf B</option> <option value="Cold Room">Cold Room</option> <option value="Warehouse">Warehouse</option> </select> </div> </div>`; } html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div> <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div> <div style="display:flex; gap:8px; flex-wrap:wrap;"> <button onclick="receiveShipment('${id}')" style="flex:1;">✅ Confirm Receipt</button> <button onclick="receiveAll('${id}')" style="flex:1; background:#27ae60;">✅ Receive All</button> </div> <button onclick="saveReceiveDraft('${id}')" style="background:#f39c12;">💾 Save Draft</button> <button onclick="viewInvoice('${id}')" style="background:#3498db;">🧾 Preview Invoice</button> </div>`; } container.innerHTML = html; } catch (error) { console.error('Load shipments error:', error); document.getElementById('shipmentsList').innerHTML = `<div class='card'>⚠️ Error loading shipments: ${error.message}</div>`; } } // ==================== Receive All (New) ==================== window.receiveAll = async function(shipId) { // Auto-fill all pending quantities and submit receipt try { const doc = await db.collection('shipments').doc(shipId).get(); if (!doc.exists) return; const data = doc.data(); const items = data.items || []; let hasPending = false; for (let i = 0; i < items.length; i++) { const it = items[i]; const pending = it.orderedQty - (it.receivedQty + it.damageQty); if (pending > 0) { hasPending = true; const recvInput = document.getElementById(`recv_${shipId}_${i}`); const damInput = document.getElementById(`dam_${shipId}_${i}`); if (recvInput) recvInput.value = pending; if (damInput) damInput.value = 0; } } if (!hasPending) { alert('No pending items to receive. This shipment is already fully received.'); return; } // Now submit the receipt receiveShipment(shipId); } catch (error) { alert('Error receiving all: ' + error.message); } }; // ==================== Receive Shipment (Submit) ==================== window.receiveShipment = async (shipId) => { try { const docRef = db.collection("shipments").doc(shipId); const doc = await docRef.get(); if (!doc.exists) return; const data = doc.data(); let items = [...data.items]; let updated = false; const quality = document.getElementById(`quality_${shipId}`).value; for (let i = 0; i < items.length; i++) { const addRecv = parseInt(document.getElementById(`recv_${shipId}_${i}`)?.value || 0); const addDam = parseInt(document.getElementById(`dam_${shipId}_${i}`)?.value || 0); const location = document.getElementById(`location_${shipId}_${i}`)?.value || 'Shelf A'; if (addRecv > 0 || addDam > 0) { updated = true; items[i].receivedQty = (items[i].receivedQty || 0) + addRecv; items[i].damageQty = (items[i].damageQty || 0) + addDam; items[i].location = location; if (items[i].receivedQty + items[i].damageQty > items[i].orderedQty) { alert(`Over-receipt on ${items[i].itemName}`); items[i].damageQty = items[i].orderedQty - items[i].receivedQty; } } } if (!updated) return alert("Enter quantities"); const rep = document.getElementById(`repName_${shipId}`).value.trim(); const grn = document.getElementById(`grn_${shipId}`).value.trim(); if (!rep) return alert("Enter rep name"); const allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty); const newStatus = allCompleted ? "Delivered" : "Partially Delivered"; await docRef.update({ items, status: newStatus, receivedDate: firebase.firestore.FieldValue.serverTimestamp(), receivingRep: rep, grnNumber: grn || `GRN-${Date.now()}`, qualityCheck: quality, receivedBy: rep }); // Update inventory for (const item of items) { if (item.receivedQty > 0) { const invRef = db.collection('inventory') .where('itemName', '==', item.itemName) .where('branch', '==', BRANCH); const snap = await invRef.get(); if (snap.empty) { await db.collection('inventory').add({ itemName: item.itemName, branch: BRANCH, stock: item.receivedQty, unitPrice: item.unitPrice, location: item.location || 'Shelf A', lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }); } else { snap.forEach(d => { d.ref.update({ stock: firebase.firestore.FieldValue.increment(item.receivedQty), lastUpdated: firebase.firestore.FieldValue.serverTimestamp() }); }); } } } // Log activity try { await db.collection('activityLog').add({ actionType: 'receive', shipmentId: shipId, branch: BRANCH, details: `Received by ${rep}, GRN: ${grn}, Quality: ${quality}`, timestamp: firebase.firestore.FieldValue.serverTimestamp(), user: rep }); } catch (logError) { console.warn('Activity log failed:', logError); } // Notification try { await db.collection('notifications').add({ userId: 'admin', message: `Shipment ${shipId.slice(0,6)} received at ${BRANCH} by ${rep}`, read: false, timestamp: firebase.firestore.FieldValue.serverTimestamp() }); } catch (notifError) { console.warn('Notification failed:', notifError); } alert(`${newStatus} - GRN: ${grn}`); loadShipments(); loadActivityHistory(); loadStats(); loadInventory(); loadDrafts(); } catch (error) { console.error('Receive error:', error); alert('Error receiving shipment: ' + error.message); } }; // ==================== Save Receive Draft ==================== window.saveReceiveDraft = async (shipId) => { try { const docRef = db.collection("shipments").doc(shipId); const doc = await docRef.get(); if (!doc.exists) return; const data = doc.data(); const items = data.items.map((it, idx) => ({ itemName: it.itemName, orderedQty: it.orderedQty, unitPrice: it.unitPrice, totalItemCost: it.totalItemCost, receivedQty: parseInt(document.getElementById(`recv_${shipId}_${idx}`)?.value || 0), damageQty: parseInt(document.getElementById(`dam_${shipId}_${idx}`)?.value || 0), location: document.getElementById(`location_${shipId}_${idx}`)?.value || 'Shelf A' })); const rep = document.getElementById(`repName_${shipId}`).value.trim() || 'Draft'; const quality = document.getElementById(`quality_${shipId}`).value || 'Pass'; await db.collection('receiveDrafts').add({ shipmentId: shipId, branch: BRANCH, items: items, receivingRep: rep, qualityCheck: quality, userId: currentUserId, userEmail: currentUserEmail, createdAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); alert('✅ Draft saved! You can continue later from the Drafts tab.'); loadDrafts(); } catch (err) { alert('Error saving draft: ' + err.message); } }; // ==================== Load Drafts ==================== async function loadDrafts() { try { const snap = await db.collection('receiveDrafts') .where('userId', '==', currentUserId) .where('branch', '==', BRANCH) .orderBy('createdAt', 'desc') .get(); const container = document.getElementById('draftsList'); if (snap.empty) { container.innerHTML = '<p class="empty">No drafts saved.</p>'; return; } let html = '<table><tr><th>Shipment</th><th>Items</th><th>Rep</th><th>Date</th><th>Action</th></tr>'; snap.forEach(doc => { const d = doc.data(); const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0}/${i.damageQty||0})`).join(", ").substring(0,40) : '-'; const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ''; html += `<tr> <td>${d.shipmentId.slice(0,8)}</td> <td>${itemsShort}</td> <td>${d.receivingRep || '-'}</td> <td>${date}</td> <td> <button class="btn-sm btn-primary" onclick="loadDraft('${doc.id}')">📂 Load</button> <button class="btn-sm btn-danger" onclick="deleteDraft('${doc.id}')">🗑️</button> </td> </tr>`; }); html += '</table>'; container.innerHTML = html; } catch (error) { console.error('Load drafts error:', error); let errorMsg = error.message; let helpHtml = `<div class="permission-error"> <p><strong>⚠️ Permission Error:</strong> ${errorMsg}</p> <p>To fix this, add the following rule to your Firestore database:</p> <pre style="background:#f0f0f0; padding:8px; border-radius:8px; font-size:0.8rem;"> match /receiveDrafts/{document} { allow read, write: if request.auth != null; }</pre> <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">🔗 Click here to open Firestore Rules</a></p> <p style="margin-top:8px;">After adding the rule, click <strong>Publish</strong> and refresh this page.</p> </div>`; document.getElementById('draftsList').innerHTML = helpHtml; } };
+// ==================== Load Draft ====================
+window.loadDraft = async (draftId) => {
+try {
+const doc = await db.collection('receiveDrafts').doc(draftId).get();
+if (!doc.exists) return alert('Draft not found.');
+const draft = doc.data();
+document.querySelector('.tab-btn[data-tab="receive"]').click();
+const shipmentCard = document.getElementById(ship-${draft.shipmentId});
+if (!shipmentCard) {
+alert('The original shipment may have been deleted. Please refresh.');
+return;
+}
+draft.items.forEach((item, idx) => {
+const recvInput = document.getElementById(recv_${draft.shipmentId}_${idx});
+const damInput = document.getElementById(dam_${draft.shipmentId}_${idx});
+const locSelect = document.getElementById(location_${draft.shipmentId}_${idx});
+if (recvInput) recvInput.value = item.receivedQty || 0;
+if (damInput) damInput.value = item.damageQty || 0;
+if (locSelect && item.location) locSelect.value = item.location;
+});
+const repInput = document.getElementById(repName_${draft.shipmentId});
+if (repInput) repInput.value = draft.receivingRep || '';
+const qualitySelect = document.getElementById(quality_${draft.shipmentId});
+if (qualitySelect && draft.qualityCheck) qualitySelect.value = draft.qualityCheck;
 
-<!-- Stats -->
-<div class="stats-grid" id="statsGrid">
-    <div class="stat-card"><h4>Received</h4><div class="num" id="receivedCount">-</div></div>
-    <div class="stat-card"><h4>Pending</h4><div class="num" id="pendingCount">-</div></div>
-    <div class="stat-card"><h4>Returned</h4><div class="num" id="returnedCount">-</div></div>
-    <div class="stat-card"><h4>Total Goods (₦)</h4><div class="num" id="totalGoods">-</div></div>
-    <div class="stat-card"><h4>Stock Value</h4><div class="num" id="stockValue">-</div></div>
-</div>
+shipmentCard.style.border = '3px solid #f39c12';
+setTimeout(() => { shipmentCard.style.border = ''; }, 3000);
+alert('✅ Draft loaded. Review and submit when ready.');
+} catch (err) {
+alert('Error loading draft: ' + err.message);
+}
+};
 
-<!-- Tabs -->
-<div class="tabs">
-    <button class="tab-btn active" data-tab="receive">📦 Receive Goods</button>
-    <button class="tab-btn" data-tab="drafts">📝 Drafts</button>
-    <button class="tab-btn" data-tab="returns">🔄 Returns</button>
-    <button class="tab-btn" data-tab="inventory">📊 Inventory</button>
-    <button class="tab-btn" data-tab="history">📜 Activity</button>
-</div>
+// ==================== Delete Draft ====================
+window.deleteDraft = async (draftId) => {
+if (!confirm('Delete this draft?')) return;
+try {
+await db.collection('receiveDrafts').doc(draftId).delete();
+alert('Draft deleted.');
+loadDrafts();
+} catch (err) {
+alert('Error: ' + err.message);
+}
+};
 
-<!-- Tab: Receive Goods -->
-<div id="tab-receive" class="tab-content active">
-    <div class="search-box">
-        <input type="text" id="searchItem" placeholder="🔍 Search by item description...">
-        <button id="searchBtn" class="btn-primary">Search</button>
-        <button id="clearSearchBtn" class="btn-secondary">Clear</button>
-    </div>
-    <div id="shipmentsList" class="card">Loading...</div>
-</div>
+// ==================== Reject Shipment ====================
+window.rejectShipment = async (shipId) => {
+if (!confirm('Reject this entire shipment?')) return;
+const reason = prompt('Reason for rejection:');
+if (reason === null) return;
+try {
+await db.collection("shipments").doc(shipId).update({
+status: 'Rejected',
+rejectionReason: reason,
+lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+});
+try {
+await db.collection('activityLog').add({
+actionType: 'reject',
+shipmentId: shipId,
+branch: BRANCH,
+details: Rejected: ${reason},
+timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+user: currentUserEmail
+});
+} catch (logError) { console.warn('Reject log failed:', logError); }
+alert('Shipment rejected');
+loadShipments();
+loadActivityHistory();
+loadStats();
+} catch (error) {
+alert('Error rejecting shipment: ' + error.message);
+}
+};
 
-<!-- Tab: Drafts -->
-<div id="tab-drafts" class="tab-content">
-    <div id="draftsList" class="card">Loading drafts...</div>
-</div>
+// ==================== View Invoice ====================
+window.viewInvoice = async (shipId) => {
+try {
+const doc = await db.collection("shipments").doc(shipId).get();
+if (!doc.exists) return;
+const data = doc.data();
+const items = data.items || [];
+let itemsHtml = '';
+items.forEach(it => {
+itemsHtml += <tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>;
+});
+const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
+const html = `
 
-<!-- Tab: Returns -->
-<div id="tab-returns" class="tab-content">
-    <div class="card">
-        <h3>Record Return</h3>
-        <select id="returnShipmentSelect"><option value="">-- Select Shipment --</option></select>
-        <select id="returnItemSelect"><option value="">-- Select Item --</option></select>
-        <input type="number" id="returnQty" placeholder="Quantity to return">
-        <textarea id="returnReason" placeholder="Reason"></textarea>
-        <button id="recordReturnBtn">📤 Record Return</button>
-        <div id="returnMessage"></div>
-    </div>
-    <div class="card">
-        <h3>Past Returns</h3>
-        <div id="pastReturnsList">Loading...</div>
-    </div>
-</div>
+<h2>NEVAMAK Enterprises</h2> <h3>Goods Received Note (GRN)</h3> <p><strong>GRN:</strong> ${data.grnNumber || 'N/A'}</p> <p><strong>Date:</strong> ${data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleString() : 'N/A'}</p> <p><strong>Supplier:</strong> ${data.senderName}</p> <p><strong>Branch:</strong> ${BRANCH}</p> <p><strong>Vehicle:</strong> ${data.vehicleNo || 'N/A'}</p> <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;"> <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr> ${itemsHtml} <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr> <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(data.transportCost||0).toLocaleString()}</strong></td></tr> </table> <p><em>Received by: ${data.receivingRep}</em></p> `; document.getElementById('invoiceContent').innerHTML = html; document.getElementById('invoiceModal').style.display = 'flex'; } catch (error) { alert('Error loading invoice: ' + error.message); } };
+function closeModal(id) {
+document.getElementById(id).style.display = 'none';
+}
+window.onclick = function(event) {
+if (event.target.classList.contains('modal')) {
+event.target.style.display = 'none';
+}
+};
 
-<!-- Tab: Inventory -->
-<div id="tab-inventory" class="tab-content">
-    <div class="card">
-        <h3>Current Stock</h3>
-        <input type="text" id="invSearch" placeholder="🔍 Search by item...">
-        <div id="inventoryList">Loading...</div>
-    </div>
-</div>
-
-<!-- Tab: Activity -->
-<div id="tab-history" class="tab-content">
-    <div class="card">
-        <h3>Activity Log</h3>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <input type="date" id="historyStart">
-            <input type="date" id="historyEnd">
-            <button id="filterHistoryBtn" style="width:auto; padding:10px 20px;">Filter</button>
-        </div>
-        <div id="activityList">Loading...</div>
-    </div>
-</div>
-
-<!-- Modal: Invoice/GRN Preview -->
-<div id="invoiceModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal('invoiceModal')">&times;</span>
-        <div id="invoiceContent"></div>
-        <button id="printInvoiceBtn" onclick="window.print()">🖨️ Print</button>
-    </div>
-</div>
-
-<script>
-    const firebaseConfig = {
-        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
-        authDomain: "nevamak-enterprises.firebaseapp.com",
-        projectId: "nevamak-enterprises",
-        storageBucket: "nevamak-enterprises.firebasestorage.app",
-        messagingSenderId: "144324172534",
-        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-        measurementId: "G-MZ8NT6KK8N"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-
-    let currentUserEmail = "";
-    const BRANCH = "Portharcourt";
-    let currentUserId = "";
-
-    auth.onAuthStateChanged(async (user) => {
-        if (!user) { window.location.href = 'login.html'; return; }
-        currentUserId = user.uid;
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        const role = userDoc.data()?.role || '';
-        if (!['admin', 'lagos_sender', 'ph_rep'].includes(role)) {
-            window.location.href = 'index.html';
-            return;
-        }
-        currentUserEmail = user.email;
-        loadShipments();
-        loadReturnShipmentsDropdown();
-        loadPastReturns();
-        loadActivityHistory();
-        loadInventory();
-        loadStats();
-        loadDrafts();
-        setupSearch();
-    });
-
-    document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
-
-    // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-        });
-    });
-
-    function setupSearch() {
-        const searchInput = document.getElementById('searchItem');
-        const searchBtn = document.getElementById('searchBtn');
-        const clearBtn = document.getElementById('clearSearchBtn');
-        function filterShipments() {
-            const query = searchInput.value.toLowerCase().trim();
-            const cards = document.querySelectorAll('.shipment-card');
-            cards.forEach(card => {
-                const text = card.innerText.toLowerCase();
-                card.style.display = text.includes(query) ? '' : 'none';
-            });
-        }
-        searchBtn.addEventListener('click', filterShipments);
-        clearBtn.addEventListener('click', () => {
-            searchInput.value = '';
-            filterShipments();
-        });
-        searchInput.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') filterShipments();
-        });
-    }
-
-    function loadStats() {
-        db.collection("shipments").where("destinationBranch", "==", BRANCH).onSnapshot((snap) => {
-            let received = 0, pending = 0, totalGoods = 0;
-            snap.forEach(doc => {
-                const d = doc.data();
-                if (d.status === 'Delivered' || d.status === 'Partially Delivered') received++;
-                if (d.status === 'Dispatched' || d.status === 'Partially Delivered') pending++;
-                if (d.items) d.items.forEach(i => totalGoods += i.totalItemCost || 0);
-            });
-            document.getElementById('receivedCount').innerText = received;
-            document.getElementById('pendingCount').innerText = pending;
-            document.getElementById('totalGoods').innerText = '₦' + totalGoods.toLocaleString();
-        }, (err) => console.error('Stats error:', err));
-        db.collection("returns").where("branch", "==", BRANCH).onSnapshot((snap) => {
-            document.getElementById('returnedCount').innerText = snap.size;
-        }, (err) => console.error('Returns stats error:', err));
-        db.collection("inventory").where("branch", "==", BRANCH).onSnapshot((snap) => {
-            let val = 0;
-            snap.forEach(doc => {
-                const d = doc.data();
-                val += (d.stock || 0) * (d.unitPrice || 0);
-            });
-            document.getElementById('stockValue').innerText = '₦' + val.toLocaleString();
-        }, (err) => console.error('Inventory stats error:', err));
-    }
-
-    async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
+// ==================== Returns ====================
+async function loadReturnShipmentsDropdown() {
+try {
+const snap = await db.collection("shipments")
+.where("destinationBranch", "==", BRANCH)
+.where("status", "in", ["Delivered", "Partially Delivered"])
+.get();
+const sel = document.getElementById("returnShipmentSelect");
+sel.innerHTML = '<option value="">-- Select Shipment --</option>';
+snap.forEach(doc => {
+const opt = document.createElement("option");
+opt.value = doc.id;
+opt.textContent = ${doc.id.slice(0,8)} - ${doc.data().senderName};
+sel.appendChild(opt);
+});
+sel.onchange = () => loadReturnItems(sel.value);
+} catch (error) { console.error('Load return dropdown error:', error); }
 }
 
-    async function loadShipments() {
-        try {
-            const snap = await db.collection("shipments")
-                .where("destinationBranch", "==", BRANCH)
-                .where("status", "in", ["Dispatched", "Partially Delivered"])
-                .get();
-            const container = document.getElementById("shipmentsList");
-            if (snap.empty) {
-                container.innerHTML = "<div class='card'>✅ No pending shipments</div>";
-                return;
-            }
-            let docs = [];
-            snap.forEach(d => docs.push({ id: d.id, data: d.data() }));
-            docs.sort((a, b) => (b.data.createdAt?.toDate() || 0) - (a.data.createdAt?.toDate() || 0));
+async function loadReturnItems(shipmentId) {
+try {
+const itemSelect = document.getElementById("returnItemSelect");
+if (!shipmentId) { itemSelect.innerHTML = '<option value="">-- Select Item --</option>'; return; }
+const doc = await db.collection("shipments").doc(shipmentId).get();
+const items = doc.data().items;
+itemSelect.innerHTML = '<option value="">-- Select Item --</option>';
+items.forEach((it, idx) => {
+const opt = document.createElement("option");
+opt.value = idx;
+opt.textContent = ${it.itemName} (OK: ${it.receivedQty}, Damaged: ${it.damageQty});
+itemSelect.appendChild(opt);
+});
+} catch (error) { console.error('Load return items error:', error); }
+}
 
-            let html = "";
-            for (const { id, data: ship } of docs) {
-                const items = ship.items;
-                const totalGoods = items.reduce((s, i) => s + (i.totalItemCost || 0), 0);
-                html += `<div class="shipment-card" id="ship-${id}">
-                            <h3>#${id.slice(0,8)} | ${ship.vehicleNo||"N/A"}<br>Sender: ${ship.senderName} | Expected: ${ship.expectedDate||'N/A'}</h3>
-                            <div class="cost-info">🚛 Transport: ₦${(ship.transportCost||0).toLocaleString()} | Goods: ₦${totalGoods.toLocaleString()}</div>
-                            <div class="quality-check">
-                                <label>Quality Check:</label>
-                                <select id="quality_${id}">
-                                    <option value="Pass">Pass</option>
-                                    <option value="Fail">Fail</option>
-                                    <option value="Partial">Partial</option>
-                                </select>
-                                <button class="btn-sm btn-danger" onclick="rejectShipment('${id}')" style="width:auto; background:#e74c3c; padding:6px 16px; border-radius:40px; border:none; color:white; cursor:pointer;">❌ Reject</button>
-                            </div>`;
-                for (let idx = 0; idx < items.length; idx++) {
-                    const it = items[idx];
-                    const pending = it.orderedQty - (it.receivedQty + it.damageQty);
-                    html += `<div class="item-row">
-                                <strong>${it.itemName}</strong> (₦${it.unitPrice?.toLocaleString()}/unit)<br>
-                                Ordered: ${it.orderedQty} | OK: ${it.receivedQty} | Damaged: ${it.damageQty} | Pending: ${pending}
-                                <div class="input-group">
-                                    <input type="number" id="recv_${id}_${idx}" placeholder="+ Received" value="0" min="0" max="${pending}">
-                                    <input type="number" id="dam_${id}_${idx}" placeholder="+ Damaged" value="0" min="0" max="${pending}">
-                                    <select id="location_${id}_${idx}">
-                                        <option value="Shelf A">Shelf A</option>
-                                        <option value="Shelf B">Shelf B</option>
-                                        <option value="Cold Room">Cold Room</option>
-                                        <option value="Warehouse">Warehouse</option>
-                                    </select>
-                                </div>
-                              </div>`;
-                }
-                html += `<div><input type="text" id="repName_${id}" placeholder="Receiving Rep Name"></div>
-                         <div><input type="text" id="grn_${id}" placeholder="GRN Number"></div>
-                         <button onclick="receiveShipment('${id}')">✅ Confirm Receipt</button>
-                         <button onclick="saveReceiveDraft('${id}')" style="background:#f39c12;">💾 Save Draft</button>
-                         <button onclick="viewInvoice('${id}')" style="background:#3498db;">🧾 Preview Invoice</button>
-                         </div>`;
-            }
-            container.innerHTML = html;
-        } catch (error) {
-            console.error('Load shipments error:', error);
-            document.getElementById('shipmentsList').innerHTML = `<div class='card'>⚠️ Error loading shipments: ${error.message}</div>`;
-        }
-    }
+document.getElementById("recordReturnBtn").addEventListener("click", async () => {
+try {
+const shipmentId = document.getElementById("returnShipmentSelect").value;
+const itemIdx = document.getElementById("returnItemSelect").value;
+const qty = parseInt(document.getElementById("returnQty").value);
+const reason = document.getElementById("returnReason").value.trim();
+if (!shipmentId || itemIdx === "" || !qty || qty <= 0) return alert("Select shipment, item, and valid quantity");
 
-    window.receiveShipment = async (shipId) => {
-        try {
-            const docRef = db.collection("shipments").doc(shipId);
-            const doc = await docRef.get();
-            if (!doc.exists) return;
-            const data = doc.data();
-            let items = [...data.items];
-            let updated = false;
-            const quality = document.getElementById(`quality_${shipId}`).value;
+const shipmentDoc = await db.collection("shipments").doc(shipmentId).get();
+const items = shipmentDoc.data().items;
+const item = items[parseInt(itemIdx)];
+if (qty > (item.receivedQty - item.damageQty)) return alert("Cannot return more than received good units");
 
-            for (let i = 0; i < items.length; i++) {
-                const addRecv = parseInt(document.getElementById(`recv_${shipId}_${i}`)?.value || 0);
-                const addDam = parseInt(document.getElementById(`dam_${shipId}_${i}`)?.value || 0);
-                const location = document.getElementById(`location_${shipId}_${i}`)?.value || 'Shelf A';
-                if (addRecv > 0 || addDam > 0) {
-                    updated = true;
-                    items[i].receivedQty = (items[i].receivedQty || 0) + addRecv;
-                    items[i].damageQty = (items[i].damageQty || 0) + addDam;
-                    items[i].location = location;
-                    if (items[i].receivedQty + items[i].damageQty > items[i].orderedQty) {
-                        alert(`Over-receipt on ${items[i].itemName}`);
-                        items[i].damageQty = items[i].orderedQty - items[i].receivedQty;
-                    }
-                }
-            }
-            if (!updated) return alert("Enter quantities");
-            const rep = document.getElementById(`repName_${shipId}`).value.trim();
-            const grn = document.getElementById(`grn_${shipId}`).value.trim();
-            if (!rep) return alert("Enter rep name");
+items[parseInt(itemIdx)].receivedQty -= qty;
+await db.collection("shipments").doc(shipmentId).update({ items });
 
-            const allCompleted = items.every(it => (it.receivedQty + it.damageQty) >= it.orderedQty);
-            const newStatus = allCompleted ? "Delivered" : "Partially Delivered";
+await db.collection("returns").add({
+shipmentId,
+branch: BRANCH,
+itemName: item.itemName,
+returnedQty: qty,
+reason,
+date: firebase.firestore.FieldValue.serverTimestamp(),
+createdBy: currentUserEmail,
+status: 'pending'
+});
 
-            await docRef.update({
-                items,
-                status: newStatus,
-                receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
-                receivingRep: rep,
-                grnNumber: grn || `GRN-${Date.now()}`,
-                qualityCheck: quality,
-                receivedBy: rep
-            });
+const invRef = db.collection('inventory')
+.where('itemName', '==', item.itemName)
+.where('branch', '==', BRANCH);
+const snap = await invRef.get();
+if (!snap.empty) {
+snap.forEach(d => {
+d.ref.update({
+stock: firebase.firestore.FieldValue.increment(-qty)
+});
+});
+}
 
-            for (const item of items) {
-                if (item.receivedQty > 0) {
-                    const invRef = db.collection('inventory')
-                        .where('itemName', '==', item.itemName)
-                        .where('branch', '==', BRANCH);
-                    const snap = await invRef.get();
-                    if (snap.empty) {
-                        await db.collection('inventory').add({
-                            itemName: item.itemName,
-                            branch: BRANCH,
-                            stock: item.receivedQty,
-                            unitPrice: item.unitPrice,
-                            location: item.location || 'Shelf A',
-                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    } else {
-                        snap.forEach(d => {
-                            d.ref.update({
-                                stock: firebase.firestore.FieldValue.increment(item.receivedQty),
-                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                            });
-                        });
-                    }
-                }
-            }
+try {
+await db.collection('activityLog').add({
+actionType: "return",
+shipmentId,
+branch: BRANCH,
+details: Returned ${qty} x ${item.itemName}. Reason: ${reason},
+timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+user: currentUserEmail
+});
+} catch (logError) { console.warn('Return log failed:', logError); }
 
-            try {
-                await db.collection('activityLog').add({
-                    actionType: 'receive',
-                    shipmentId: shipId,
-                    branch: BRANCH,
-                    details: `Received by ${rep}, GRN: ${grn}, Quality: ${quality}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: rep
-                });
-            } catch (logError) { console.warn('Activity log failed:', logError); }
+alert("Return recorded");
+document.getElementById("returnQty").value = "";
+document.getElementById("returnReason").value = "";
+loadPastReturns();
+loadActivityHistory();
+loadReturnShipmentsDropdown();
+loadStats();
+loadInventory();
+} catch (error) {
+alert('Error recording return: ' + error.message);
+}
+});
 
-            try {
-                await db.collection('notifications').add({
-                    userId: 'admin',
-                    message: `Shipment ${shipId.slice(0,6)} received at ${BRANCH} by ${rep}`,
-                    read: false,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            } catch (notifError) { console.warn('Notification failed:', notifError); }
+async function loadPastReturns() {
+try {
+const snap = await db.collection("returns").where("branch", "==", BRANCH).orderBy("date", "desc").get();
+let html = "<ul>";
+snap.forEach(doc => {
+const r = doc.data();
+html += <li>${new Date(r.date?.toDate()).toLocaleString()}: ${r.itemName} x${r.returnedQty} (${r.reason})</li>;
+});
+html += "</ul>";
+document.getElementById("pastReturnsList").innerHTML = html || "No returns";
+} catch (error) {
+console.error('Load past returns error:', error);
+document.getElementById("pastReturnsList").innerHTML = '<p>Error loading returns.</p>';
+}
+}
 
-            alert(`${newStatus} - GRN: ${grn}`);
-            loadShipments();
-            loadActivityHistory();
-            loadStats();
-            loadInventory();
-            loadDrafts();
-        } catch (error) {
-            console.error('Receive error:', error);
-            alert('Error receiving shipment: ' + error.message);
-        }
-    };
+// ==================== Inventory ====================
+async function loadInventory() {
+try {
+const snap = await db.collection("inventory").where("branch", "==", BRANCH).get();
+let html = '<table><tr><th>Item</th><th>Stock</th><th>Location</th><th>Unit Price</th></tr>';
+snap.forEach(doc => {
+const d = doc.data();
+html += <tr><td>${d.itemName}</td><td>${d.stock}</td><td>${d.location||'N/A'}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>;
+});
+html += '</table>';
+document.getElementById("inventoryList").innerHTML = html || 'No inventory';
+} catch (error) {
+console.error('Load inventory error:', error);
+document.getElementById("inventoryList").innerHTML = '<p>Error loading inventory.</p>';
+}
+}
 
-    window.saveReceiveDraft = async (shipId) => {
-        try {
-            const docRef = db.collection("shipments").doc(shipId);
-            const doc = await docRef.get();
-            if (!doc.exists) return;
-            const data = doc.data();
-            const items = data.items.map((it, idx) => ({
-                itemName: it.itemName,
-                orderedQty: it.orderedQty,
-                unitPrice: it.unitPrice,
-                totalItemCost: it.totalItemCost,
-                receivedQty: parseInt(document.getElementById(`recv_${shipId}_${idx}`)?.value || 0),
-                damageQty: parseInt(document.getElementById(`dam_${shipId}_${idx}`)?.value || 0),
-                location: document.getElementById(`location_${shipId}_${idx}`)?.value || 'Shelf A'
-            }));
-            const rep = document.getElementById(`repName_${shipId}`).value.trim() || 'Draft';
-            const quality = document.getElementById(`quality_${shipId}`).value || 'Pass';
+document.getElementById('invSearch').addEventListener('input', function() {
+const q = this.value.toLowerCase();
+const rows = document.querySelectorAll('#inventoryList table tr');
+rows.forEach((row, idx) => {
+if (idx === 0) return;
+const text = row.innerText.toLowerCase();
+row.style.display = text.includes(q) ? '' : 'none';
+});
+});
 
-            await db.collection('receiveDrafts').add({
-                shipmentId: shipId,
-                branch: BRANCH,
-                items: items,
-                receivingRep: rep,
-                qualityCheck: quality,
-                userId: currentUserId,
-                userEmail: currentUserEmail,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+// ==================== Activity History ====================
+async function loadActivityHistory(startDate, endDate) {
+try {
+let query = db.collection("activityLog").where("branch", "==", BRANCH).orderBy("timestamp", "desc").limit(100);
+if (startDate && endDate) {
+const start = new Date(startDate);
+const end = new Date(endDate);
+end.setHours(23,59,59);
+query = query.where("timestamp", ">=", start).where("timestamp", "<=", end);
+}
+const snap = await query.get();
+let html = '<table style="width:100%; border-collapse:collapse;"><tr><th>Time</th><th>Action</th><th>Details</th><th>User</th></tr>';
+snap.forEach(doc => {
+const a = doc.data();
+html += `<tr>
 
-            alert('✅ Draft saved! You can continue later from the Drafts tab.');
-            loadDrafts();
-        } catch (err) {
-            alert('Error saving draft: ' + err.message);
-        }
-    };
-
-    async function loadDrafts() {
-        try {
-            const snap = await db.collection('receiveDrafts')
-                .where('userId', '==', currentUserId)
-                .where('branch', '==', BRANCH)
-                .orderBy('createdAt', 'desc')
-                .get();
-            const container = document.getElementById('draftsList');
-            if (snap.empty) {
-                container.innerHTML = '<p class="empty">No drafts saved.</p>';
-                return;
-            }
-            let html = '<table><tr><th>Shipment</th><th>Items</th><th>Rep</th><th>Date</th><th>Action</th></tr>';
-            snap.forEach(doc => {
-                const d = doc.data();
-                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0}/${i.damageQty||0})`).join(", ").substring(0,40) : '-';
-                const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
-                html += `<tr>
-                    <td>${d.shipmentId.slice(0,8)}</td>
-                    <td>${itemsShort}</td>
-                    <td>${d.receivingRep || '-'}</td>
-                    <td>${date}</td>
-                    <td>
-                        <button class="btn-sm btn-primary" onclick="loadDraft('${doc.id}')">📂 Load</button>
-                        <button class="btn-sm btn-danger" onclick="deleteDraft('${doc.id}')">🗑️</button>
-                    </td>
-                </tr>`;
-            });
-            html += '</table>';
-            container.innerHTML = html;
-        } catch (error) {
-            console.error('Load drafts error:', error);
-            let helpHtml = `<div class="permission-error">
-                <p><strong>⚠️ Permission Error:</strong> ${error.message}</p>
-                <p>To fix this, add the following rule to your Firestore database:</p>
-                <pre style="background:#f0f0f0; padding:8px; border-radius:8px; font-size:0.8rem;">
-match /receiveDrafts/{document} {
-  allow read, write: if request.auth != null;
-}</pre>
-                <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">🔗 Click here to open Firestore Rules</a></p>
-                <p style="margin-top:8px;">After adding the rule, click <strong>Publish</strong> and refresh this page.</p>
-            </div>`;
-            document.getElementById('draftsList').innerHTML = helpHtml;
-        }
-    }
-
-    window.loadDraft = async (draftId) => {
-        try {
-            const doc = await db.collection('receiveDrafts').doc(draftId).get();
-            if (!doc.exists) return alert('Draft not found.');
-            const draft = doc.data();
-            document.querySelector('.tab-btn[data-tab="receive"]').click();
-            const shipmentCard = document.getElementById(`ship-${draft.shipmentId}`);
-            if (!shipmentCard) {
-                alert('The original shipment may have been deleted. Please refresh.');
-                return;
-            }
-            draft.items.forEach((item, idx) => {
-                const recvInput = document.getElementById(`recv_${draft.shipmentId}_${idx}`);
-                const damInput = document.getElementById(`dam_${draft.shipmentId}_${idx}`);
-                const locSelect = document.getElementById(`location_${draft.shipmentId}_${idx}`);
-                if (recvInput) recvInput.value = item.receivedQty || 0;
-                if (damInput) damInput.value = item.damageQty || 0;
-                if (locSelect && item.location) locSelect.value = item.location;
-            });
-            const repInput = document.getElementById(`repName_${draft.shipmentId}`);
-            if (repInput) repInput.value = draft.receivingRep || '';
-            const qualitySelect = document.getElementById(`quality_${draft.shipmentId}`);
-            if (qualitySelect && draft.qualityCheck) qualitySelect.value = draft.qualityCheck;
-
-            shipmentCard.style.border = '3px solid #f39c12';
-            setTimeout(() => { shipmentCard.style.border = ''; }, 3000);
-            alert('✅ Draft loaded. Review and submit when ready.');
-        } catch (err) {
-            alert('Error loading draft: ' + err.message);
-        }
-    };
-
-    window.deleteDraft = async (draftId) => {
-        if (!confirm('Delete this draft?')) return;
-        try {
-            await db.collection('receiveDrafts').doc(draftId).delete();
-            alert('Draft deleted.');
-            loadDrafts();
-        } catch (err) {
-            alert('Error: ' + err.message);
-        }
-    };
-
-    window.rejectShipment = async (shipId) => {
-        if (!confirm('Reject this entire shipment?')) return;
-        const reason = prompt('Reason for rejection:');
-        if (reason === null) return;
-        try {
-            await db.collection("shipments").doc(shipId).update({
-                status: 'Rejected',
-                rejectionReason: reason,
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            try {
-                await db.collection('activityLog').add({
-                    actionType: 'reject',
-                    shipmentId: shipId,
-                    branch: BRANCH,
-                    details: `Rejected: ${reason}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentUserEmail
-                });
-            } catch (logError) { console.warn('Reject log failed:', logError); }
-            alert('Shipment rejected');
-            loadShipments();
-            loadActivityHistory();
-            loadStats();
-        } catch (error) {
-            alert('Error rejecting shipment: ' + error.message);
-        }
-    };
-
-    window.viewInvoice = async (shipId) => {
-        try {
-            const doc = await db.collection("shipments").doc(shipId).get();
-            if (!doc.exists) return;
-            const data = doc.data();
-            const items = data.items || [];
-            let itemsHtml = '';
-            items.forEach(it => {
-                itemsHtml += `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${it.unitPrice?.toLocaleString()}</td><td>₦${(it.totalItemCost||0).toLocaleString()}</td></tr>`;
-            });
-            const totalGoods = items.reduce((s,i) => s + (i.totalItemCost||0), 0);
-            const html = `
-                <h2>NEVAMAK Enterprises</h2>
-                <h3>Goods Received Note (GRN)</h3>
-                <p><strong>GRN:</strong> ${data.grnNumber || 'N/A'}</p>
-                <p><strong>Date:</strong> ${data.receivedDate ? new Date(data.receivedDate.toDate()).toLocaleString() : 'N/A'}</p>
-                <p><strong>Supplier:</strong> ${data.senderName}</p>
-                <p><strong>Branch:</strong> ${BRANCH}</p>
-                <p><strong>Vehicle:</strong> ${data.vehicleNo || 'N/A'}</p>
-                <table border="1" cellpadding="5" style="width:100%; border-collapse:collapse;">
-                    <tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
-                    ${itemsHtml}
-                    <tr><td colspan="3"><strong>Total Goods</strong></td><td><strong>₦${totalGoods.toLocaleString()}</strong></td></tr>
-                    <tr><td colspan="3"><strong>Transport</strong></td><td><strong>₦${(data.transportCost||0).toLocaleString()}</strong></td></tr>
-                </table>
-                <p><em>Received by: ${data.receivingRep}</em></p>
-            `;
-            document.getElementById('invoiceContent').innerHTML = html;
-            document.getElementById('invoiceModal').style.display = 'flex';
-        } catch (error) {
-            alert('Error loading invoice: ' + error.message);
-        }
-    };
-
-    function closeModal(id) {
-        document.getElementById(id).style.display = 'none';
-    }
-    window.onclick = function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-        }
-    };
-
-    // Returns, Inventory, Activity (same as Abuja but with BRANCH)
-    async function loadReturnShipmentsDropdown() {
-        try {
-            const snap = await db.collection("shipments")
-                .where("destinationBranch", "==", BRANCH)
-                .where("status", "in", ["Delivered", "Partially Delivered"])
-                .get();
-            const sel = document.getElementById("returnShipmentSelect");
-            sel.innerHTML = '<option value="">-- Select Shipment --</option>';
-            snap.forEach(doc => {
-                const opt = document.createElement("option");
-                opt.value = doc.id;
-                opt.textContent = `${doc.id.slice(0,8)} - ${doc.data().senderName}`;
-                sel.appendChild(opt);
-            });
-            sel.onchange = () => loadReturnItems(sel.value);
-        } catch (error) { console.error('Load return dropdown error:', error); }
-    }
-
-    async function loadReturnItems(shipmentId) {
-        try {
-            const itemSelect = document.getElementById("returnItemSelect");
-            if (!shipmentId) { itemSelect.innerHTML = '<option value="">-- Select Item --</option>'; return; }
-            const doc = await db.collection("shipments").doc(shipmentId).get();
-            const items = doc.data().items;
-            itemSelect.innerHTML = '<option value="">-- Select Item --</option>';
-            items.forEach((it, idx) => {
-                const opt = document.createElement("option");
-                opt.value = idx;
-                opt.textContent = `${it.itemName} (OK: ${it.receivedQty}, Damaged: ${it.damageQty})`;
-                itemSelect.appendChild(opt);
-            });
-        } catch (error) { console.error('Load return items error:', error); }
-    }
-
-    document.getElementById("recordReturnBtn").addEventListener("click", async () => {
-        try {
-            const shipmentId = document.getElementById("returnShipmentSelect").value;
-            const itemIdx = document.getElementById("returnItemSelect").value;
-            const qty = parseInt(document.getElementById("returnQty").value);
-            const reason = document.getElementById("returnReason").value.trim();
-            if (!shipmentId || itemIdx === "" || !qty || qty <= 0) return alert("Select shipment, item, and valid quantity");
-
-            const shipmentDoc = await db.collection("shipments").doc(shipmentId).get();
-            const items = shipmentDoc.data().items;
-            const item = items[parseInt(itemIdx)];
-            if (qty > (item.receivedQty - item.damageQty)) return alert("Cannot return more than received good units");
-
-            items[parseInt(itemIdx)].receivedQty -= qty;
-            await db.collection("shipments").doc(shipmentId).update({ items });
-
-            await db.collection("returns").add({
-                shipmentId,
-                branch: BRANCH,
-                itemName: item.itemName,
-                returnedQty: qty,
-                reason,
-                date: firebase.firestore.FieldValue.serverTimestamp(),
-                createdBy: currentUserEmail,
-                status: 'pending'
-            });
-
-            const invRef = db.collection('inventory')
-                .where('itemName', '==', item.itemName)
-                .where('branch', '==', BRANCH);
-            const snap = await invRef.get();
-            if (!snap.empty) {
-                snap.forEach(d => {
-                    d.ref.update({
-                        stock: firebase.firestore.FieldValue.increment(-qty)
-                    });
-                });
-            }
-
-            try {
-                await db.collection('activityLog').add({
-                    actionType: "return",
-                    shipmentId,
-                    branch: BRANCH,
-                    details: `Returned ${qty} x ${item.itemName}. Reason: ${reason}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentUserEmail
-                });
-            } catch (logError) { console.warn('Return log failed:', logError); }
-
-            alert("Return recorded");
-            document.getElementById("returnQty").value = "";
-            document.getElementById("returnReason").value = "";
-            loadPastReturns();
-            loadActivityHistory();
-            loadReturnShipmentsDropdown();
-            loadStats();
-            loadInventory();
-        } catch (error) {
-            alert('Error recording return: ' + error.message);
-        }
-    });
-
-    async function loadPastReturns() {
-        try {
-            const snap = await db.collection("returns").where("branch", "==", BRANCH).orderBy("date", "desc").get();
-            let html = "<ul>";
-            snap.forEach(doc => {
-                const r = doc.data();
-                html += `<li>${new Date(r.date?.toDate()).toLocaleString()}: ${r.itemName} x${r.returnedQty} (${r.reason})</li>`;
-            });
-            html += "</ul>";
-            document.getElementById("pastReturnsList").innerHTML = html || "No returns";
-        } catch (error) {
-            console.error('Load past returns error:', error);
-            document.getElementById("pastReturnsList").innerHTML = '<p>Error loading returns.</p>';
-        }
-    }
-
-    async function loadInventory() {
-        try {
-            const snap = await db.collection("inventory").where("branch", "==", BRANCH).get();
-            let html = '<table><tr><th>Item</th><th>Stock</th><th>Location</th><th>Unit Price</th></tr>';
-            snap.forEach(doc => {
-                const d = doc.data();
-                html += `<tr><td>${d.itemName}</td><td>${d.stock}</td><td>${d.location||'N/A'}</td><td>₦${d.unitPrice?.toLocaleString()}</td></tr>`;
-            });
-            html += '</table>';
-            document.getElementById("inventoryList").innerHTML = html || 'No inventory';
-        } catch (error) {
-            console.error('Load inventory error:', error);
-            document.getElementById("inventoryList").innerHTML = '<p>Error loading inventory.</p>';
-        }
-    }
-
-    document.getElementById('invSearch').addEventListener('input', function() {
-        const q = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#inventoryList table tr');
-        rows.forEach((row, idx) => {
-            if (idx === 0) return;
-            const text = row.innerText.toLowerCase();
-            row.style.display = text.includes(q) ? '' : 'none';
-        });
-    });
-
-    async function loadActivityHistory(startDate, endDate) {
-        try {
-            let query = db.collection("activityLog").where("branch", "==", BRANCH).orderBy("timestamp", "desc").limit(100);
-            if (startDate && endDate) {
-                const start = new Date(startDate);
-                const end = new Date(endDate);
-                end.setHours(23,59,59);
-                query = query.where("timestamp", ">=", start).where("timestamp", "<=", end);
-            }
-            const snap = await query.get();
-            let html = '<table style="width:100%; border-collapse:collapse;"><tr><th>Time</th><th>Action</th><th>Details</th><th>User</th></tr>';
-            snap.forEach(doc => {
-                const a = doc.data();
-                html += `<tr>
-                    <td>${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ""}</td>
-                    <td>${a.actionType}</td>
-                    <td>${a.details}</td>
-                    <td>${a.user || ''}</td>
-                </tr>`;
-            });
-            html += '</table>';
-            document.getElementById("activityList").innerHTML = html || "No activity";
-        } catch (error) {
-            console.error('Load activity error:', error);
-            document.getElementById("activityList").innerHTML = '<p>Error loading activity.</p>';
-        }
-    }
-
-    document.getElementById('filterHistoryBtn').addEventListener('click', () => {
-        const start = document.getElementById('historyStart').value;
-        const end = document.getElementById('historyEnd').value;
-        loadActivityHistory(start, end);
-    });
-    loadActivityHistory();
+<td>${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ""}</td> <td>${a.actionType}</td> <td>${a.details}</td> <td>${a.user || ''}</td> </tr>`; }); html += '</table>'; document.getElementById("activityList").innerHTML = html || "No activity"; } catch (error) { console.error('Load activity error:', error); document.getElementById("activityList").innerHTML = '<p>Error loading activity.</p>'; } }
+document.getElementById('filterHistoryBtn').addEventListener('click', () => {
+const start = document.getElementById('historyStart').value;
+const end = document.getElementById('historyEnd').value;
+loadActivityHistory(start, end);
+});
+// Initial load
+loadActivityHistory();
 </script>
-</body>
-</html>
+
+</body> </html>
