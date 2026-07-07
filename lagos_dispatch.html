@@ -72,6 +72,8 @@
         .permission-error { background: #f8d7da; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 12px; margin: 12px 0; }
         .permission-error a { color: #0a3d62; font-weight: 600; }
         .permission-error .index-link { word-break: break-all; }
+        .action-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+        .action-btns button { padding: 4px 8px; font-size: 0.7rem; margin: 2px; }
         @media (max-width: 600px) {
             .flex-row { flex-direction: column; }
             .item-row { flex-direction: column; align-items: stretch; }
@@ -81,6 +83,8 @@
             .items-cell { max-width: 80px; }
             .cost-cell { max-width: 70px; }
             .stat-card .num { font-size: 1.2rem; }
+            .action-btns { flex-direction: column; }
+            .action-btns button { width: 100%; }
         }
     </style>
 </head>
@@ -189,7 +193,7 @@
         <div id="shipmentsError" style="display:none;"></div>
         <div class="scroll">
             <table id="shipmentsTable">
-                <thead><tr><th>ID</th><th>Dest</th><th>Supplier</th><th>Items</th><th>Goods</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+                <thead><tr><th>ID</th><th>Dest</th><th>Supplier</th><th>Items</th><th>Goods</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
                 <tbody><tr><td colspan="8"><div class="loading-spinner"></div> Loading...</td></tr></tbody>
             </table>
         </div>
@@ -1005,7 +1009,7 @@
         saveShipment('Draft');
     });
 
-    // ==================== Cancel/Delete Shipment ====================
+    // ==================== Cancel Shipment ====================
     window.cancelShipment = async function(id) {
         if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
             showToast('Permission denied.', 'error');
@@ -1033,6 +1037,7 @@
         }
     };
 
+    // ==================== Delete Shipment ====================
     window.deleteShipment = async function(id) {
         if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
             showToast('Permission denied.', 'error');
@@ -1064,7 +1069,35 @@
         }
     };
 
-    // ==================== Load Shipments (with Error Handling) ====================
+    // ==================== Recall Shipment (New) ====================
+    window.recallShipment = async function(id) {
+        if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
+            showToast('Permission denied.', 'error');
+            return;
+        }
+        if (!confirm('Recall this shipment? It will be converted to a Draft for editing.')) return;
+        try {
+            await db.collection('shipments').doc(id).update({
+                status: 'Draft',
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await db.collection('activityLog').add({
+                actionType: 'recall',
+                shipmentId: id,
+                branch: 'Lagos',
+                details: `Shipment ${id} recalled by ${currentUserEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+            showToast('✅ Shipment recalled and converted to Draft.', 'success');
+            loadShipments();
+            loadStats();
+        } catch (err) {
+            showToast('Error recalling shipment: ' + err.message, 'error');
+        }
+    };
+
+    // ==================== Load Shipments (with Recall & Edit) ====================
     function loadShipments() {
         const searchInput = document.getElementById('searchShipment');
         const filterSelect = document.getElementById('filterStatus');
@@ -1098,11 +1131,12 @@
                         const supplierName = d.supplierId ? 'Supplier' : '-';
                         const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
                         const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : '';
-                        const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered') &&
-                                          (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-                        const canDelete = (d.status === 'Draft' || d.status === 'Cancelled') &&
-                                          (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-                        const canEdit = d.status === 'Draft';
+                        const isEditable = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+                        const canCancel = (d.status === 'Dispatched' || d.status === 'Partially Delivered') && isEditable;
+                        const canDelete = (d.status === 'Draft' || d.status === 'Cancelled') && isEditable;
+                        const canEdit = d.status === 'Draft' && isEditable;
+                        const canRecall = (d.status === 'Dispatched' || d.status === 'Partially Delivered') && isEditable;
+
                         html += `<tr>
                             <td><strong>${escapeHtml(id.slice(0,6))}</strong></td>
                             <td><span class="badge">${escapeHtml(d.destinationBranch)}</span></td>
@@ -1112,10 +1146,13 @@
                             <td><span class="status-badge ${statusClass}">${escapeHtml(d.status)}</span></td>
                             <td>${escapeHtml(date)}</td>
                             <td>
-                                <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️ View</button>
-                                ${canEdit ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️ Edit</button>` : ''}
-                                ${canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${id}')">❌ Cancel</button>` : ''}
-                                ${canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${id}')">🗑️ Delete</button>` : ''}
+                                <div class="action-btns">
+                                    <button class="btn-sm btn-primary" onclick="viewShipment('${id}')">👁️</button>
+                                    ${canEdit ? `<button class="btn-sm btn-warning" onclick="editDraft('${id}')">✏️</button>` : ''}
+                                    ${canRecall ? `<button class="btn-sm btn-warning" onclick="recallShipment('${id}')" style="background:#f39c12; color:white;">↩️ Recall</button>` : ''}
+                                    ${canCancel ? `<button class="btn-sm btn-danger" onclick="cancelShipment('${id}')">❌</button>` : ''}
+                                    ${canDelete ? `<button class="btn-sm btn-danger" onclick="deleteShipment('${id}')">🗑️</button>` : ''}
+                                </div>
                             </td>
                         </tr>`;
                     });
@@ -1125,7 +1162,6 @@
             (err) => {
                 console.error('Shipments load error:', err);
                 tbody.innerHTML = '<tr><td colspan="8">Error loading shipments</td></tr>';
-                // Show detailed error with index creation link
                 let errorHtml = `
                     <div class="permission-error">
                         <strong>⚠️ Error loading shipments:</strong> ${escapeHtml(err.message)}
@@ -1136,7 +1172,6 @@
                             <li>If the error mentions an index, click the link below to create it.</li>
                         </ul>
                 `;
-                // Check if error has index URL
                 if (err.message && err.message.includes('https://console.firebase.google.com')) {
                     const match = err.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/);
                     if (match) {
@@ -1773,7 +1808,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dispatch with Reroute and error handling loaded.');
+    console.log('NEVAMAK Dispatch with Recall and Edit functionality loaded.');
 </script>
 </body>
 </html>
