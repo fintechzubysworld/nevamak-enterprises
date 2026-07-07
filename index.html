@@ -58,6 +58,44 @@
         .btn-info { background: #3498db; color: white; }
         @media (max-width: 640px) { .stats { grid-template-columns: 1fr 1fr; } .stat-card .number { font-size: 1.3rem; } header { flex-direction: column; text-align: center; } }
     </style>
+    <script>
+    // Redirect external vendors away from the main dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        const firebaseConfig = {
+            apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+            authDomain: "nevamak-enterprises.firebaseapp.com",
+            projectId: "nevamak-enterprises",
+            storageBucket: "nevamak-enterprises.firebasestorage.app",
+            messagingSenderId: "144324172534",
+            appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+            measurementId: "G-MZ8NT6KK8N"
+        };
+        // Only initialize Firebase if not already initialized
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    if (userDoc.exists) {
+                        const role = userDoc.data().role;
+                        // If the user is a vendor, redirect to external_vendor.html
+                        if (role === 'vendor' || role === 'external_vendor') {
+                            window.location.href = 'external_vendor.html';
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Vendor check error:', err);
+                }
+            }
+        });
+    });
+</script>
 </head>
 <body>
 <div class="container">
