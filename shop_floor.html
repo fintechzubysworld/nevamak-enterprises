@@ -38,6 +38,8 @@
         .btn-warning { background: #f39c12; color: white; }
         .btn-success { background: #27ae60; color: white; }
         .btn-return { background: #e67e22; color: white; }
+        .permission-error { background: #f8d7da; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 12px; margin: 12px 0; }
+        .permission-error a { color: #0a3d62; font-weight: 600; }
         @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
     </style>
 </head>
@@ -132,14 +134,18 @@
     let unsubscribeFloor = null; // listener reference
     let returnItemData = {};
 
-    // ==================== Auth ====================
-    auth.onAuthStateChanged( (user) => {
+    // ==================== Auth (FIXED: added async) ====================
+    auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
         currentUserEmail = user.email;
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        if (userDoc.exists) {
-            currentUserRole = userDoc.data().role || '';
+        try {
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                currentUserRole = userDoc.data().role || '';
+            }
+        } catch (err) {
+            console.warn('Error loading user role:', err);
         }
         // Attach listener ONCE
         listenToShopFloor();
@@ -166,7 +172,24 @@
             renderFloorInventory();
         }, (error) => {
             console.error('Shop floor listener error:', error);
-            document.getElementById('floorList').innerHTML = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
+            let errorHtml = '';
+            if (error.code === 'permission-denied') {
+                errorHtml = `
+                    <div class="permission-error">
+                        <strong>🔒 Permission Denied</strong>
+                        <p>You don't have permission to view the shop floor inventory.</p>
+                        <p>Add the following rule to your Firestore database:</p>
+                        <pre style="background:#f0f0f0; padding:8px; border-radius:8px; font-size:0.8rem;">
+match /shopFloor/{document} {
+  allow read, write: if request.auth != null;
+}</pre>
+                        <p><a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" style="color:#0a3d62; font-weight:600;">🔗 Click here to open Firestore Rules</a></p>
+                    </div>
+                `;
+            } else {
+                errorHtml = `<p style="color:red;">Error loading shop floor: ${error.message}</p>`;
+            }
+            document.getElementById('floorList').innerHTML = errorHtml;
         });
     }
 
@@ -245,9 +268,6 @@
             return (a.itemName || '').localeCompare(b.itemName || '');
         });
 
-        // Store filtered data for stats
-        const filteredDocs = docs;
-
         if (docs.length === 0) {
             document.getElementById('floorList').innerHTML = '<p class="empty" style="text-align:center; color:#888; padding:20px;">No items found on shop floor.</p>';
             updateStats([]);
@@ -288,7 +308,7 @@
         });
         html += '</table>';
         document.getElementById('floorList').innerHTML = html;
-        updateStats(filteredDocs);
+        updateStats(docs);
     }
 
     // ==================== Stats ====================
@@ -427,23 +447,7 @@
         link.click();
     }
 
-    console.log('NEVAMAK Shop Floor loaded – search fixed.');
-
-    async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
+    console.log('NEVAMAK Shop Floor loaded – fixed async error.');
 </script>
 </body>
 </html>
