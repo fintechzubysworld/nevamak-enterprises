@@ -21,27 +21,37 @@
         .forgot-link { display: block; text-align: center; margin-top: 12px; color: #0a3d62; text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
         .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
         .debug-box { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; text-align: left; color: #333; border: 1px solid #ddd; }
-        .debug-box strong { color: #0a3d62; }
+        .debug-box pre { background: #f0f0f0; padding: 8px; border-radius: 4px; overflow: auto; font-size: 0.75rem; margin: 4px 0; }
         .fix-link { color: #0a3d62; text-decoration: underline; cursor: pointer; font-weight: bold; }
         .fix-link:hover { color: #1e3799; }
         .hidden { display: none; }
+        #setupAdminContainer { margin-top: 16px; }
+        .setup-btn { background: #e67e22; }
+        .setup-btn:hover { background: #d35400; }
     </style>
 </head>
 <body>
 <div class="card">
     <h1>🚛 NEVAMAK</h1>
     <div class="sub">Supply Chain Portal</div>
-    <input type="email" id="email" placeholder="Email">
+    <input type="email" id="email" placeholder="Email" autofocus>
     <input type="password" id="password" placeholder="Password">
     <button id="loginBtn">Sign In</button>
     <div id="message" class="error"></div>
     <a id="forgotPasswordLink" class="forgot-link">🔑 Forgot Password?</a>
     <div id="verificationMessage" class="info" style="display:none;"></div>
     <div id="debugInfo" class="debug-box hidden"></div>
+    <div id="setupAdminContainer" style="display:none;">
+        <button id="setupAdminBtn" class="setup-btn">🔧 Create Default Admin</button>
+        <div class="info" style="font-size:0.85rem; color:#666; margin-top:4px;">
+            Only needed if no admin account exists. Creates admin@nevamak.com / admin123
+        </div>
+    </div>
 </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // ==================== Firebase Config ====================
         const firebaseConfig = {
             apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
             authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -55,14 +65,85 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // ==================== DOM References ====================
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('loginBtn');
         const messageDiv = document.getElementById('message');
         const verificationMsg = document.getElementById('verificationMessage');
         const debugDiv = document.getElementById('debugInfo');
+        const forgotLink = document.getElementById('forgotPasswordLink');
+        const setupContainer = document.getElementById('setupAdminContainer');
+        const setupBtn = document.getElementById('setupAdminBtn');
 
-        document.getElementById('loginBtn').addEventListener('click', async () => {
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            
+        let currentAdminEmail = ''; // will be set if admin logs in
+
+        // ==================== Check if admin exists ====================
+        async function checkAdminExists() {
+            if (!setupContainer) return;
+            try {
+                const snap = await db.collection('users').where('role', '==', 'admin').limit(1).get();
+                setupContainer.style.display = snap.empty ? 'block' : 'none';
+            } catch (err) {
+                setupContainer.style.display = 'block';
+            }
+        }
+        checkAdminExists().catch(() => { if(setupContainer) setupContainer.style.display = 'block'; });
+
+        // ==================== Create Default Admin ====================
+        setupBtn?.addEventListener('click', async () => {
+            const adminEmail = 'admin@nevamak.com';
+            const adminPassword = 'admin123';
+            const btn = setupBtn;
+            const originalText = btn.textContent;
+            btn.textContent = 'Creating...';
+            btn.disabled = true;
+
+            try {
+                let uid, user;
+                try {
+                    const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
+                    uid = userCred.user.uid;
+                    user = userCred.user;
+                    await user.sendEmailVerification();
+                } catch (err) {
+                    if (err.code === 'auth/email-already-in-use') {
+                        const userCred = await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
+                        uid = userCred.user.uid;
+                        user = userCred.user;
+                        await auth.signOut();
+                    } else {
+                        throw err;
+                    }
+                }
+                await db.collection('users').doc(uid).set({
+                    email: adminEmail,
+                    role: 'admin',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    enabled: true,
+                    emailVerified: user?.emailVerified || false
+                });
+                alert('✅ Admin account is ready!\nEmail: admin@nevamak.com\nPassword: admin123\nYou can sign in now.');
+                setupContainer.style.display = 'none';
+            } catch (err) {
+                alert('Error creating admin: ' + err.message);
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        // ==================== Login Handler ====================
+        loginBtn.addEventListener('click', handleLogin);
+        passwordInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') handleLogin();
+        });
+
+        async function handleLogin() {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+
+            // Reset messages
             messageDiv.innerText = '';
             verificationMsg.style.display = 'none';
             verificationMsg.innerText = '';
@@ -78,7 +159,8 @@
                 const userCred = await auth.signInWithEmailAndPassword(email, password);
                 const user = userCred.user;
 
-                if (!user.emailVerified && verificationMsg) {
+                // Optional email verification warning (allow login anyway)
+                if (!user.emailVerified) {
                     verificationMsg.style.display = 'block';
                     verificationMsg.innerHTML = `⚠️ Your email (${email}) is not verified. You can still log in, but some features may require verification.
                         <span id="resendVerification" style="color:#0a3d62; text-decoration:underline; cursor:pointer; display:block; margin-top:4px;">Resend verification email</span>`;
@@ -92,10 +174,11 @@
                     });
                 }
 
-                // Get user document
+                // Get Firestore user document
                 const userDoc = await db.collection('users').doc(user.uid).get();
+
+                // If document doesn't exist, try auto-create for admin default
                 if (!userDoc.exists) {
-                    // Auto-create for admin default
                     if (email === 'admin@nevamak.com') {
                         await db.collection('users').doc(user.uid).set({
                             email: email,
@@ -111,9 +194,10 @@
                             return;
                         }
                     }
+                    // No document, show error
                     await auth.signOut();
                     messageDiv.innerHTML = `
-                        ❌ User role not found. 
+                        ❌ User role not found.
                         <br><small style="color:#666;">Your account exists but is missing configuration. Please contact your administrator to fix your account.</small>
                         <br><small style="color:#666;">Admin: Go to User Management and click the "Fix" button for this user.</small>
                     `;
@@ -123,14 +207,13 @@
                 const data = userDoc.data();
                 const role = data.role;
 
+                // If role is missing or empty, show debug info and allow manual fix
                 if (!role) {
-                    // Role is empty or null
                     await auth.signOut();
-                    // Show debug info
                     debugDiv.classList.remove('hidden');
                     debugDiv.innerHTML = `
-                        <strong>📄 User Document Data:</strong><br>
-                        <pre style="background:#f0f0f0; padding:8px; border-radius:4px; font-size:0.75rem; overflow:auto;">${JSON.stringify(data, null, 2)}</pre>
+                        <strong>📄 User Document Data:</strong>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
                         <p><strong>Problem:</strong> The document exists but <code>role</code> field is missing or empty.</p>
                         <p><span class="fix-link" onclick="attemptFixRole('${user.uid}', '${email}')">🔧 Click here to attempt auto-fix (if you are admin)</span></p>
                         <p style="font-size:0.75rem; color:#888;">If you are not admin, please ask your administrator to fix your account.</p>
@@ -142,7 +225,7 @@
                     return;
                 }
 
-                // Role exists, proceed
+                // Role exists – proceed to redirect
                 redirectUser(role);
             } catch (err) {
                 console.error('Login error:', err);
@@ -154,11 +237,11 @@
                 else if (err.code === 'auth/user-disabled') msg = 'This account has been disabled. Please contact admin.';
                 messageDiv.innerText = '❌ ' + msg;
             }
-        });
+        }
 
-        // Forgot password
-        document.getElementById('forgotPasswordLink').addEventListener('click', async () => {
-            const email = document.getElementById('email').value.trim();
+        // ==================== Forgot Password ====================
+        forgotLink.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
             if (!email) {
                 messageDiv.innerText = 'Please enter your email address first.';
                 return;
@@ -173,15 +256,16 @@
             }
         });
 
-        // Function to attempt auto-fix from login (if admin)
+        // ==================== Auto-fix role from login (for admins) ====================
         window.attemptFixRole = async function(uid, email) {
-            // This will only work if the user is an admin (or has proper permissions)
-            // We'll re-authenticate with the current user (which may have been signed out)
-            // So we need to sign in again.
+            // This function will only work if the user is an admin.
+            // It will prompt for password to re-authenticate.
             const password = prompt('Please enter your admin password to authorize this fix:');
             if (!password) return;
+
             try {
-                const cred = await auth.signInWithEmailAndPassword(currentAdminEmail || email, password);
+                // Sign in with admin credentials
+                const cred = await auth.signInWithEmailAndPassword(email, password);
                 // Check if this user is admin
                 const adminDoc = await db.collection('users').doc(cred.user.uid).get();
                 if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
@@ -202,7 +286,9 @@
             }
         };
 
+        // ==================== Redirect Helper ====================
         function redirectUser(role) {
+            console.log('Redirecting user with role:', role);
             if (role === 'admin' || role === 'lagos_sender') {
                 window.location.href = 'index.html';
             } else if (role === 'abuja_rep') {
@@ -213,231 +299,24 @@
                 window.location.href = 'external_vendor.html';
             } else {
                 alert('Unknown role: ' + role);
+                // Fallback: stay on login page
             }
         }
 
-        // Auto-redirect
+        // ==================== Auto-redirect if already logged in ====================
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 try {
                     const userDoc = await db.collection('users').doc(user.uid).get();
                     if (userDoc.exists) {
                         const role = userDoc.data().role;
-                        if (role) redirectUser(role);
-                    }
-                } catch (err) {
-                    console.warn('Auto-redirect error:', err);
-                }
-            }
-        });
-
-        // Enter key
-        document.getElementById('password').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('loginBtn').click();
-            }
-        });
-    });
-</script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>NEVAMAK – Login</title>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
-        body { background: linear-gradient(135deg, #0a3d62, #3c6382); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; padding: 16px; }
-        .card { background: white; max-width: 500px; width: 100%; padding: 24px 20px; border-radius: 32px; box-shadow: 0 20px 35px rgba(0,0,0,0.2); }
-        h1 { color: #0a3d62; margin: 0 0 5px; font-size: 1.8rem; text-align: center; }
-        .sub { color: #555; margin-bottom: 25px; font-size: 0.9rem; text-align: center; }
-        input { width: 100%; padding: 14px 16px; margin: 8px 0; border: 1px solid #ccc; border-radius: 48px; font-size: 1rem; }
-        button { width: 100%; padding: 14px; background: #0a3d62; color: white; border: none; border-radius: 48px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 12px; }
-        button:hover { background: #1e3799; }
-        .error { color: #e74c3c; margin-top: 12px; text-align: center; font-size: 0.9rem; }
-        .info { color: #27ae60; text-align: center; margin-top: 12px; font-size: 0.85rem; }
-        .forgot-link { display: block; text-align: center; margin-top: 12px; color: #0a3d62; text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
-        .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-<div class="card">
-    <h1>🚛 NEVAMAK</h1>
-    <div class="sub">Supply Chain Portal</div>
-    <input type="email" id="email" placeholder="Email">
-    <input type="password" id="password" placeholder="Password">
-    <button id="loginBtn">Sign In</button>
-    <div id="message" class="error"></div>
-    <a id="forgotPasswordLink" class="forgot-link">🔑 Forgot Password?</a>
-    <div id="verificationMessage" class="info" style="display:none;"></div>
-</div>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const firebaseConfig = {
-            apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
-            authDomain: "nevamak-enterprises.firebaseapp.com",
-            projectId: "nevamak-enterprises",
-            storageBucket: "nevamak-enterprises.firebasestorage.app",
-            messagingSenderId: "144324172534",
-            appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-            measurementId: "G-MZ8NT6KK8N"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        const messageDiv = document.getElementById('message');
-        const verificationMsg = document.getElementById('verificationMessage');
-
-        // Login
-        document.getElementById('loginBtn').addEventListener('click', async () => {
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            
-            if (messageDiv) messageDiv.innerText = '';
-            if (verificationMsg) {
-                verificationMsg.style.display = 'none';
-                verificationMsg.innerText = '';
-            }
-
-            if (!email || !password) {
-                if (messageDiv) messageDiv.innerText = 'Please enter email and password.';
-                return;
-            }
-
-            try {
-                const userCred = await auth.signInWithEmailAndPassword(email, password);
-                const user = userCred.user;
-
-                if (!user.emailVerified && verificationMsg) {
-                    verificationMsg.style.display = 'block';
-                    verificationMsg.innerHTML = `⚠️ Your email (${email}) is not verified. You can still log in, but some features may require verification.
-                        <span id="resendVerification" style="color:#0a3d62; text-decoration:underline; cursor:pointer; display:block; margin-top:4px;">Resend verification email</span>`;
-                    document.getElementById('resendVerification')?.addEventListener('click', async () => {
-                        try {
-                            await user.sendEmailVerification();
-                            if (verificationMsg) {
-                                verificationMsg.innerHTML = `✅ Verification email resent to ${email}. Please check your spam folder.`;
-                            }
-                        } catch (err) {
-                            alert('Error resending: ' + err.message);
-                        }
-                    });
-                }
-
-                // Check Firestore document
-                const userDoc = await db.collection('users').doc(user.uid).get();
-                if (!userDoc.exists) {
-                    // Auto-create for admin default
-                    if (email === 'admin@nevamak.com') {
-                        await db.collection('users').doc(user.uid).set({
-                            email: email,
-                            role: 'admin',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            enabled: true,
-                            emailVerified: user.emailVerified
-                        });
-                        const newDoc = await db.collection('users').doc(user.uid).get();
-                        if (newDoc.exists) {
-                            const role = newDoc.data().role;
+                        if (role) {
                             redirectUser(role);
-                            return;
                         }
-                    }
-                    await auth.signOut();
-                    if (messageDiv) {
-                        messageDiv.innerHTML = `
-                            ❌ User role not found. 
-                            <br><small style="color:#666;">Your account exists but is missing configuration. Please contact your administrator to fix your account.</small>
-                            <br><small style="color:#666;">Admin: Go to User Management and click the "Fix" button for this user.</small>
-                        `;
-                    }
-                    return;
-                }
-                const role = userDoc.data().role;
-                if (!role) {
-                    await auth.signOut();
-                    if (messageDiv) {
-                        messageDiv.innerHTML = `
-                            ❌ User role is missing.
-                            <br><small style="color:#666;">Your account is not properly configured. Please contact your administrator.</small>
-                        `;
-                    }
-                    return;
-                }
-                redirectUser(role);
-            } catch (err) {
-                console.error('Login error:', err);
-                let msg = err.message;
-                if (err.code === 'auth/user-not-found') msg = 'User not found. Please check your email or create an account.';
-                else if (err.code === 'auth/wrong-password') msg = 'Incorrect password. Please try again.';
-                else if (err.code === 'auth/invalid-email') msg = 'Invalid email format.';
-                else if (err.code === 'auth/too-many-requests') msg = 'Too many failed attempts. Please try again later.';
-                else if (err.code === 'auth/user-disabled') msg = 'This account has been disabled. Please contact admin.';
-                if (messageDiv) messageDiv.innerText = '❌ ' + msg;
-            }
-        });
-
-        // Forgot password
-        document.getElementById('forgotPasswordLink').addEventListener('click', async () => {
-            const email = document.getElementById('email').value.trim();
-            if (!email) {
-                if (messageDiv) messageDiv.innerText = 'Please enter your email address first.';
-                return;
-            }
-            try {
-                await auth.sendPasswordResetEmail(email);
-                if (messageDiv) {
-                    messageDiv.innerHTML = `<span style="color:#27ae60;">✅ Password reset email sent to ${email}. Please check your inbox.</span>`;
-                }
-            } catch (err) {
-                let msg = err.message;
-                if (err.code === 'auth/user-not-found') msg = 'No user found with this email address.';
-                if (messageDiv) {
-                    messageDiv.innerHTML = `<span style="color:#e74c3c;">❌ ${msg}</span>`;
-                }
-            }
-        });
-
-        function redirectUser(role) {
-            if (role === 'admin' || role === 'lagos_sender') {
-                window.location.href = 'index.html';
-            } else if (role === 'abuja_rep') {
-                window.location.href = 'receive_abuja.html';
-            } else if (role === 'ph_rep') {
-                window.location.href = 'receive_ph.html';
-            } else if (role === 'vendor' || role === 'external_vendor') {
-                window.location.href = 'external_vendor.html';
-            } else {
-                alert('Unknown role: ' + role);
-            }
-        }
-
-        // Auto-redirect
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                try {
-                    const userDoc = await db.collection('users').doc(user.uid).get();
-                    if (userDoc.exists) {
-                        const role = userDoc.data().role;
-                        if (role) redirectUser(role);
                     }
                 } catch (err) {
                     console.warn('Auto-redirect error:', err);
                 }
-            }
-        });
-
-        // Enter key
-        document.getElementById('password').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('loginBtn').click();
             }
         });
     });
