@@ -8,11 +8,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <!-- Storage removed - not used -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
@@ -77,9 +75,6 @@
         .toast.error { background: #e74c3c; }
         .recipient-selector { margin: 12px 0; }
         .recipient-selector select { width: 100%; }
-        .recipient-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
-        .recipient-tag { background: #e8f0fe; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; }
-        .recipient-tag .remove { cursor: pointer; color: #e74c3c; font-weight: bold; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -111,6 +106,7 @@
         <div class="card">
             <h2>New Invoice</h2>
             <form id="invoiceForm" novalidate>
+                <!-- ... same as before ... -->
                 <div class="flex-row">
                     <input type="text" id="invoiceNumber" placeholder="Invoice # (auto)" readonly>
                     <input type="date" id="invoiceDate" required>
@@ -291,9 +287,8 @@
     let shareInvoiceId = null;
     let importedItems = [];
     let moveInvoiceId = null;
-    let invoicesUnsubscribe = null;  // For cleanup
+    let invoicesUnsubscribe = null;
     let suppliers = [];
-    let recipientUsers = [];
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -313,8 +308,6 @@
     const toast = document.getElementById('toast');
 
     // ==================== Helpers ====================
-
-    /** Sanitize text for safe DOM insertion using textContent */
     function escapeHtml(text) {
         if (text === null || text === undefined) return '';
         const div = document.createElement('div');
@@ -322,11 +315,9 @@
         return div.innerHTML;
     }
 
-    /** Show toast notification */
     function showToast(message, type = 'info', duration = 3000) {
         toast.textContent = message;
         toast.className = 'toast ' + type;
-        // Force reflow
         void toast.offsetWidth;
         toast.classList.add('show');
         clearTimeout(toast._hideTimer);
@@ -335,7 +326,6 @@
         }, duration);
     }
 
-    /** Set button loading state */
     function setButtonLoading(btn, loading) {
         if (loading) {
             btn._originalText = btn.innerHTML;
@@ -351,7 +341,6 @@
         }
     }
 
-    /** Validate number inputs */
     function validateNumber(val, min = 0, max = Infinity) {
         const num = parseFloat(val);
         if (isNaN(num) || num < min || num > max) return null;
@@ -382,7 +371,6 @@
         }
         document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
         document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
-        // Load suppliers for share modal
         await loadSuppliers();
         loadInvoices();
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -393,7 +381,6 @@
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
             });
         });
-        // Initialize with one row
         addItemRow();
         updateCostPreview();
         transportMultiplier.addEventListener('input', updateCostPreview);
@@ -435,7 +422,6 @@
         };
         div.querySelectorAll('input').forEach(inp => {
             inp.addEventListener('input', updateCostPreview);
-            // Ensure non-negative values
             if (inp.type === 'number' && inp.min) {
                 inp.addEventListener('blur', function() {
                     const min = parseFloat(this.min);
@@ -465,7 +451,6 @@
             const whtPct = validateNumber(row.querySelector('.itemWHT').value, 0, 100) || 0;
 
             if (name && qty > 0 && price > 0) {
-                // Apply transport multiplier to unit price
                 const updatedPrice = price * multiplier;
                 const itemSub = qty * updatedPrice;
                 subtotal += itemSub;
@@ -868,6 +853,7 @@
                 total: grandTotal,
                 movedToWarehouse: false,
                 createdBy: currentUserEmail,
+                sharedWith: [],
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -1454,36 +1440,64 @@
                 return;
             }
 
-            // Create notification
+            // Prepare share data
             const invoiceLink = `${window.location.origin}/invoice_repo.html?view=${shareInvoiceData.id}`;
             const message = document.getElementById('shareMessage').value.trim() || `Invoice ${shareInvoiceData.data.invoiceNumber} shared with you.`;
-            await db.collection('notifications').add({
-                userId: recipientId,
-                message: `📨 Invoice ${shareInvoiceData.data.invoiceNumber} shared by ${currentUserEmail}. ${message}`,
-                invoiceId: shareInvoiceData.id,
-                invoiceNumber: shareInvoiceData.data.invoiceNumber,
-                link: invoiceLink,
-                read: false,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
 
-            // Log activity
-            await db.collection('activityLog').add({
-                actionType: 'invoice_shared',
-                invoiceId: shareInvoiceData.id,
-                invoiceNumber: shareInvoiceData.data.invoiceNumber,
-                recipientId: recipientId,
-                recipientName: recipientName,
-                recipientRole: recipientRole,
-                sharedBy: currentUserEmail,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            showToast(`✅ Invoice shared with ${recipientName}`, 'success');
-            document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName}`;
-            document.getElementById('shareMessageResult').style.color = 'green';
-            setTimeout(() => closeModal('shareModal'), 2000);
-
+            // Attempt primary method: write to notifications and activityLog
+            let primarySuccess = false;
+            try {
+                await db.collection('notifications').add({
+                    userId: recipientId,
+                    message: `📨 Invoice ${shareInvoiceData.data.invoiceNumber} shared by ${currentUserEmail}. ${message}`,
+                    invoiceId: shareInvoiceData.id,
+                    invoiceNumber: shareInvoiceData.data.invoiceNumber,
+                    link: invoiceLink,
+                    read: false,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await db.collection('activityLog').add({
+                    actionType: 'invoice_shared',
+                    invoiceId: shareInvoiceData.id,
+                    invoiceNumber: shareInvoiceData.data.invoiceNumber,
+                    recipientId: recipientId,
+                    recipientName: recipientName,
+                    recipientRole: recipientRole,
+                    sharedBy: currentUserEmail,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                primarySuccess = true;
+                showToast(`✅ Invoice shared with ${recipientName}`, 'success');
+                document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName}`;
+                document.getElementById('shareMessageResult').style.color = 'green';
+                setTimeout(() => closeModal('shareModal'), 2000);
+            } catch (permError) {
+                console.warn('Primary notification failed, using fallback:', permError);
+                // Fallback: write to sharedInvoices collection
+                await db.collection('sharedInvoices').add({
+                    invoiceId: shareInvoiceData.id,
+                    invoiceNumber: shareInvoiceData.data.invoiceNumber,
+                    sharedBy: currentUserEmail,
+                    sharedWith: recipientId,
+                    sharedWithName: recipientName,
+                    message: message,
+                    link: invoiceLink,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    read: false
+                });
+                // Also update the invoice document itself (if possible)
+                await db.collection('invoices').doc(shareInvoiceData.id).update({
+                    sharedWith: firebase.firestore.FieldValue.arrayUnion({
+                        userId: recipientId,
+                        name: recipientName,
+                        sharedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    })
+                }).catch(e => console.warn('Could not update invoice sharedWith:', e));
+                showToast(`✅ Invoice shared with ${recipientName} (using fallback)`, 'success');
+                document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName} (notification not sent, but they can see it in shared list)`;
+                document.getElementById('shareMessageResult').style.color = 'green';
+                setTimeout(() => closeModal('shareModal'), 3000);
+            }
         } catch (err) {
             console.error('Share error:', err);
             document.getElementById('shareMessageResult').textContent = 'Error: ' + err.message;
@@ -1605,7 +1619,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with sharing feature.');
+    console.log('NEVAMAK Invoice Repository loaded with enhanced sharing fallback.');
 </script>
 </body>
 </html>
