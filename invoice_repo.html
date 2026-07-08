@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Invoice Repository</title>
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -762,7 +763,6 @@
 
         if (items.length === 0) return '<p style="color:red;">Add at least one item.</p>';
 
-        // ==== UPDATED: include discount and tax columns per item ====
         let itemsHtml = '';
         items.forEach(it => {
             itemsHtml += `<tr>
@@ -1091,7 +1091,6 @@
                     totalVAT += it.vat || 0;
                     totalWHT += it.wht || 0;
                     grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
-                    // Use stored values for discPct, discAmt, vatPct, whtPct
                     const discPct = it.discountPercent || 0;
                     const discAmt = it.discountAmount || 0;
                     const vatPct = it.vatPercent || 0;
@@ -1534,7 +1533,7 @@
         }
     });
 
-    // ==================== Load Shared Invoices ====================
+    // ==================== Load Shared Invoices (with index fallback) ====================
     function loadSharedInvoices() {
         if (sharedUnsubscribe) {
             sharedUnsubscribe();
@@ -1544,47 +1543,106 @@
         const container = document.getElementById('sharedList');
         container.innerHTML = '<div class="loading-spinner"></div> Loading...';
 
+        // Try with orderBy (requires index)
         sharedUnsubscribe = db.collection('sharedInvoices')
             .where('recipientId', '==', currentUser.uid)
             .orderBy('timestamp', 'desc')
-            .onSnapshot(async (snap) => {
-                if (snap.empty) {
-                    container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No invoices shared with you.</p>';
-                    return;
-                }
-                let html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Shared By</th><th>Message</th><th>Date</th><th>Action</th></tr>';
-                for (const doc of snap.docs) {
-                    const d = doc.data();
-                    let invoiceTotal = 'N/A';
-                    let invoiceDate = '';
-                    try {
-                        const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
-                        if (invDoc.exists) {
-                            const invData = invDoc.data();
-                            invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
-                            invoiceDate = invData.date || '';
-                        }
-                    } catch (e) { /* ignore */ }
-
-                    const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
-                    const isRead = d.read ? '' : ' style="font-weight:bold;"';
-                    html += `<tr${isRead}>
-                        <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
-                        <td>${escapeHtml(d.senderName || 'Unknown')}</td>
-                        <td>${escapeHtml(d.message || '')}</td>
-                        <td>${date}</td>
-                        <td>
-                            <button class="btn-sm btn-primary" onclick="viewSharedInvoice('${d.invoiceId}')">👁️ View</button>
-                            <button class="btn-sm btn-success" onclick="markSharedRead('${doc.id}')">✅ Mark Read</button>
-                        </td>
-                    </tr>`;
-                }
-                html += '</table></div>';
-                container.innerHTML = html;
+            .onSnapshot((snap) => {
+                renderSharedInvoices(snap);
             }, (err) => {
                 console.error('Shared invoices load error:', err);
-                container.innerHTML = '<p style="color:red;">Error loading shared invoices: ' + escapeHtml(err.message) + '</p>';
+                if (err.message && err.message.includes('requires an index')) {
+                    // Show index creation link
+                    const match = err.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/);
+                    const indexUrl = match ? match[0] : '#';
+                    container.innerHTML = `
+                        <div style="background:#fff3cd; padding:12px; border-radius:8px; margin:8px 0;">
+                            <strong>⚠️ Missing Firestore Index</strong>
+                            <p>To load shared invoices, you need to create a composite index.</p>
+                            <p><a href="${indexUrl}" target="_blank" style="color:#0a3d62; font-weight:bold;">Click here to create the required index</a></p>
+                            <p style="font-size:0.8rem; color:#666;">Alternatively, use fallback mode (slower).</p>
+                            <button id="fallbackSharedBtn" class="btn-sm btn-primary" style="margin-top:8px;">Use fallback (no index needed)</button>
+                        </div>
+                    `;
+                    document.getElementById('fallbackSharedBtn')?.addEventListener('click', function() {
+                        loadSharedInvoicesFallback();
+                    });
+                } else {
+                    container.innerHTML = `<p style="color:red;">Error loading shared invoices: ${escapeHtml(err.message)}</p>`;
+                }
             });
+    }
+
+    function loadSharedInvoicesFallback() {
+        if (sharedUnsubscribe) {
+            sharedUnsubscribe();
+            sharedUnsubscribe = null;
+        }
+        const container = document.getElementById('sharedList');
+        container.innerHTML = '<div class="loading-spinner"></div> Loading (fallback mode)...';
+
+        sharedUnsubscribe = db.collection('sharedInvoices')
+            .where('recipientId', '==', currentUser.uid)
+            .onSnapshot((snap) => {
+                let docs = [];
+                snap.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
+                docs.sort((a, b) => (b.data.timestamp?.toDate() || 0) - (a.data.timestamp?.toDate() || 0));
+                // Convert to a snapshot-like object for rendering
+                const filteredSnap = {
+                    empty: docs.length === 0,
+                    forEach: (callback) => docs.forEach(d => callback({
+                        id: d.id,
+                        data: () => d.data
+                    })),
+                    docs: docs.map(d => ({ id: d.id, data: d.data }))
+                };
+                renderSharedInvoices(filteredSnap);
+                // Add a note
+                const note = document.createElement('div');
+                note.style.cssText = 'font-size:0.75rem; color:#888; text-align:center; margin-top:8px;';
+                note.textContent = 'ℹ️ Using fallback mode (all shared invoices loaded, sorted client-side).';
+                container.appendChild(note);
+            }, (err) => {
+                console.error('Fallback shared invoices error:', err);
+                container.innerHTML = `<p style="color:red;">Error loading shared invoices (fallback): ${escapeHtml(err.message)}</p>`;
+            });
+    }
+
+    function renderSharedInvoices(snap) {
+        const container = document.getElementById('sharedList');
+        if (snap.empty || snap.docs?.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No invoices shared with you.</p>';
+            return;
+        }
+        let html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Shared By</th><th>Message</th><th>Date</th><th>Action</th></tr>';
+        for (const doc of snap.docs) {
+            const d = doc.data();
+            let invoiceTotal = 'N/A';
+            let invoiceDate = '';
+            try {
+                const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
+                if (invDoc.exists) {
+                    const invData = invDoc.data();
+                    invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                    invoiceDate = invData.date || '';
+                }
+            } catch (e) { /* ignore */ }
+
+            const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
+            const isRead = d.read ? '' : ' style="font-weight:bold;"';
+            html += `<tr${isRead}>
+                <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                <td>${escapeHtml(d.senderName || 'Unknown')}</td>
+                <td>${escapeHtml(d.message || '')}</td>
+                <td>${date}</td>
+                <td>
+                    <button class="btn-sm btn-primary" onclick="viewSharedInvoice('${d.invoiceId}')">👁️ View</button>
+                    <button class="btn-sm btn-success" onclick="markSharedRead('${doc.id}')">✅ Mark Read</button>
+                </td>
+            </tr>`;
+        }
+        html += '</table></div>';
+        container.innerHTML = html;
     }
 
     window.viewSharedInvoice = async function(invoiceId) {
@@ -1723,7 +1781,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded – detailed invoice view with per-item taxes.');
+    console.log('NEVAMAK Invoice Repository loaded – detailed invoice view with per-item taxes and shared invoice index fallback.');
 </script>
 </body>
 </html>
