@@ -36,8 +36,8 @@
         .btn-danger { background: #e74c3c; color: white; }
         .btn-warning { background: #f39c12; color: white; }
         .btn-info { background: #3498db; color: white; }
-        .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
         .btn-secondary { background: #8e44ad; color: white; }
+        .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
         .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; padding: 8px; background: #f8f9fa; border-radius: 16px; border-left: 3px solid #0a3d62; }
         .item-row select, .item-row input { flex: 1; margin: 0; min-width: 70px; }
         .item-row .item-checkbox { flex: 0 0 30px; }
@@ -75,6 +75,11 @@
         .toast.show { opacity: 1; }
         .toast.success { background: #27ae60; }
         .toast.error { background: #e74c3c; }
+        .recipient-selector { margin: 12px 0; }
+        .recipient-selector select { width: 100%; }
+        .recipient-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+        .recipient-tag { background: #e8f0fe; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; }
+        .recipient-tag .remove { cursor: pointer; color: #e74c3c; font-weight: bold; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -90,6 +95,7 @@
             <a href="chat.html">💬 Chat</a>
             <a href="reports.html">📊 Reports</a>
             <a href="warehouse.html">🏚️ Warehouse</a>
+            <a href="permissions.html">🔐 Permissions</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -186,6 +192,36 @@
     </div>
 </div>
 
+<!-- Share Modal -->
+<div id="shareModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('shareModal')">&times;</span>
+        <h3>📨 Share Invoice</h3>
+        <p><strong>Invoice #:</strong> <span id="shareInvoiceNumber"></span></p>
+        <p><strong>Total:</strong> ₦<span id="shareInvoiceTotal"></span></p>
+        <div class="recipient-selector">
+            <label>Select Recipient Type:</label>
+            <select id="shareRecipientType">
+                <option value="">-- Select --</option>
+                <option value="branch_rep">Branch Rep (for invoice's branch)</option>
+                <option value="lagos_sender">Lagos Sender</option>
+                <option value="external_vendor">External Vendor</option>
+            </select>
+        </div>
+        <div id="shareVendorSelect" style="display:none;">
+            <label>Select Vendor:</label>
+            <select id="shareVendorList"><option value="">-- Select Vendor --</option></select>
+        </div>
+        <div id="shareRecipientInfo" style="margin:12px 0; font-size:0.9rem; color:#555;"></div>
+        <textarea id="shareMessage" placeholder="Optional message to recipient" rows="2"></textarea>
+        <div style="display:flex; gap:8px; margin-top:16px;">
+            <button id="shareConfirmBtn" class="btn-success" style="flex:2;">📨 Share</button>
+            <button onclick="closeModal('shareModal')" class="btn-danger" style="flex:1;">Cancel</button>
+        </div>
+        <div id="shareMessageResult" style="color:red; margin-top:8px;"></div>
+    </div>
+</div>
+
 <!-- Move to Warehouse Modal -->
 <div id="moveWarehouseModal" class="modal">
     <div class="modal-content">
@@ -252,9 +288,12 @@
     let currentUserRole = '';
     let currentUserEmail = '';
     let sendInvoiceId = null;
+    let shareInvoiceId = null;
     let importedItems = [];
     let moveInvoiceId = null;
     let invoicesUnsubscribe = null;  // For cleanup
+    let suppliers = [];
+    let recipientUsers = [];
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -319,22 +358,6 @@
         return num;
     }
 
-async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
-    
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
@@ -359,6 +382,8 @@ async function hasPermission(permName) {
         }
         document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
         document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+        // Load suppliers for share modal
+        await loadSuppliers();
         loadInvoices();
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -534,7 +559,6 @@ async function hasPermission(permName) {
         const rows = document.querySelectorAll('.item-row');
         if (rows.length === 0) { showToast('No items to apply to.', 'error'); return; }
         
-        // Use modal-style prompt instead of blocking prompt()
         const discPct = prompt('Enter Discount % for all items (0-100):', '0');
         if (discPct === null) return;
         const discAmt = prompt('Enter Discount Amount (₦) for all items:', '0');
@@ -567,7 +591,7 @@ async function hasPermission(permName) {
         showToast('🧹 Taxes cleared.', 'info');
     });
 
-    // ==================== Improved Excel Import ====================
+    // ==================== Import Excel ====================
     importExcelBtn.addEventListener('click', () => excelFileInput.click());
 
     excelFileInput.addEventListener('change', function(e) {
@@ -587,19 +611,16 @@ async function hasPermission(permName) {
                 let json = XLSX.utils.sheet_to_json(firstSheet);
                 let headers = Object.keys(json[0] || {});
 
-                // --- Improved header detection ---
                 const isDataHeader = (h) => {
                     if (!h || h.trim() === '') return true;
                     if (/^\d+$/.test(h.trim())) return true;
                     return false;
                 };
 
-                // Check if all headers look like data (not column names)
                 const allHeadersAreData = headers.every(isDataHeader);
 
                 let rows = [];
                 if (allHeadersAreData || headers.length === 0) {
-                    // Use raw row approach
                     const rawRows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                     if (rawRows.length === 0) { 
                         formMessage.textContent = '⚠️ The Excel file is empty.';
@@ -616,7 +637,6 @@ async function hasPermission(permName) {
                         return { itemName: name, quantity: qty, unitPrice: price };
                     }).filter(it => it.itemName && it.quantity > 0);
                 } else {
-                    // Use column name matching - improved with exact and fuzzy
                     const findColumnExact = (variations) => {
                         for (const h of headers) {
                             const hLower = h.toLowerCase().trim();
@@ -631,7 +651,6 @@ async function hasPermission(permName) {
                             const hLower = h.toLowerCase().trim();
                             for (const v of variations) {
                                 const vLower = v.toLowerCase().trim();
-                                // Only match if the shorter string is contained in the longer
                                 if (hLower.length > 2 && vLower.length > 2) {
                                     if (hLower.includes(vLower) || vLower.includes(hLower)) {
                                         return h;
@@ -718,7 +737,7 @@ async function hasPermission(permName) {
         formMessage.textContent = '';
     };
 
-    // ==================== Preview Invoice (shows adjusted prices) ====================
+    // ==================== Preview Invoice ====================
     document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
         const preview = generateInvoiceHTML();
         invoicePreviewContainer.innerHTML = preview;
@@ -805,12 +824,11 @@ async function hasPermission(permName) {
                 return;
             }
 
-            // Check for duplicate invoice number (client-side check with server fallback)
+            // Check for duplicate invoice number
             const existingCheck = await db.collection('invoices')
                 .where('invoiceNumber', '==', invNum)
                 .get();
             if (!existingCheck.empty) {
-                // Generate a new unique number
                 const newNum = 'INV-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
                 document.getElementById('invoiceNumber').value = newNum;
                 formMessage.textContent = `Invoice number already exists. Auto-generated: ${newNum}`;
@@ -946,11 +964,28 @@ async function hasPermission(permName) {
         }
     });
 
-    // ==================== Load Saved Invoices with Cleanup ====================
+    // ==================== Load Suppliers for Share ====================
+    async function loadSuppliers() {
+        try {
+            const snap = await db.collection('suppliers').get();
+            const sel = document.getElementById('shareVendorList');
+            sel.innerHTML = '<option value="">-- Select Vendor --</option>';
+            snap.forEach(doc => {
+                const s = doc.data();
+                const opt = document.createElement('option');
+                opt.value = doc.id;
+                opt.textContent = s.name + (s.contact ? ' (' + s.contact + ')' : '');
+                sel.appendChild(opt);
+            });
+        } catch (err) {
+            console.warn('Suppliers load error:', err);
+        }
+    }
+
+    // ==================== Load Saved Invoices ====================
     function loadInvoices() {
         const search = searchInvoices.value.toLowerCase().trim();
 
-        // Unsubscribe from previous listener
         if (invoicesUnsubscribe) {
             invoicesUnsubscribe();
             invoicesUnsubscribe = null;
@@ -986,6 +1021,7 @@ async function hasPermission(permName) {
                         }
                         if (!match) return;
                         const moved = d.movedToWarehouse || false;
+                        const isShareable = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
                         html += `<tr>
                             <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                             <td>${escapeHtml(d.date || '')}</td>
@@ -999,6 +1035,7 @@ async function hasPermission(permName) {
                                 <button class="btn-sm btn-success" onclick="downloadPDF('${doc.id}')">📄</button>
                                 <button class="btn-sm btn-warning" onclick="downloadCSV('${doc.id}')">📊</button>
                                 <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
+                                ${isShareable ? `<button class="btn-sm btn-secondary" onclick="openShareModal('${doc.id}')">📨 Share</button>` : ''}
                                 ${!moved ? `<button class="btn-sm btn-secondary" onclick="openMoveWarehouseModal('${doc.id}')">🏚️ Move</button>` : ''}
                                 <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
                             </td>
@@ -1016,22 +1053,6 @@ async function hasPermission(permName) {
 
     refreshBtn.addEventListener('click', loadInvoices);
     searchInvoices.addEventListener('input', loadInvoices);
-
-    async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
 
     // ==================== View Invoice ====================
     window.viewInvoice = async function(id) {
@@ -1246,6 +1267,7 @@ async function hasPermission(permName) {
         document.getElementById('sendMessage').textContent = '';
         document.getElementById('moveMessage').textContent = '';
         document.getElementById('bulkMessage').textContent = '';
+        document.getElementById('shareMessageResult').textContent = '';
     }
     window.closeModal = closeModal;
 
@@ -1255,6 +1277,7 @@ async function hasPermission(permName) {
             document.getElementById('sendMessage').textContent = '';
             document.getElementById('moveMessage').textContent = '';
             document.getElementById('bulkMessage').textContent = '';
+            document.getElementById('shareMessageResult').textContent = '';
         }
     };
 
@@ -1311,6 +1334,162 @@ async function hasPermission(permName) {
             showToast('Error: ' + err.message, 'error');
         }
     };
+
+    // ==================== Share Modal ====================
+    let shareInvoiceData = null;
+
+    window.openShareModal = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+            shareInvoiceData = { id, data: doc.data() };
+            document.getElementById('shareInvoiceNumber').textContent = shareInvoiceData.data.invoiceNumber;
+            document.getElementById('shareInvoiceTotal').textContent = shareInvoiceData.data.total.toLocaleString();
+            document.getElementById('shareRecipientType').value = '';
+            document.getElementById('shareVendorSelect').style.display = 'none';
+            document.getElementById('shareRecipientInfo').innerHTML = '';
+            document.getElementById('shareMessage').value = '';
+            document.getElementById('shareMessageResult').textContent = '';
+            document.getElementById('shareModal').style.display = 'flex';
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    document.getElementById('shareRecipientType').addEventListener('change', function() {
+        const type = this.value;
+        const infoDiv = document.getElementById('shareRecipientInfo');
+        const vendorSelect = document.getElementById('shareVendorSelect');
+        vendorSelect.style.display = 'none';
+        infoDiv.innerHTML = '';
+        if (!shareInvoiceData) return;
+
+        if (type === 'branch_rep') {
+            const branch = shareInvoiceData.data.branch || 'Lagos';
+            infoDiv.innerHTML = `📤 Will send to <strong>${branch} Branch Rep</strong> (if account exists).`;
+        } else if (type === 'lagos_sender') {
+            infoDiv.innerHTML = '📤 Will send to <strong>Lagos Sender</strong> (if account exists).';
+        } else if (type === 'external_vendor') {
+            vendorSelect.style.display = 'block';
+            infoDiv.innerHTML = '📤 Select a vendor from the list.';
+        }
+    });
+
+    document.getElementById('shareConfirmBtn').addEventListener('click', async function() {
+        if (!shareInvoiceData) {
+            document.getElementById('shareMessageResult').textContent = 'No invoice selected.';
+            return;
+        }
+        const type = document.getElementById('shareRecipientType').value;
+        if (!type) {
+            document.getElementById('shareMessageResult').textContent = 'Please select a recipient type.';
+            return;
+        }
+
+        let recipientId = null;
+        let recipientName = '';
+        let recipientRole = '';
+
+        try {
+            if (type === 'branch_rep') {
+                const branch = shareInvoiceData.data.branch || 'Lagos';
+                const roleMap = { 'Abuja': 'abuja_rep', 'Portharcourt': 'ph_rep', 'Lagos': 'lagos_sender' };
+                const targetRole = roleMap[branch] || 'lagos_sender';
+                const snap = await db.collection('users')
+                    .where('role', '==', targetRole)
+                    .limit(1)
+                    .get();
+                if (snap.empty) {
+                    document.getElementById('shareMessageResult').textContent = `No ${targetRole} user found for ${branch}.`;
+                    return;
+                }
+                const doc = snap.docs[0];
+                recipientId = doc.id;
+                recipientName = doc.data().email || 'Branch Rep';
+                recipientRole = targetRole;
+            } else if (type === 'lagos_sender') {
+                const snap = await db.collection('users')
+                    .where('role', '==', 'lagos_sender')
+                    .limit(1)
+                    .get();
+                if (snap.empty) {
+                    document.getElementById('shareMessageResult').textContent = 'No Lagos Sender user found.';
+                    return;
+                }
+                const doc = snap.docs[0];
+                recipientId = doc.id;
+                recipientName = doc.data().email || 'Lagos Sender';
+                recipientRole = 'lagos_sender';
+            } else if (type === 'external_vendor') {
+                const vendorId = document.getElementById('shareVendorList').value;
+                if (!vendorId) {
+                    document.getElementById('shareMessageResult').textContent = 'Please select a vendor.';
+                    return;
+                }
+                // Find supplier document
+                const supplierDoc = await db.collection('suppliers').doc(vendorId).get();
+                if (!supplierDoc.exists) {
+                    document.getElementById('shareMessageResult').textContent = 'Vendor not found.';
+                    return;
+                }
+                const supplierData = supplierDoc.data();
+                // Find user with this supplier name (vendor account)
+                const snap = await db.collection('users')
+                    .where('supplierName', '==', supplierData.name)
+                    .where('role', '==', 'vendor')
+                    .limit(1)
+                    .get();
+                if (snap.empty) {
+                    document.getElementById('shareMessageResult').textContent = `No vendor account found for ${supplierData.name}. Create a vendor user first.`;
+                    return;
+                }
+                const userDoc = snap.docs[0];
+                recipientId = userDoc.id;
+                recipientName = userDoc.data().email || supplierData.name;
+                recipientRole = 'vendor';
+            }
+
+            if (!recipientId) {
+                document.getElementById('shareMessageResult').textContent = 'No valid recipient found.';
+                return;
+            }
+
+            // Create notification
+            const invoiceLink = `${window.location.origin}/invoice_repo.html?view=${shareInvoiceData.id}`;
+            const message = document.getElementById('shareMessage').value.trim() || `Invoice ${shareInvoiceData.data.invoiceNumber} shared with you.`;
+            await db.collection('notifications').add({
+                userId: recipientId,
+                message: `📨 Invoice ${shareInvoiceData.data.invoiceNumber} shared by ${currentUserEmail}. ${message}`,
+                invoiceId: shareInvoiceData.id,
+                invoiceNumber: shareInvoiceData.data.invoiceNumber,
+                link: invoiceLink,
+                read: false,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Log activity
+            await db.collection('activityLog').add({
+                actionType: 'invoice_shared',
+                invoiceId: shareInvoiceData.id,
+                invoiceNumber: shareInvoiceData.data.invoiceNumber,
+                recipientId: recipientId,
+                recipientName: recipientName,
+                recipientRole: recipientRole,
+                sharedBy: currentUserEmail,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            showToast(`✅ Invoice shared with ${recipientName}`, 'success');
+            document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName}`;
+            document.getElementById('shareMessageResult').style.color = 'green';
+            setTimeout(() => closeModal('shareModal'), 2000);
+
+        } catch (err) {
+            console.error('Share error:', err);
+            document.getElementById('shareMessageResult').textContent = 'Error: ' + err.message;
+            document.getElementById('shareMessageResult').style.color = 'red';
+        }
+    });
 
     // ==================== Move to Warehouse ====================
     window.openMoveWarehouseModal = async function(id) {
@@ -1426,10 +1605,7 @@ async function hasPermission(permName) {
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with security fixes.');
-    console.log('✅ XSS protection enabled');
-    console.log('✅ Input validation active');
-    console.log('✅ Toast notifications ready');
+    console.log('NEVAMAK Invoice Repository loaded with sharing feature.');
 </script>
 </body>
 </html>
