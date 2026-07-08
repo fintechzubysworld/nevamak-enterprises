@@ -8,10 +8,12 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f4f7fc; margin: 0; padding: 12px; }
-        .container { max-width: 1000px; margin: auto; }
+        .container { max-width: 1100px; margin: auto; }
         .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         h2 { margin-top: 0; font-size: 1.3rem; color: #0a3d62; }
         input, select, textarea { width: 100%; padding: 12px; border-radius: 48px; border: 1px solid #ccc; font-size: 1rem; margin: 6px 0; }
@@ -49,6 +51,7 @@
         .status-submitted { background: #ffeaa7; color: #b85c00; }
         .status-received { background: #d4edda; color: #155724; }
         .status-rejected { background: #f8d7da; color: #721c24; }
+        .status-shared { background: #a29bfe; color: #2d1b69; }
         .badge { background: #e2e3e5; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .cost-cell { font-family: monospace; font-weight: bold; white-space: nowrap; max-width: 100px; overflow: hidden; text-overflow: ellipsis; }
         .items-cell { word-wrap: break-word; overflow-wrap: break-word; max-width: 120px; }
@@ -63,6 +66,9 @@
         .tab-btn.active { background: #0a3d62; color: white; }
         .tab-content { display: none; background: white; border-radius: 24px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .tab-content.active { display: block; }
+        .invoice-preview { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; margin-top: 12px; }
+        .invoice-preview table { width: 100%; border-collapse: collapse; }
+        .invoice-preview th, .invoice-preview td { border: 1px solid #ddd; padding: 8px; }
         @media (max-width: 600px) {
             .flex-row { flex-direction: column; }
             .item-row { flex-direction: column; align-items: stretch; }
@@ -76,7 +82,6 @@
 </head>
 <body>
 <div class="container">
-    <!-- Nav – only logout, no dashboard -->
     <div class="nav">
         <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
     </div>
@@ -84,7 +89,9 @@
     <!-- Tabs -->
     <div class="tabs">
         <button class="tab-btn active" data-tab="create">✏️ Create Invoice</button>
-        <button class="tab-btn" data-tab="saved">📋 Saved Invoices</button>
+        <button class="tab-btn" data-tab="myinvoices">📋 My Invoices</button>
+        <button class="tab-btn" data-tab="shared">📨 Shared with Me</button>
+        <button class="tab-btn" data-tab="reconciliation">🔄 Reconciliation</button>
         <button class="tab-btn" data-tab="password">🔑 Change Password</button>
     </div>
 
@@ -109,7 +116,6 @@
                 <label>Items:</label>
                 <div id="itemsContainer"></div>
 
-                <!-- Bulk Actions -->
                 <div class="bulk-actions">
                     <button type="button" id="addItemBtn" class="btn-success">+ Add Product</button>
                     <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
@@ -132,12 +138,12 @@
         </div>
     </div>
 
-    <!-- Saved Invoices Tab -->
-    <div id="tab-saved" class="tab-content">
+    <!-- My Invoices Tab -->
+    <div id="tab-myinvoices" class="tab-content">
         <div class="card">
             <h2>My Invoices / Dispatches</h2>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                <input type="text" id="searchInvoices" placeholder="🔍 Search by #, customer, or item..." style="flex:1;">
+                <input type="text" id="searchInvoices" placeholder="🔍 Search..." style="flex:1;">
                 <select id="filterStatus" style="width:auto; flex:0;">
                     <option value="all">All Status</option>
                     <option value="Draft">Draft</option>
@@ -148,6 +154,34 @@
                 <button id="refreshInvoicesBtn" class="btn-primary">🔄 Refresh</button>
             </div>
             <div class="scroll" id="invoicesList">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Shared with Me Tab -->
+    <div id="tab-shared" class="tab-content">
+        <div class="card">
+            <h2>📨 Invoices Shared with Me</h2>
+            <div id="sharedList">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Reconciliation Tab (Reroutes) -->
+    <div id="tab-reconciliation" class="tab-content">
+        <div class="card">
+            <h2>🔄 Reconciliation – Shared Invoices</h2>
+            <p style="color:#666; font-size:0.9rem;">Invoices shared with you for reconciliation (via reroutes).</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <input type="text" id="searchRecon" placeholder="🔍 Search..." style="flex:1;">
+                <select id="filterReconStatus" style="width:auto; flex:0;">
+                    <option value="all">All Status</option>
+                    <option value="Shared">Shared</option>
+                    <option value="Viewed">Viewed</option>
+                    <option value="Accepted">Accepted</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+                <button id="refreshReconBtn" class="btn-primary">🔄 Refresh</button>
+            </div>
+            <div class="scroll" id="reconciliationList">Loading...</div>
         </div>
     </div>
 
@@ -187,7 +221,22 @@
         </div>
     </div>
 
-    <!-- View Invoice Modal -->
+    <!-- View Shared Invoice Modal -->
+    <div id="viewSharedModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('viewSharedModal')">&times;</span>
+            <h2>📄 Shared Invoice Details</h2>
+            <div id="viewSharedContent"></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
+                <button onclick="downloadSharedPDF()" class="btn-info">📄 PDF</button>
+                <button onclick="downloadSharedCSV()" class="btn-success">📊 CSV</button>
+                <button onclick="downloadSharedJSON()" class="btn-primary">📦 JSON</button>
+                <button onclick="downloadSharedExcel()" class="btn-warning">📂 Excel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Invoice Modal (for my invoices) -->
     <div id="viewInvoiceModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('viewInvoiceModal')">&times;</span>
@@ -195,7 +244,6 @@
             <div id="viewInvoiceContent"></div>
         </div>
     </div>
-
 </div>
 
 <!-- Toast -->
@@ -220,7 +268,11 @@
     let currentUserRole = '';
     let currentUserEmail = '';
     let vendorName = '';
+    let vendorId = '';
     let invoicesUnsubscribe = null;
+    let reconUnsubscribe = null;
+    let sharedUnsubscribe = null;
+    let currentSharedInvoice = null; // holds data for download
 
     // ==================== Helpers ====================
     function escapeHtml(text) {
@@ -277,19 +329,13 @@
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
         currentUserEmail = user.email;
+        vendorId = user.uid;
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
-            vendorName = userDoc.data().vendorName || user.email.split('@')[0];
-            if (currentUserRole !== 'vendor' && currentUserRole !== 'external_vendor') {
-                showToast('Access denied. You are not a vendor.', 'error');
-                // Optionally redirect to login
-                // window.location.href = 'login.html';
-                // return;
-            }
+            vendorName = userDoc.data().vendorName || userDoc.data().supplierName || user.email.split('@')[0];
             document.getElementById('vendorName').value = vendorName;
         } else {
-            // No profile found, use email as name
             vendorName = user.email.split('@')[0];
             document.getElementById('vendorName').value = vendorName;
         }
@@ -301,6 +347,8 @@
         updatePreview();
 
         loadInvoices();
+        loadSharedInvoices();
+        loadReconciliation();
 
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -309,6 +357,9 @@
                 btn.classList.add('active');
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                if (btn.dataset.tab === 'shared') loadSharedInvoices();
+                if (btn.dataset.tab === 'reconciliation') loadReconciliation();
+                if (btn.dataset.tab === 'myinvoices') loadInvoices();
             });
         });
     });
@@ -621,23 +672,7 @@
         importedItems = [];
     };
 
-async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
-    
-    // ==================== Save Invoice (Draft or Dispatch) ====================
+    // ==================== Save Invoice ====================
     async function saveInvoice(status) {
         const confirmMsg = status === 'Draft' ? 'save as draft' : 'dispatch (submit) this invoice';
         if (!confirm(`Are you sure you want to ${confirmMsg}?`)) return;
@@ -681,7 +716,7 @@ async function hasPermission(permName) {
                 totalVAT: totalVAT,
                 totalWHT: totalWHT,
                 total: grandTotal,
-                status: status, // 'Draft' or 'Submitted'
+                status: status,
                 submittedBy: currentUserEmail,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
@@ -721,7 +756,7 @@ async function hasPermission(permName) {
         saveInvoice('Draft');
     });
 
-    // ==================== Load Invoices (Vendor only) ====================
+    // ==================== Load My Invoices ====================
     function loadInvoices() {
         if (invoicesUnsubscribe) invoicesUnsubscribe();
 
@@ -743,7 +778,6 @@ async function hasPermission(permName) {
                 html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Destination</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
                 snap.forEach(doc => {
                     const d = doc.data();
-                    // Filter by search
                     let match = true;
                     if (search) {
                         const text = (d.invoiceNumber + ' ' + d.destinationBranch + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
@@ -757,7 +791,6 @@ async function hasPermission(permName) {
                     const statusClass = `status-${d.status?.toLowerCase() || 'draft'}`;
                     const canEdit = d.status === 'Draft';
                     const canDelete = d.status === 'Draft';
-                    const canView = true;
 
                     html += `<tr>
                         <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
@@ -786,7 +819,7 @@ async function hasPermission(permName) {
     document.getElementById('filterStatus').addEventListener('change', loadInvoices);
     document.getElementById('refreshInvoicesBtn').addEventListener('click', loadInvoices);
 
-    // ==================== View Invoice ====================
+    // ==================== View My Invoice ====================
     window.viewInvoice = async function(id) {
         try {
             const doc = await db.collection('shipments').doc(id).get();
@@ -846,7 +879,7 @@ async function hasPermission(permName) {
                 return;
             }
             editDraftId = id;
-            // Populate form fields (we'll use the create form)
+            // Populate form fields
             document.getElementById('vendorName').value = d.vendorName || '';
             document.getElementById('invoiceDate').value = d.date || '';
             document.getElementById('destBranch').value = d.destinationBranch || 'Abuja';
@@ -854,7 +887,6 @@ async function hasPermission(permName) {
             document.getElementById('referenceNo').value = d.reference || '';
             document.getElementById('notes').value = d.notes || '';
 
-            // Populate items
             itemsContainer.innerHTML = '';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
@@ -866,7 +898,6 @@ async function hasPermission(permName) {
             }
             updatePreview();
 
-            // Change submit button to update draft
             const submitBtn = document.getElementById('dispatchBtn');
             submitBtn.textContent = '💾 Update Draft';
             submitBtn.onclick = async (e) => {
@@ -874,10 +905,9 @@ async function hasPermission(permName) {
                 await updateDraft();
             };
             const draftBtn = document.getElementById('saveDraftBtn');
-            draftBtn.style.display = 'none'; // hide save draft button during edit
+            draftBtn.style.display = 'none';
             document.getElementById('formMessage').textContent = 'Editing draft... Click "Update Draft" to save changes.';
 
-            // Switch to create tab
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelector('[data-tab="create"]').classList.add('active');
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -923,7 +953,6 @@ async function hasPermission(permName) {
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
             showToast('✅ Draft updated successfully.', 'success');
-            // Reset form to normal mode
             resetFormAfterEdit();
             loadInvoices();
         } catch (err) {
@@ -935,7 +964,6 @@ async function hasPermission(permName) {
     }
 
     function resetFormAfterEdit() {
-        // Restore submit button
         const submitBtn = document.getElementById('dispatchBtn');
         submitBtn.textContent = '🚛 Dispatch (Submit)';
         submitBtn.onclick = (e) => {
@@ -946,8 +974,6 @@ async function hasPermission(permName) {
         draftBtn.style.display = 'inline-block';
         document.getElementById('formMessage').textContent = '';
         editDraftId = null;
-        // Optionally clear form
-        // but keep as is
     }
 
     // ==================== Delete Invoice ====================
@@ -966,6 +992,491 @@ async function hasPermission(permName) {
         } catch (err) {
             showToast('Error: ' + err.message, 'error');
         }
+    };
+
+    // ==================== Shared Invoices (from invoice repository) ====================
+    function loadSharedInvoices() {
+        if (sharedUnsubscribe) {
+            sharedUnsubscribe();
+            sharedUnsubscribe = null;
+        }
+
+        const container = document.getElementById('sharedList');
+        container.innerHTML = '<div class="loading-spinner"></div> Loading...';
+
+        // Read from sharedInvoices where recipientId == currentUser.uid
+        sharedUnsubscribe = db.collection('sharedInvoices')
+            .where('recipientId', '==', currentUser.uid)
+            .orderBy('timestamp', 'desc')
+            .onSnapshot(async (snap) => {
+                if (snap.empty) {
+                    container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No invoices shared with you.</p>';
+                    return;
+                }
+                let html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Shared By</th><th>Message</th><th>Date</th><th>Action</th></tr>';
+                for (const doc of snap.docs) {
+                    const d = doc.data();
+                    let invoiceTotal = 'N/A';
+                    let invoiceDate = '';
+                    try {
+                        const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
+                        if (invDoc.exists) {
+                            const invData = invDoc.data();
+                            invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                            invoiceDate = invData.date || '';
+                        }
+                    } catch (e) { /* ignore */ }
+
+                    const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
+                    const isRead = d.read ? '' : ' style="font-weight:bold;"';
+                    html += `<tr${isRead}>
+                        <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                        <td>${escapeHtml(d.senderName || 'Unknown')}</td>
+                        <td>${escapeHtml(d.message || '')}</td>
+                        <td>${date}</td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="viewSharedInvoice('${d.invoiceId}')">👁️ View</button>
+                            <button class="btn-sm btn-success" onclick="markSharedRead('${doc.id}')">✅ Mark Read</button>
+                        </td>
+                    </tr>`;
+                }
+                html += '</table></div>';
+                container.innerHTML = html;
+            }, (err) => {
+                console.error('Shared invoices load error:', err);
+                if (err.message && err.message.includes('requires an index')) {
+                    const match = err.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/);
+                    const indexUrl = match ? match[0] : '#';
+                    container.innerHTML = `
+                        <div style="background:#fff3cd; padding:12px; border-radius:8px; margin:8px 0;">
+                            <strong>⚠️ Missing Firestore Index</strong>
+                            <p>To load shared invoices, you need to create a composite index.</p>
+                            <p><a href="${indexUrl}" target="_blank" style="color:#0a3d62; font-weight:bold;">Click here to create the required index</a></p>
+                            <p style="font-size:0.8rem; color:#666;">Alternatively, use fallback mode.</p>
+                            <button id="fallbackSharedBtn" class="btn-sm btn-primary" style="margin-top:8px;">Use fallback (no index needed)</button>
+                        </div>
+                    `;
+                    document.getElementById('fallbackSharedBtn')?.addEventListener('click', function() {
+                        loadSharedInvoicesFallback();
+                    });
+                } else {
+                    container.innerHTML = `<p style="color:red;">Error loading shared invoices: ${escapeHtml(err.message)}</p>`;
+                }
+            });
+    }
+
+    function loadSharedInvoicesFallback() {
+        if (sharedUnsubscribe) {
+            sharedUnsubscribe();
+            sharedUnsubscribe = null;
+        }
+        const container = document.getElementById('sharedList');
+        container.innerHTML = '<div class="loading-spinner"></div> Loading (fallback mode)...';
+
+        sharedUnsubscribe = db.collection('sharedInvoices')
+            .where('recipientId', '==', currentUser.uid)
+            .onSnapshot((snap) => {
+                let docs = [];
+                snap.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
+                docs.sort((a, b) => (b.data.timestamp?.toDate() || 0) - (a.data.timestamp?.toDate() || 0));
+                const filteredSnap = {
+                    empty: docs.length === 0,
+                    forEach: (callback) => docs.forEach(d => callback({
+                        id: d.id,
+                        data: () => d.data
+                    })),
+                    docs: docs.map(d => ({ id: d.id, data: d.data }))
+                };
+                renderSharedInvoices(filteredSnap);
+                const note = document.createElement('div');
+                note.style.cssText = 'font-size:0.75rem; color:#888; text-align:center; margin-top:8px;';
+                note.textContent = 'ℹ️ Using fallback mode (all shared invoices loaded, sorted client-side).';
+                container.appendChild(note);
+            }, (err) => {
+                console.error('Fallback shared invoices error:', err);
+                container.innerHTML = `<p style="color:red;">Error loading shared invoices (fallback): ${escapeHtml(err.message)}</p>`;
+            });
+    }
+
+    async function renderSharedInvoices(snap) {
+        const container = document.getElementById('sharedList');
+        if (snap.empty || snap.docs?.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No invoices shared with you.</p>';
+            return;
+        }
+        let html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Shared By</th><th>Message</th><th>Date</th><th>Action</th></tr>';
+        for (const doc of snap.docs) {
+            const d = doc.data();
+            let invoiceTotal = 'N/A';
+            let invoiceDate = '';
+            try {
+                const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
+                if (invDoc.exists) {
+                    const invData = invDoc.data();
+                    invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                    invoiceDate = invData.date || '';
+                }
+            } catch (e) { /* ignore */ }
+
+            const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
+            const isRead = d.read ? '' : ' style="font-weight:bold;"';
+            html += `<tr${isRead}>
+                <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                <td>${escapeHtml(d.senderName || 'Unknown')}</td>
+                <td>${escapeHtml(d.message || '')}</td>
+                <td>${date}</td>
+                <td>
+                    <button class="btn-sm btn-primary" onclick="viewSharedInvoice('${d.invoiceId}')">👁️ View</button>
+                    <button class="btn-sm btn-success" onclick="markSharedRead('${doc.id}')">✅ Mark Read</button>
+                </td>
+            </tr>`;
+        }
+        html += '</table></div>';
+        container.innerHTML = html;
+    }
+
+    window.viewSharedInvoice = async function(invoiceId) {
+        try {
+            const doc = await db.collection('invoices').doc(invoiceId).get();
+            if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+            const d = doc.data();
+            // Use the same viewInvoice function but we need to display it in the shared modal
+            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th><th>Total</th></tr>';
+            if (d.items) {
+                d.items.forEach(it => {
+                    itemsHtml += `<tr>
+                        <td>${escapeHtml(it.itemName)}</td>
+                        <td>${it.quantity}</td>
+                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                        <td>${it.discountPercent||0}%</td>
+                        <td>₦${(it.discountAmount||0).toFixed(2)}</td>
+                        <td>${it.vatPercent||0}%</td>
+                        <td>${it.whtPercent||0}%</td>
+                        <td>₦${(it.total||0).toFixed(2)}</td>
+                    </tr>`;
+                });
+            }
+            itemsHtml += '</table></div>';
+            const total = d.total || 0;
+            const html = `
+                <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
+                <p><strong>Customer:</strong> ${escapeHtml(d.customer)}</p>
+                <p><strong>Branch:</strong> ${escapeHtml(d.branch)}</p>
+                <p><strong>Date:</strong> ${escapeHtml(d.date)}</p>
+                <p><strong>Total Value:</strong> ₦${total.toLocaleString()}</p>
+                <p><strong>Subtotal:</strong> ₦${(d.subtotal||0).toLocaleString()}</p>
+                <p><strong>Total Discount:</strong> ₦${(d.totalDiscount||0).toLocaleString()}</p>
+                <p><strong>Total VAT:</strong> ₦${(d.totalVAT||0).toLocaleString()}</p>
+                <p><strong>Total WHT:</strong> ₦${(d.totalWHT||0).toLocaleString()}</p>
+                ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
+                <h4>Items</h4>
+                ${itemsHtml}
+            `;
+            document.getElementById('viewSharedContent').innerHTML = html;
+            document.getElementById('viewSharedModal').style.display = 'flex';
+        } catch (err) {
+            showToast('Error viewing invoice: ' + err.message, 'error');
+        }
+    };
+
+    window.markSharedRead = async function(sharedId) {
+        try {
+            await db.collection('sharedInvoices').doc(sharedId).update({
+                read: true
+            });
+            showToast('Marked as read.', 'success');
+            loadSharedInvoices();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    // ==================== Reconciliation (Reroutes) ====================
+    function loadReconciliation() {
+        if (reconUnsubscribe) reconUnsubscribe();
+
+        const search = document.getElementById('searchRecon').value.toLowerCase().trim();
+        const statusFilter = document.getElementById('filterReconStatus').value;
+
+        const listDiv = document.getElementById('reconciliationList');
+        listDiv.innerHTML = '<div class="loading-spinner"></div> Loading...';
+
+        let q = db.collection('reroutes')
+            .where('destinationType', '==', 'vendor')
+            .where('destination', '==', vendorName)
+            .orderBy('createdAt', 'desc');
+
+        reconUnsubscribe = q.onSnapshot(snap => {
+            let html = '';
+            if (snap.empty) {
+                html = '<p style="text-align:center; color:#888; padding:20px;">No reconciliation invoices found.</p>';
+            } else {
+                html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Source</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    let match = true;
+                    if (search) {
+                        const text = (d.reference + ' ' + d.source + ' ' + (d.items?.map(i=>i.itemName).join(' ')||'')).toLowerCase();
+                        if (!text.includes(search)) match = false;
+                    }
+                    if (statusFilter !== 'all' && d.status !== statusFilter) match = false;
+                    if (!match) return;
+
+                    let total = 0;
+                    let itemsShort = '';
+                    if (d.items) {
+                        total = d.items.reduce((sum, i) => sum + (i.total || 0), 0);
+                        itemsShort = d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40);
+                    }
+                    const statusClass = `status-${d.status?.toLowerCase() || 'shared'}`;
+
+                    html += `<tr>
+                        <td><strong>${escapeHtml(d.reference || 'N/A')}</strong></td>
+                        <td>${escapeHtml(d.date || '')}</td>
+                        <td><span class="badge">${escapeHtml(d.source)}</span></td>
+                        <td class="items-cell">${escapeHtml(itemsShort)}</td>
+                        <td class="cost-cell">₦${total.toLocaleString()}</td>
+                        <td><span class="status-badge ${statusClass}">${escapeHtml(d.status || 'Shared')}</span></td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="viewReconInvoice('${doc.id}')">👁️</button>
+                            <button class="btn-sm btn-success" onclick="acceptReconInvoice('${doc.id}')">✅ Accept</button>
+                            <button class="btn-sm btn-danger" onclick="rejectReconInvoice('${doc.id}')">❌ Reject</button>
+                        </td>
+                    </tr>`;
+                });
+                html += '</table></div>';
+            }
+            listDiv.innerHTML = html;
+        }, err => {
+            listDiv.innerHTML = '<p style="color:red;">Error loading reconciliation: ' + escapeHtml(err.message) + '</p>';
+            showToast('Error loading reconciliation: ' + err.message, 'error');
+        });
+    }
+
+    window.viewReconInvoice = async function(id) {
+        try {
+            const doc = await db.collection('reroutes').doc(id).get();
+            if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+            const d = doc.data();
+            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th><th>Total</th></tr>';
+            if (d.items) {
+                d.items.forEach(it => {
+                    itemsHtml += `<tr>
+                        <td>${escapeHtml(it.itemName)}</td>
+                        <td>${it.orderedQty}</td>
+                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                        <td>${it.discountPercent||0}%</td>
+                        <td>₦${(it.discountAmount||0).toFixed(2)}</td>
+                        <td>${it.vatPercent||0}%</td>
+                        <td>${it.whtPercent||0}%</td>
+                        <td>₦${(it.total||0).toFixed(2)}</td>
+                    </tr>`;
+                });
+            }
+            itemsHtml += '</table></div>';
+            const total = d.total || 0;
+            const html = `
+                <p><strong>Reference:</strong> ${escapeHtml(d.reference || 'N/A')}</p>
+                <p><strong>Source:</strong> ${escapeHtml(d.source)}</p>
+                <p><strong>Destination:</strong> ${escapeHtml(d.destination)}</p>
+                <p><strong>Date:</strong> ${escapeHtml(d.date)}</p>
+                <p><strong>Status:</strong> <span class="status-badge status-${d.status?.toLowerCase()}">${escapeHtml(d.status || 'Shared')}</span></p>
+                <p><strong>Total Value:</strong> ₦${total.toLocaleString()}</p>
+                ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
+                <h4>Items</h4>
+                ${itemsHtml}
+            `;
+            document.getElementById('viewSharedContent').innerHTML = html;
+            document.getElementById('viewSharedModal').style.display = 'flex';
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    window.acceptReconInvoice = async function(id) {
+        if (!confirm('Accept this invoice?')) return;
+        try {
+            await db.collection('reroutes').doc(id).update({
+                status: 'Accepted',
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast('✅ Invoice accepted.', 'success');
+            loadReconciliation();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    window.rejectReconInvoice = async function(id) {
+        if (!confirm('Reject this invoice?')) return;
+        try {
+            await db.collection('reroutes').doc(id).update({
+                status: 'Rejected',
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast('❌ Invoice rejected.', 'info');
+            loadReconciliation();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    // ==================== Download Functions for Shared Invoice ====================
+    function getSharedInvoiceData() {
+        const contentDiv = document.getElementById('viewSharedContent');
+        if (!contentDiv) return null;
+        // Try to extract data from displayed content (for simplicity, we use currentSharedInvoice)
+        return currentSharedInvoice;
+    }
+
+    window.downloadSharedPDF = async function() {
+        const data = getSharedInvoiceData();
+        if (!data) { showToast('No invoice loaded.', 'error'); return; }
+        // Build HTML for PDF from data
+        const d = data;
+        let itemsHtml = '';
+        if (d.items) {
+            d.items.forEach(it => {
+                itemsHtml += `<tr>
+                    <td>${escapeHtml(it.itemName)}</td>
+                    <td>${it.orderedQty}</td>
+                    <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                    <td>${it.discountPercent||0}%</td>
+                    <td>₦${(it.discountAmount||0).toFixed(2)}</td>
+                    <td>${it.vatPercent||0}%</td>
+                    <td>${it.whtPercent||0}%</td>
+                    <td>₦${(it.total||0).toFixed(2)}</td>
+                </tr>`;
+            });
+        }
+        const total = d.total || 0;
+        const html = `
+            <div style="padding:20px; font-family:sans-serif;">
+                <h2>NEVAMAK – Shared Invoice</h2>
+                <p><strong>Reference:</strong> ${escapeHtml(d.reference || d.invoiceNumber || 'N/A')}</p>
+                <p><strong>Source:</strong> ${escapeHtml(d.source || d.vendorName || 'N/A')}</p>
+                <p><strong>Destination:</strong> ${escapeHtml(d.destination || 'N/A')}</p>
+                <p><strong>Date:</strong> ${escapeHtml(d.date || '')}</p>
+                <p><strong>Status:</strong> ${escapeHtml(d.status || 'Shared')}</p>
+                <p><strong>Total Value:</strong> ₦${total.toLocaleString()}</p>
+                <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                    <tr style="background:#f0f0f0;"><th>Item</th><th>Qty</th><th>Unit Price</th><th>Disc%</th><th>Disc₦</th><th>VAT%</th><th>WHT%</th><th>Total</th></tr>
+                    ${itemsHtml}
+                    <tr><td colspan="7"><strong>Subtotal</strong></td><td><strong>₦${(d.subtotal||0).toFixed(2)}</strong></td></tr>
+                    <tr><td colspan="7"><strong>Total Discount</strong></td><td><strong>₦${(d.totalDiscount||0).toFixed(2)}</strong></td></tr>
+                    <tr><td colspan="7"><strong>Total VAT</strong></td><td><strong>₦${(d.totalVAT||0).toFixed(2)}</strong></td></tr>
+                    <tr><td colspan="7"><strong>Total WHT</strong></td><td><strong>₦${(d.totalWHT||0).toFixed(2)}</strong></td></tr>
+                    <tr><td colspan="7"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                </table>
+                ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
+            </div>
+        `;
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        document.body.appendChild(tempDiv);
+        try {
+            const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`SharedInvoice_${d.reference || d.invoiceNumber || 'invoice'}.pdf`);
+            showToast('✅ PDF downloaded.', 'success');
+        } catch (err) {
+            showToast('PDF error: ' + err.message, 'error');
+        } finally {
+            document.body.removeChild(tempDiv);
+        }
+    };
+
+    window.downloadSharedCSV = function() {
+        const data = getSharedInvoiceData();
+        if (!data) { showToast('No invoice loaded.', 'error'); return; }
+        const d = data;
+        const rows = [['Item', 'Qty', 'Unit Price', 'Disc%', 'Disc₦', 'VAT%', 'WHT%', 'Total']];
+        if (d.items) {
+            d.items.forEach(it => {
+                rows.push([it.itemName, it.orderedQty, it.unitPrice, it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent, it.total]);
+            });
+        }
+        rows.push(['Subtotal', '', '', '', '', '', '', d.subtotal || 0]);
+        rows.push(['Total Discount', '', '', '', '', '', '', d.totalDiscount || 0]);
+        rows.push(['Total VAT', '', '', '', '', '', '', d.totalVAT || 0]);
+        rows.push(['Total WHT', '', '', '', '', '', '', d.totalWHT || 0]);
+        rows.push(['Grand Total', '', '', '', '', '', '', d.total || 0]);
+
+        const csvContent = rows.map(row => row.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SharedInvoice_${d.reference || d.invoiceNumber || 'invoice'}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('✅ CSV downloaded.', 'success');
+    };
+
+    window.downloadSharedJSON = function() {
+        const data = getSharedInvoiceData();
+        if (!data) { showToast('No invoice loaded.', 'error'); return; }
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SharedInvoice_${data.reference || data.invoiceNumber || 'invoice'}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('✅ JSON downloaded.', 'success');
+    };
+
+    window.downloadSharedExcel = function() {
+        const data = getSharedInvoiceData();
+        if (!data) { showToast('No invoice loaded.', 'error'); return; }
+        const wb = XLSX.utils.book_new();
+        // Main items sheet
+        const itemRows = [['Item', 'Qty', 'Unit Price', 'Disc%', 'Disc₦', 'VAT%', 'WHT%', 'Total']];
+        if (data.items) {
+            data.items.forEach(it => {
+                itemRows.push([it.itemName, it.orderedQty, it.unitPrice, it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent, it.total]);
+            });
+        }
+        itemRows.push(['Subtotal', '', '', '', '', '', '', data.subtotal || 0]);
+        itemRows.push(['Total Discount', '', '', '', '', '', '', data.totalDiscount || 0]);
+        itemRows.push(['Total VAT', '', '', '', '', '', '', data.totalVAT || 0]);
+        itemRows.push(['Total WHT', '', '', '', '', '', '', data.totalWHT || 0]);
+        itemRows.push(['Grand Total', '', '', '', '', '', '', data.total || 0]);
+        const ws = XLSX.utils.aoa_to_sheet(itemRows);
+        XLSX.utils.book_append_sheet(wb, ws, 'Items');
+        // Summary sheet
+        const summaryRows = [
+            ['Reference', data.reference || data.invoiceNumber || 'N/A'],
+            ['Source', data.source || data.vendorName || 'N/A'],
+            ['Destination', data.destination || 'N/A'],
+            ['Date', data.date || ''],
+            ['Status', data.status || 'Shared'],
+            ['Total', data.total || 0],
+            ['Notes', data.notes || '']
+        ];
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+        XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SharedInvoice_${data.reference || data.invoiceNumber || 'invoice'}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('✅ Excel downloaded.', 'success');
     };
 
     // ==================== Change Password ====================
@@ -990,7 +1501,6 @@ async function hasPermission(permName) {
         msg.textContent = '';
 
         try {
-            // Re-authenticate user
             const credential = firebase.auth.EmailAuthProvider.credential(currentUserEmail, current);
             await currentUser.reauthenticateWithCredential(credential);
             await currentUser.updatePassword(newPass);
@@ -1010,8 +1520,7 @@ async function hasPermission(permName) {
     });
 
     // ==================== Init ====================
-    console.log('External Vendor page loaded.');
-    // Initial row already added in auth callback.
+    console.log('External Vendor page loaded with shared invoices and reconciliation.');
 </script>
 </body>
 </html>
