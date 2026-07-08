@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Invoice Repository</title>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
@@ -284,10 +282,7 @@
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
         measurementId: "G-MZ8NT6KK8N"
     };
-    // Re-initialize to avoid duplicates
-    if (firebase.apps.length) {
-        firebase.apps[0].delete();
-    }
+    if (firebase.apps.length) { firebase.apps[0].delete(); }
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
@@ -348,9 +343,7 @@
             btn.classList.add('btn-loading');
             btn.disabled = true;
         } else {
-            if (btn._originalText) {
-                btn.innerHTML = btn._originalText;
-            }
+            if (btn._originalText) { btn.innerHTML = btn._originalText; }
             btn.classList.remove('btn-loading');
             btn.disabled = false;
         }
@@ -364,20 +357,16 @@
 
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
-        document.getElementById('sendMessage').textContent = '';
-        document.getElementById('moveMessage').textContent = '';
-        document.getElementById('bulkMessage').textContent = '';
-        document.getElementById('shareMessageResult').textContent = '';
+        ['sendMessage','moveMessage','bulkMessage','shareMessageResult'].forEach(e => {
+            const el = document.getElementById(e);
+            if (el) el.textContent = '';
+        });
     }
     window.closeModal = closeModal;
 
     window.onclick = function(event) {
         if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-            document.getElementById('sendMessage').textContent = '';
-            document.getElementById('moveMessage').textContent = '';
-            document.getElementById('bulkMessage').textContent = '';
-            document.getElementById('shareMessageResult').textContent = '';
+            closeModal(event.target.id);
         }
     };
 
@@ -500,19 +489,9 @@
                 const itemTotal = afterDisc + itemVAT - itemWHT;
                 grandTotal += itemTotal;
                 items.push({
-                    name: name,
-                    qty: qty,
-                    originalPrice: price,
-                    updatedPrice: updatedPrice,
-                    subtotal: itemSub,
-                    discPct: discPct,
-                    discAmt: discAmt,
-                    itemDisc: itemDisc,
-                    vatPct: vatPct,
-                    whtPct: whtPct,
-                    itemVAT: itemVAT,
-                    itemWHT: itemWHT,
-                    total: itemTotal
+                    name: name, qty: qty, originalPrice: price, updatedPrice: updatedPrice,
+                    subtotal: itemSub, discPct: discPct, discAmt: discAmt, itemDisc: itemDisc,
+                    vatPct: vatPct, whtPct: whtPct, itemVAT: itemVAT, itemWHT: itemWHT, total: itemTotal
                 });
             }
         });
@@ -536,10 +515,7 @@
     // ==================== Bulk Actions ====================
     document.getElementById('applyToSelectedBtn').addEventListener('click', () => {
         const selected = document.querySelectorAll('.item-checkbox:checked');
-        if (selected.length === 0) {
-            showToast('Please select at least one item.', 'error');
-            return;
-        }
+        if (selected.length === 0) { showToast('Please select at least one item.', 'error'); return; }
         document.getElementById('bulkItemCount').textContent = selected.length;
         document.getElementById('bulkDiscountPct').value = '0';
         document.getElementById('bulkDiscountAmt').value = '0';
@@ -980,7 +956,7 @@
         }
     });
 
-    // ==================== Load Suppliers for Share ====================
+    // ==================== Load Suppliers ====================
     async function loadSuppliers() {
         try {
             const snap = await db.collection('suppliers').get();
@@ -1331,7 +1307,7 @@
         }
     };
 
-    // ==================== Share Modal (Using sharedInvoices Collection) ====================
+    // ==================== Share Modal (Reliable – uses only sharedInvoices) ====================
     let shareInvoiceData = null;
 
     window.openShareModal = async function(id) {
@@ -1458,7 +1434,7 @@
                 return;
             }
 
-            // Now share using sharedInvoices collection
+            // Write to sharedInvoices only (reliable)
             const message = document.getElementById('shareMessage').value.trim() || `Invoice ${shareInvoiceData.data.invoiceNumber} shared with you.`;
             await db.collection('sharedInvoices').add({
                 invoiceId: shareInvoiceData.id,
@@ -1472,38 +1448,6 @@
                 read: false,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-
-            // Try to create a notification too (optional)
-            try {
-                await db.collection('notifications').add({
-                    userId: recipientId,
-                    message: `📨 Invoice ${shareInvoiceData.data.invoiceNumber} shared by ${currentUserEmail}. ${message}`,
-                    invoiceId: shareInvoiceData.id,
-                    invoiceNumber: shareInvoiceData.data.invoiceNumber,
-                    link: `${window.location.origin}/invoice_repo.html`,
-                    read: false,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            } catch (notifErr) {
-                // If notification fails, it's okay because we have the sharedInvoices record
-                console.warn('Notification not sent:', notifErr.message);
-            }
-
-            // Log activity (optional)
-            try {
-                await db.collection('activityLog').add({
-                    actionType: 'invoice_shared',
-                    invoiceId: shareInvoiceData.id,
-                    invoiceNumber: shareInvoiceData.data.invoiceNumber,
-                    recipientId: recipientId,
-                    recipientName: recipientName,
-                    recipientRole: recipientRole,
-                    sharedBy: currentUserEmail,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            } catch (logErr) {
-                console.warn('Activity log not recorded:', logErr.message);
-            }
 
             showToast(`✅ Invoice shared with ${recipientName}`, 'success');
             document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName}`;
@@ -1541,7 +1485,6 @@
                 let html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Shared By</th><th>Message</th><th>Date</th><th>Action</th></tr>';
                 for (const doc of snap.docs) {
                     const d = doc.data();
-                    // Fetch invoice details if needed
                     let invoiceTotal = 'N/A';
                     let invoiceDate = '';
                     try {
@@ -1578,9 +1521,6 @@
         try {
             const doc = await db.collection('invoices').doc(invoiceId).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
-            // Use the same view function
-            // We'll open the invoice in a new window or in the same view
-            // For simplicity, we'll use the same viewInvoice function
             viewInvoice(invoiceId);
         } catch (err) {
             showToast('Error viewing invoice: ' + err.message, 'error');
@@ -1713,7 +1653,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with sharing via sharedInvoices.');
+    console.log('NEVAMAK Invoice Repository loaded – sharing works with sharedInvoices only.');
 </script>
 </body>
 </html>
