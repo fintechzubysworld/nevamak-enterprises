@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>NEVAMAK – Invoice Repository</title>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -1533,7 +1532,7 @@
         }
     });
 
-    // ==================== Load Shared Invoices (with index fallback) ====================
+    // ==================== Load Shared Invoices (async/await fixes) ====================
     function loadSharedInvoices() {
         if (sharedUnsubscribe) {
             sharedUnsubscribe();
@@ -1552,7 +1551,6 @@
             }, (err) => {
                 console.error('Shared invoices load error:', err);
                 if (err.message && err.message.includes('requires an index')) {
-                    // Show index creation link
                     const match = err.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/);
                     const indexUrl = match ? match[0] : '#';
                     container.innerHTML = `
@@ -1608,7 +1606,8 @@
             });
     }
 
-    function renderSharedInvoices(snap) {
+    // FIX: make this async
+    async function renderSharedInvoices(snap) {
         const container = document.getElementById('sharedList');
         if (snap.empty || snap.docs?.length === 0) {
             container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No invoices shared with you.</p>';
@@ -1781,7 +1780,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded – detailed invoice view with per-item taxes and shared invoice index fallback.');
+    console.log('NEVAMAK Invoice Repository loaded – detailed invoice view with per-item taxes and fixed async.');
 </script>
 </body>
 </html>
