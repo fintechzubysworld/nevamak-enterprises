@@ -11,6 +11,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
@@ -74,7 +75,7 @@
         .toast.success { background: #27ae60; }
         .toast.error { background: #e74c3c; }
         .recipient-selector { margin: 12px 0; }
-        .recipient-selector select { width: 100%; }
+        .recipient-selector select { width: 100%; padding: 10px; border-radius: 40px; border: 1px solid #ccc; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -99,6 +100,7 @@
     <div class="tabs">
         <button class="tab-btn active" data-tab="create">✏️ Create Invoice</button>
         <button class="tab-btn" data-tab="list">📋 Saved Invoices</button>
+        <button class="tab-btn" data-tab="shared">📨 Shared with Me</button>
     </div>
 
     <!-- Create Invoice Tab -->
@@ -106,7 +108,6 @@
         <div class="card">
             <h2>New Invoice</h2>
             <form id="invoiceForm" novalidate>
-                <!-- ... same as before ... -->
                 <div class="flex-row">
                     <input type="text" id="invoiceNumber" placeholder="Invoice # (auto)" readonly>
                     <input type="date" id="invoiceDate" required>
@@ -168,6 +169,14 @@
                 <button id="refreshInvoicesBtn" class="btn-primary">🔄 Refresh</button>
             </div>
             <div class="scroll" id="invoicesList"><div class="loading-spinner"></div> Loading...</div>
+        </div>
+    </div>
+
+    <!-- Shared with Me Tab -->
+    <div id="tab-shared" class="tab-content">
+        <div class="card">
+            <h2>📨 Invoices Shared with Me</h2>
+            <div id="sharedList">Loading...</div>
         </div>
     </div>
 </div>
@@ -275,6 +284,10 @@
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
         measurementId: "G-MZ8NT6KK8N"
     };
+    // Re-initialize to avoid duplicates
+    if (firebase.apps.length) {
+        firebase.apps[0].delete();
+    }
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
@@ -288,6 +301,7 @@
     let importedItems = [];
     let moveInvoiceId = null;
     let invoicesUnsubscribe = null;
+    let sharedUnsubscribe = null;
     let suppliers = [];
 
     // ==================== DOM ====================
@@ -299,6 +313,7 @@
     const invoicePreviewContainer = document.getElementById('invoicePreviewContainer');
     const formMessage = document.getElementById('formMessage');
     const invoicesList = document.getElementById('invoicesList');
+    const sharedList = document.getElementById('sharedList');
     const searchInvoices = document.getElementById('searchInvoices');
     const refreshBtn = document.getElementById('refreshInvoicesBtn');
     const importPreviewContainer = document.getElementById('importPreviewContainer');
@@ -347,6 +362,25 @@
         return num;
     }
 
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+        document.getElementById('sendMessage').textContent = '';
+        document.getElementById('moveMessage').textContent = '';
+        document.getElementById('bulkMessage').textContent = '';
+        document.getElementById('shareMessageResult').textContent = '';
+    }
+    window.closeModal = closeModal;
+
+    window.onclick = function(event) {
+        if (event.target.classList.contains('modal')) {
+            event.target.style.display = 'none';
+            document.getElementById('sendMessage').textContent = '';
+            document.getElementById('moveMessage').textContent = '';
+            document.getElementById('bulkMessage').textContent = '';
+            document.getElementById('shareMessageResult').textContent = '';
+        }
+    };
+
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
@@ -373,12 +407,14 @@
         document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
         await loadSuppliers();
         loadInvoices();
+        loadSharedInvoices();
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                if (btn.dataset.tab === 'shared') loadSharedInvoices();
             });
         });
         addItemRow();
@@ -435,7 +471,7 @@
         updateCostPreview();
     }
 
-    // ==================== Calculate Item Totals with Transport Multiplier ====================
+    // ==================== Calculations ====================
     function calculateItemTotals() {
         const multiplier = validateNumber(transportMultiplier.value, 0.01) || 1.00;
         const items = [];
@@ -484,7 +520,6 @@
         return { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier };
     }
 
-    // ==================== Update Cost Preview ====================
     function updateCostPreview() {
         const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
         document.getElementById('invoiceCostPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
@@ -498,7 +533,7 @@
         `;
     }
 
-    // ==================== Bulk Apply to Selected ====================
+    // ==================== Bulk Actions ====================
     document.getElementById('applyToSelectedBtn').addEventListener('click', () => {
         const selected = document.querySelectorAll('.item-checkbox:checked');
         if (selected.length === 0) {
@@ -539,11 +574,9 @@
         showToast('✅ Applied to ' + selectedIds.length + ' items.', 'success');
     });
 
-    // ==================== Apply to All ====================
     document.getElementById('applyToAllBtn').addEventListener('click', () => {
         const rows = document.querySelectorAll('.item-row');
         if (rows.length === 0) { showToast('No items to apply to.', 'error'); return; }
-        
         const discPct = prompt('Enter Discount % for all items (0-100):', '0');
         if (discPct === null) return;
         const discAmt = prompt('Enter Discount Amount (₦) for all items:', '0');
@@ -563,7 +596,6 @@
         showToast('✅ Applied to all items.', 'success');
     });
 
-    // ==================== Clear Taxes ====================
     document.getElementById('clearTaxesBtn').addEventListener('click', () => {
         if (!confirm('Clear all tax/discount fields on all items?')) return;
         document.querySelectorAll('.item-row').forEach(row => {
@@ -809,7 +841,6 @@
                 return;
             }
 
-            // Check for duplicate invoice number
             const existingCheck = await db.collection('invoices')
                 .where('invoiceNumber', '==', invNum)
                 .get();
@@ -853,7 +884,6 @@
                 total: grandTotal,
                 movedToWarehouse: false,
                 createdBy: currentUserEmail,
-                sharedWith: [],
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -1101,7 +1131,7 @@
         }
     };
 
-    // ==================== Download PDF from Saved Invoice ====================
+    // ==================== Download PDF ====================
     window.downloadPDF = async function(id) {
         const btn = event && event.target ? event.target : null;
         if (btn) setButtonLoading(btn, true);
@@ -1175,7 +1205,7 @@
         }
     };
 
-    // ==================== Download CSV from Saved Invoice ====================
+    // ==================== Download CSV ====================
     window.downloadCSV = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
@@ -1248,26 +1278,6 @@
         }
     };
 
-    function closeModal(id) {
-        document.getElementById(id).style.display = 'none';
-        document.getElementById('sendMessage').textContent = '';
-        document.getElementById('moveMessage').textContent = '';
-        document.getElementById('bulkMessage').textContent = '';
-        document.getElementById('shareMessageResult').textContent = '';
-    }
-    window.closeModal = closeModal;
-
-    window.onclick = function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-            document.getElementById('sendMessage').textContent = '';
-            document.getElementById('moveMessage').textContent = '';
-            document.getElementById('bulkMessage').textContent = '';
-            document.getElementById('shareMessageResult').textContent = '';
-        }
-    };
-
-    // ==================== Send Methods ====================
     window.sendViaEmail = async function() {
         if (!sendInvoiceId) return;
         try {
@@ -1321,7 +1331,7 @@
         }
     };
 
-    // ==================== Share Modal ====================
+    // ==================== Share Modal (Using sharedInvoices Collection) ====================
     let shareInvoiceData = null;
 
     window.openShareModal = async function(id) {
@@ -1375,8 +1385,12 @@
         let recipientId = null;
         let recipientName = '';
         let recipientRole = '';
+        const btn = this;
+        setButtonLoading(btn, true);
+        document.getElementById('shareMessageResult').textContent = '';
 
         try {
+            // Find recipient
             if (type === 'branch_rep') {
                 const branch = shareInvoiceData.data.branch || 'Lagos';
                 const roleMap = { 'Abuja': 'abuja_rep', 'Portharcourt': 'ph_rep', 'Lagos': 'lagos_sender' };
@@ -1387,6 +1401,7 @@
                     .get();
                 if (snap.empty) {
                     document.getElementById('shareMessageResult').textContent = `No ${targetRole} user found for ${branch}.`;
+                    setButtonLoading(btn, false);
                     return;
                 }
                 const doc = snap.docs[0];
@@ -1400,6 +1415,7 @@
                     .get();
                 if (snap.empty) {
                     document.getElementById('shareMessageResult').textContent = 'No Lagos Sender user found.';
+                    setButtonLoading(btn, false);
                     return;
                 }
                 const doc = snap.docs[0];
@@ -1410,16 +1426,16 @@
                 const vendorId = document.getElementById('shareVendorList').value;
                 if (!vendorId) {
                     document.getElementById('shareMessageResult').textContent = 'Please select a vendor.';
+                    setButtonLoading(btn, false);
                     return;
                 }
-                // Find supplier document
                 const supplierDoc = await db.collection('suppliers').doc(vendorId).get();
                 if (!supplierDoc.exists) {
                     document.getElementById('shareMessageResult').textContent = 'Vendor not found.';
+                    setButtonLoading(btn, false);
                     return;
                 }
                 const supplierData = supplierDoc.data();
-                // Find user with this supplier name (vendor account)
                 const snap = await db.collection('users')
                     .where('supplierName', '==', supplierData.name)
                     .where('role', '==', 'vendor')
@@ -1427,6 +1443,7 @@
                     .get();
                 if (snap.empty) {
                     document.getElementById('shareMessageResult').textContent = `No vendor account found for ${supplierData.name}. Create a vendor user first.`;
+                    setButtonLoading(btn, false);
                     return;
                 }
                 const userDoc = snap.docs[0];
@@ -1437,25 +1454,43 @@
 
             if (!recipientId) {
                 document.getElementById('shareMessageResult').textContent = 'No valid recipient found.';
+                setButtonLoading(btn, false);
                 return;
             }
 
-            // Prepare share data
-            const invoiceLink = `${window.location.origin}/invoice_repo.html?view=${shareInvoiceData.id}`;
+            // Now share using sharedInvoices collection
             const message = document.getElementById('shareMessage').value.trim() || `Invoice ${shareInvoiceData.data.invoiceNumber} shared with you.`;
+            await db.collection('sharedInvoices').add({
+                invoiceId: shareInvoiceData.id,
+                invoiceNumber: shareInvoiceData.data.invoiceNumber,
+                recipientId: recipientId,
+                recipientName: recipientName,
+                recipientRole: recipientRole,
+                senderId: currentUser.uid,
+                senderName: currentUserEmail,
+                message: message,
+                read: false,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-            // Attempt primary method: write to notifications and activityLog
-            let primarySuccess = false;
+            // Try to create a notification too (optional)
             try {
                 await db.collection('notifications').add({
                     userId: recipientId,
                     message: `📨 Invoice ${shareInvoiceData.data.invoiceNumber} shared by ${currentUserEmail}. ${message}`,
                     invoiceId: shareInvoiceData.id,
                     invoiceNumber: shareInvoiceData.data.invoiceNumber,
-                    link: invoiceLink,
+                    link: `${window.location.origin}/invoice_repo.html`,
                     read: false,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
+            } catch (notifErr) {
+                // If notification fails, it's okay because we have the sharedInvoices record
+                console.warn('Notification not sent:', notifErr.message);
+            }
+
+            // Log activity (optional)
+            try {
                 await db.collection('activityLog').add({
                     actionType: 'invoice_shared',
                     invoiceId: shareInvoiceData.id,
@@ -1466,44 +1501,103 @@
                     sharedBy: currentUserEmail,
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                primarySuccess = true;
-                showToast(`✅ Invoice shared with ${recipientName}`, 'success');
-                document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName}`;
-                document.getElementById('shareMessageResult').style.color = 'green';
-                setTimeout(() => closeModal('shareModal'), 2000);
-            } catch (permError) {
-                console.warn('Primary notification failed, using fallback:', permError);
-                // Fallback: write to sharedInvoices collection
-                await db.collection('sharedInvoices').add({
-                    invoiceId: shareInvoiceData.id,
-                    invoiceNumber: shareInvoiceData.data.invoiceNumber,
-                    sharedBy: currentUserEmail,
-                    sharedWith: recipientId,
-                    sharedWithName: recipientName,
-                    message: message,
-                    link: invoiceLink,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    read: false
-                });
-                // Also update the invoice document itself (if possible)
-                await db.collection('invoices').doc(shareInvoiceData.id).update({
-                    sharedWith: firebase.firestore.FieldValue.arrayUnion({
-                        userId: recipientId,
-                        name: recipientName,
-                        sharedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    })
-                }).catch(e => console.warn('Could not update invoice sharedWith:', e));
-                showToast(`✅ Invoice shared with ${recipientName} (using fallback)`, 'success');
-                document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName} (notification not sent, but they can see it in shared list)`;
-                document.getElementById('shareMessageResult').style.color = 'green';
-                setTimeout(() => closeModal('shareModal'), 3000);
+            } catch (logErr) {
+                console.warn('Activity log not recorded:', logErr.message);
             }
+
+            showToast(`✅ Invoice shared with ${recipientName}`, 'success');
+            document.getElementById('shareMessageResult').textContent = `✅ Shared with ${recipientName}`;
+            document.getElementById('shareMessageResult').style.color = 'green';
+            setTimeout(() => closeModal('shareModal'), 2000);
+
         } catch (err) {
             console.error('Share error:', err);
             document.getElementById('shareMessageResult').textContent = 'Error: ' + err.message;
             document.getElementById('shareMessageResult').style.color = 'red';
+            showToast('Error sharing invoice: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
         }
     });
+
+    // ==================== Load Shared Invoices ====================
+    function loadSharedInvoices() {
+        if (sharedUnsubscribe) {
+            sharedUnsubscribe();
+            sharedUnsubscribe = null;
+        }
+
+        const container = document.getElementById('sharedList');
+        container.innerHTML = '<div class="loading-spinner"></div> Loading...';
+
+        sharedUnsubscribe = db.collection('sharedInvoices')
+            .where('recipientId', '==', currentUser.uid)
+            .orderBy('timestamp', 'desc')
+            .onSnapshot(async (snap) => {
+                if (snap.empty) {
+                    container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No invoices shared with you.</p>';
+                    return;
+                }
+                let html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Shared By</th><th>Message</th><th>Date</th><th>Action</th></tr>';
+                for (const doc of snap.docs) {
+                    const d = doc.data();
+                    // Fetch invoice details if needed
+                    let invoiceTotal = 'N/A';
+                    let invoiceDate = '';
+                    try {
+                        const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
+                        if (invDoc.exists) {
+                            const invData = invDoc.data();
+                            invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                            invoiceDate = invData.date || '';
+                        }
+                    } catch (e) { /* ignore */ }
+
+                    const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
+                    const isRead = d.read ? '' : ' style="font-weight:bold;"';
+                    html += `<tr${isRead}>
+                        <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                        <td>${escapeHtml(d.senderName || 'Unknown')}</td>
+                        <td>${escapeHtml(d.message || '')}</td>
+                        <td>${date}</td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="viewSharedInvoice('${d.invoiceId}')">👁️ View</button>
+                            <button class="btn-sm btn-success" onclick="markSharedRead('${doc.id}')">✅ Mark Read</button>
+                        </td>
+                    </tr>`;
+                }
+                html += '</table></div>';
+                container.innerHTML = html;
+            }, (err) => {
+                console.error('Shared invoices load error:', err);
+                container.innerHTML = '<p style="color:red;">Error loading shared invoices: ' + escapeHtml(err.message) + '</p>';
+            });
+    }
+
+    window.viewSharedInvoice = async function(invoiceId) {
+        try {
+            const doc = await db.collection('invoices').doc(invoiceId).get();
+            if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+            // Use the same view function
+            // We'll open the invoice in a new window or in the same view
+            // For simplicity, we'll use the same viewInvoice function
+            viewInvoice(invoiceId);
+        } catch (err) {
+            showToast('Error viewing invoice: ' + err.message, 'error');
+        }
+    };
+
+    window.markSharedRead = async function(sharedId) {
+        try {
+            await db.collection('sharedInvoices').doc(sharedId).update({
+                read: true
+            });
+            showToast('Marked as read.', 'success');
+            loadSharedInvoices();
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
 
     // ==================== Move to Warehouse ====================
     window.openMoveWarehouseModal = async function(id) {
@@ -1619,7 +1713,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with enhanced sharing fallback.');
+    console.log('NEVAMAK Invoice Repository loaded with sharing via sharedInvoices.');
 </script>
 </body>
 </html>
