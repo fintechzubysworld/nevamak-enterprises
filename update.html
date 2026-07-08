@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – File Updater</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; }
+        .container { max-width: 1200px; margin: auto; }
+        .card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        h2 { margin-top: 0; color: #0a3d62; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .nav { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; }
+        .nav a, .logout-btn { background: #3c6382; color: white; padding: 8px 16px; border-radius: 40px; text-decoration: none; border: none; cursor: pointer; }
+        .nav a:hover, .logout-btn:hover { background: #1a252f; }
+        .file-item { border: 1px solid #ddd; border-radius: 16px; margin-bottom: 16px; overflow: hidden; }
+        .file-header { background: #f8f9fa; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #ddd; }
+        .file-header .file-name { font-weight: 600; color: #0a3d62; }
+        .file-body { display: none; padding: 12px; }
+        .file-body.open { display: block; }
+        .file-body textarea { width: 100%; height: 400px; padding: 12px; border-radius: 12px; border: 1px solid #ccc; font-family: 'Courier New', monospace; font-size: 0.85rem; }
+        .file-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+        .file-actions button { padding: 6px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 600; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 40px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s ease; font-size: 0.95rem; max-width: 90%; text-align: center; }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
+        .token-input { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+        .token-input input { flex: 1; padding: 10px 16px; border-radius: 40px; border: 1px solid #ccc; min-width: 200px; }
+        .token-input button { padding: 10px 20px; border-radius: 40px; border: none; cursor: pointer; font-weight: bold; }
+        .repo-info { background: #e8f0fe; padding: 12px 16px; border-radius: 16px; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+        .repo-info .label { font-weight: 600; color: #0a3d62; }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .progress { background: #f0f0f0; border-radius: 8px; padding: 4px 8px; font-size: 0.8rem; }
+        .commit-msg { margin: 16px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .commit-msg input { flex: 1; padding: 10px 16px; border-radius: 40px; border: 1px solid #ccc; min-width: 200px; }
+        .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        @media (max-width: 600px) { .file-body textarea { height: 200px; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="nav">
+        <span style="font-weight:bold;">📂 File Updater</span>
+        <div style="flex:1;"></div>
+        <a href="index.html">🏠 Dashboard</a>
+        <a href="admin_create_user.html">👑 Admin</a>
+        <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+    </div>
+
+    <div class="card">
+        <h2>🛠️ GitHub File Manager</h2>
+        <p style="color:#666;">Edit and commit changes to any file in this repository directly from this page.</p>
+
+        <div class="repo-info">
+            <span class="label">📁 Repository:</span>
+            <input type="text" id="repoInput" placeholder="owner/repo (e.g., your-username/nevamak-enterprises)" style="flex:1; min-width:150px; padding:6px 12px; border-radius:40px; border:1px solid #ccc;">
+            <span class="label">🔑 Token:</span>
+            <input type="password" id="tokenInput" placeholder="GitHub Personal Access Token" style="flex:1; min-width:200px; padding:6px 12px; border-radius:40px; border:1px solid #ccc;">
+            <button id="saveCredentialsBtn" class="btn-primary">💾 Save Credentials</button>
+            <button id="fetchFilesBtn" class="btn-success">📥 Fetch Files</button>
+        </div>
+
+        <div id="statusMessage" style="margin:8px 0; padding:8px; border-radius:12px; display:none;"></div>
+
+        <div class="commit-msg">
+            <input type="text" id="commitMessage" placeholder="Commit message" value="Update files via web updater">
+            <button id="commitAllBtn" class="btn-success">📦 Commit All Changes</button>
+            <button id="expandAllBtn" class="btn-secondary">📂 Expand All</button>
+            <button id="collapseAllBtn" class="btn-secondary">📁 Collapse All</button>
+        </div>
+
+        <div id="filesContainer">
+            <p style="color:#888;">Enter your GitHub credentials, click "Fetch Files" to load file contents.</p>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+    // ==================== Firebase Config (for auth check) ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    if (firebase.apps.length) { firebase.apps[0].delete(); }
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // ==================== DOM refs ====================
+    const repoInput = document.getElementById('repoInput');
+    const tokenInput = document.getElementById('tokenInput');
+    const saveCredentialsBtn = document.getElementById('saveCredentialsBtn');
+    const fetchFilesBtn = document.getElementById('fetchFilesBtn');
+    const commitAllBtn = document.getElementById('commitAllBtn');
+    const expandAllBtn = document.getElementById('expandAllBtn');
+    const collapseAllBtn = document.getElementById('collapseAllBtn');
+    const commitMessageInput = document.getElementById('commitMessage');
+    const filesContainer = document.getElementById('filesContainer');
+    const statusMessage = document.getElementById('statusMessage');
+    const toast = document.getElementById('toast');
+
+    // ==================== State ====================
+    let fileContents = {}; // { filename: content }
+    let fileShas = {}; // { filename: sha }
+    let currentRepo = '';
+    let currentToken = '';
+    const STORAGE_KEY = 'gh_updater_creds';
+
+    // ==================== Toast ====================
+    function showToast(message, type = 'info', duration = 3000) {
+        toast.textContent = message;
+        toast.className = 'toast ' + type;
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        clearTimeout(toast._hideTimer);
+        toast._hideTimer = setTimeout(() => {
+            toast.classList.remove('show');
+        }, duration);
+    }
+
+    // ==================== Auth ====================
+    auth.onAuthStateChanged(user => {
+        if (!user) {
+            window.location.href = 'login.html';
+        }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    // ==================== Credentials ====================
+    function loadCredentials() {
+        try {
+            const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+            if (data) {
+                repoInput.value = data.repo || '';
+                tokenInput.value = data.token || '';
+                currentRepo = data.repo || '';
+                currentToken = data.token || '';
+            }
+        } catch (e) {}
+    }
+    loadCredentials();
+
+    saveCredentialsBtn.addEventListener('click', () => {
+        const repo = repoInput.value.trim();
+        const token = tokenInput.value.trim();
+        if (!repo || !token) {
+            showToast('Please enter both repository and token.', 'error');
+            return;
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ repo, token }));
+        currentRepo = repo;
+        currentToken = token;
+        showToast('Credentials saved.', 'success');
+        // Optionally fetch files after saving
+        fetchAllFiles();
+    });
+
+    // ==================== API Helpers ====================
+    function getRepo() {
+        const repo = repoInput.value.trim() || currentRepo;
+        if (!repo) throw new Error('Repository not set.');
+        return repo;
+    }
+
+    function getToken() {
+        const token = tokenInput.value.trim() || currentToken;
+        if (!token) throw new Error('GitHub token not set.');
+        return token;
+    }
+
+    function getHeaders() {
+        return {
+            'Authorization': `token ${getToken()}`,
+            'Accept': 'application/vnd.github.v3+json'
+        };
+    }
+
+    async function githubFetch(path, options = {}) {
+        const repo = getRepo();
+        const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...getHeaders(),
+                ...(options.headers || {})
+            }
+        });
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`GitHub API error (${response.status}): ${err}`);
+        }
+        return response.json();
+    }
+
+    // ==================== Fetch Files ====================
+    async function fetchAllFiles() {
+        try {
+            const repo = getRepo();
+            const token = getToken();
+            currentRepo = repo;
+            currentToken = token;
+            // Get list of HTML files
+            // We'll use a hardcoded list of files from the project
+            const fileNames = [
+                'index.html',
+                'lagos_dispatch.html',
+                'receive_abuja.html',
+                'receive_ph.html',
+                'external_vendor.html',
+                'invoice_repo.html',
+                'reports.html',
+                'warehouse.html',
+                'chat.html',
+                'login.html',
+                'admin_create_user.html',
+                'permissions.html',
+                'returns.html',
+                'request_invoice.html',
+                'picture_repo.html',
+                'update.html'  // we'll exclude this from editing but show
+            ];
+
+            filesContainer.innerHTML = '<div class="loading-spinner"></div> Loading files...';
+            let html = '';
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const fileName of fileNames) {
+                try {
+                    const data = await githubFetch(fileName);
+                    const content = atob(data.content);
+                    fileShas[fileName] = data.sha;
+                    fileContents[fileName] = content;
+                    successCount++;
+                    html += buildFileItem(fileName, content);
+                } catch (err) {
+                    errorCount++;
+                    console.warn(`Error fetching ${fileName}:`, err);
+                    // If file doesn't exist, we'll create it later
+                    fileContents[fileName] = '';
+                    fileShas[fileName] = null;
+                    html += buildFileItem(fileName, '', true);
+                }
+            }
+
+            // Sort files alphabetically
+            const sortedFiles = Object.keys(fileContents).sort();
+            let sortedHtml = '';
+            for (const f of sortedFiles) {
+                const content = fileContents[f] || '';
+                const isMissing = !fileShas[f];
+                sortedHtml += buildFileItem(f, content, isMissing);
+            }
+            filesContainer.innerHTML = sortedHtml;
+
+            // Update status
+            showStatus(`✅ Loaded ${successCount} files. ${errorCount > 0 ? '⚠️ ' + errorCount + ' files not found.' : ''}`, 'success');
+            showToast(`Loaded ${successCount} files.`, 'success');
+        } catch (err) {
+            console.error('Fetch error:', err);
+            filesContainer.innerHTML = `<p style="color:red;">Error fetching files: ${err.message}</p>`;
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+
+    function buildFileItem(fileName, content, isMissing = false) {
+        const fileId = fileName.replace(/\./g, '_');
+        const isHtml = fileName.endsWith('.html');
+        const isUpdater = fileName === 'update.html';
+        const canEdit = !isUpdater; // Don't allow editing update.html itself
+
+        return `
+            <div class="file-item" id="file-${fileId}">
+                <div class="file-header" onclick="toggleFile('${fileId}')">
+                    <span class="file-name">${fileName} ${isMissing ? '<span class="badge" style="background:#f5c6cb;color:#721c24;">Missing</span>' : ''}</span>
+                    <span style="display:flex; gap:8px;">
+                        ${isMissing ? `<button class="btn-sm btn-success" onclick="event.stopPropagation(); createFile('${fileName}')">➕ Create</button>` : ''}
+                        <button class="btn-sm btn-primary" onclick="event.stopPropagation(); fetchFileContent('${fileName}')">🔄 Refresh</button>
+                        <span style="font-size:0.8rem; color:#888;">${isMissing ? 'Not in repo' : 'SHA: ' + (fileShas[fileName] || '').slice(0,7)}</span>
+                    </span>
+                </div>
+                <div class="file-body" id="body-${fileId}">
+                    ${isUpdater ? '<p style="color:#e67e22;"><strong>⚠️ This is the updater file itself. Editing it may break the updater. Proceed with caution.</strong></p>' : ''}
+                    <textarea id="textarea-${fileId}" ${canEdit ? '' : 'readonly'} style="${isUpdater ? 'border-color:#e67e22;' : ''}">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                    <div class="file-actions">
+                        <button class="btn-sm btn-success" onclick="saveFile('${fileName}', '${fileId}')">💾 Save</button>
+                        <button class="btn-sm btn-primary" onclick="previewFile('${fileId}')">👁️ Preview</button>
+                        <button class="btn-sm btn-warning" onclick="resetFile('${fileName}', '${fileId}')">↩️ Reset</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // ==================== Toggle ====================
+    window.toggleFile = function(fileId) {
+        const body = document.getElementById(`body-${fileId}`);
+        if (body) body.classList.toggle('open');
+    };
+
+    // ==================== Fetch single file ====================
+    window.fetchFileContent = async function(fileName) {
+        try {
+            const data = await githubFetch(fileName);
+            const content = atob(data.content);
+            fileContents[fileName] = content;
+            fileShas[fileName] = data.sha;
+            const fileId = fileName.replace(/\./g, '_');
+            const textarea = document.getElementById(`textarea-${fileId}`);
+            if (textarea) {
+                textarea.value = content;
+            }
+            showToast(`Refreshed ${fileName}`, 'success');
+            // Update SHA in header
+            const header = document.querySelector(`#file-${fileId} .file-header span:last-child`);
+            if (header) {
+                header.innerHTML = `<span style="font-size:0.8rem; color:#888;">SHA: ${data.sha.slice(0,7)}</span>`;
+            }
+        } catch (err) {
+            showToast(`Error fetching ${fileName}: ${err.message}`, 'error');
+        }
+    };
+
+    // ==================== Create missing file ====================
+    window.createFile = async function(fileName) {
+        try {
+            // Create a new file with a basic template
+            let content = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEVAMAK – ${fileName}</title>
+</head>
+<body>
+    <h1>${fileName}</h1>
+    <p>This file was created by the File Updater.</p>
+</body>
+</html>`;
+            const repo = getRepo();
+            const token = getToken();
+            const url = `https://api.github.com/repos/${repo}/contents/${fileName}`;
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `Create ${fileName} via updater`,
+                    content: btoa(content)
+                })
+            });
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(err);
+            }
+            const data = await response.json();
+            fileContents[fileName] = content;
+            fileShas[fileName] = data.content.sha;
+            showToast(`Created ${fileName}`, 'success');
+            // Refresh the file item
+            const fileId = fileName.replace(/\./g, '_');
+            const textarea = document.getElementById(`textarea-${fileId}`);
+            if (textarea) {
+                textarea.value = content;
+            }
+            // Update header to show SHA and remove missing badge
+            const header = document.querySelector(`#file-${fileId} .file-header`);
+            if (header) {
+                const nameSpan = header.querySelector('.file-name');
+                if (nameSpan) {
+                    nameSpan.innerHTML = fileName;
+                }
+                const rightSpan = header.querySelector('span:last-child');
+                if (rightSpan) {
+                    rightSpan.innerHTML = `<span style="font-size:0.8rem; color:#888;">SHA: ${data.content.sha.slice(0,7)}</span>`;
+                }
+                // Remove create button
+                const createBtn = header.querySelector('.btn-success');
+                if (createBtn) createBtn.remove();
+            }
+            // Update status
+            showStatus(`Created ${fileName}.`, 'success');
+        } catch (err) {
+            showToast(`Error creating ${fileName}: ${err.message}`, 'error');
+        }
+    };
+
+    // ==================== Save individual file ====================
+    window.saveFile = async function(fileName, fileId) {
+        try {
+            const textarea = document.getElementById(`textarea-${fileId}`);
+            if (!textarea) return;
+            const content = textarea.value;
+            const repo = getRepo();
+            const token = getToken();
+            const url = `https://api.github.com/repos/${repo}/contents/${fileName}`;
+            const sha = fileShas[fileName] || null;
+            const body = {
+                message: `Update ${fileName} via web updater`,
+                content: btoa(content)
+            };
+            if (sha) body.sha = sha;
+
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+            if (!response.ok) {
+                const err = await response.text();
+                throw new Error(err);
+            }
+            const data = await response.json();
+            fileContents[fileName] = content;
+            fileShas[fileName] = data.content.sha;
+            // Update SHA display
+            const header = document.querySelector(`#file-${fileId} .file-header span:last-child`);
+            if (header) {
+                header.innerHTML = `<span style="font-size:0.8rem; color:#888;">SHA: ${data.content.sha.slice(0,7)}</span>`;
+            }
+            showToast(`✅ Saved ${fileName}`, 'success');
+        } catch (err) {
+            showToast(`Error saving ${fileName}: ${err.message}`, 'error');
+        }
+    };
+
+    // ==================== Reset file ====================
+    window.resetFile = async function(fileName, fileId) {
+        if (!confirm(`Reset ${fileName} to the latest version from GitHub?`)) return;
+        await fetchFileContent(fileName);
+        // The textarea will be updated by fetchFileContent
+        // Then we need to open the body
+        const body = document.getElementById(`body-${fileId}`);
+        if (body) body.classList.add('open');
+        showToast(`Reset ${fileName}`, 'info');
+    };
+
+    // ==================== Preview file ====================
+    window.previewFile = function(fileId) {
+        const textarea = document.getElementById(`textarea-${fileId}`);
+        if (!textarea) return;
+        const content = textarea.value;
+        const win = window.open('', '_blank', 'width=800,height=600');
+        if (win) {
+            win.document.write(content);
+            win.document.close();
+        } else {
+            showToast('Please allow popups for preview.', 'error');
+        }
+    };
+
+    // ==================== Commit All ====================
+    commitAllBtn.addEventListener('click', async () => {
+        const commitMsg = commitMessageInput.value.trim() || 'Update files via web updater';
+        if (!confirm(`Commit all changes with message: "${commitMsg}"?`)) return;
+
+        const btn = commitAllBtn;
+        const originalText = btn.textContent;
+        btn.textContent = '⏳ Committing...';
+        btn.disabled = true;
+
+        try {
+            const repo = getRepo();
+            const token = getToken();
+            const files = document.querySelectorAll('.file-item');
+            let updatedCount = 0;
+            let errorCount = 0;
+
+            for (const fileItem of files) {
+                const fileId = fileItem.id.replace('file-', '');
+                const textarea = document.getElementById(`textarea-${fileId}`);
+                if (!textarea) continue;
+                // Determine filename from the header
+                const nameSpan = fileItem.querySelector('.file-name');
+                if (!nameSpan) continue;
+                const fileName = nameSpan.textContent.trim();
+                if (fileName === 'update.html') continue; // Skip updater itself
+
+                const content = textarea.value;
+                const sha = fileShas[fileName] || null;
+                if (sha === null && !content) continue; // Skip if file doesn't exist and content is empty
+
+                const url = `https://api.github.com/repos/${repo}/contents/${fileName}`;
+                const body = {
+                    message: commitMsg,
+                    content: btoa(content)
+                };
+                if (sha) body.sha = sha;
+
+                const response = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    fileShas[fileName] = data.content.sha;
+                    updatedCount++;
+                    // Update SHA display
+                    const header = fileItem.querySelector('.file-header span:last-child');
+                    if (header) {
+                        header.innerHTML = `<span style="font-size:0.8rem; color:#888;">SHA: ${data.content.sha.slice(0,7)}</span>`;
+                    }
+                } else {
+                    errorCount++;
+                    const errText = await response.text();
+                    console.error(`Error committing ${fileName}:`, errText);
+                }
+            }
+
+            showToast(`✅ Committed ${updatedCount} files. ${errorCount > 0 ? '⚠️ ' + errorCount + ' failed.' : ''}`, 'success');
+            showStatus(`Committed ${updatedCount} files. ${errorCount > 0 ? '⚠️ ' + errorCount + ' failed.' : ''}`, 'success');
+        } catch (err) {
+            console.error('Commit error:', err);
+            showToast('Error committing: ' + err.message, 'error');
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    });
+
+    // ==================== Expand/Collapse All ====================
+    expandAllBtn.addEventListener('click', () => {
+        document.querySelectorAll('.file-body').forEach(el => el.classList.add('open'));
+    });
+    collapseAllBtn.addEventListener('click', () => {
+        document.querySelectorAll('.file-body').forEach(el => el.classList.remove('open'));
+    });
+
+    // ==================== Status message ====================
+    function showStatus(msg, type = 'info') {
+        statusMessage.textContent = msg;
+        statusMessage.className = `alert alert-${type}`;
+        statusMessage.style.display = 'block';
+        statusMessage.style.background = type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#d1ecf1';
+        statusMessage.style.color = type === 'success' ? '#155724' : type === 'error' ? '#721c24' : '#0c5460';
+        statusMessage.style.border = '1px solid ' + (type === 'success' ? '#c3e6cb' : type === 'error' ? '#f5c6cb' : '#bee5eb');
+        statusMessage.style.padding = '12px';
+        statusMessage.style.borderRadius = '12px';
+        setTimeout(() => { statusMessage.style.display = 'none'; }, 8000);
+    }
+
+    // ==================== Fetch on load if credentials exist ====================
+    if (currentRepo && currentToken) {
+        // Auto-fetch after a short delay
+        setTimeout(fetchAllFiles, 500);
+    }
+
+    fetchFilesBtn.addEventListener('click', fetchAllFiles);
+
+    // ==================== Init ====================
+    console.log('NEVAMAK File Updater loaded.');
+</script>
+</body>
+</html>
