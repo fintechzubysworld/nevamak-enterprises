@@ -49,7 +49,7 @@
         .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .scroll { overflow-x: auto; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 1000px; width: 95%; max-height: 90vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.8rem; }
         .invoice-preview { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; margin-top: 12px; }
         .invoice-preview table { width: 100%; border-collapse: collapse; }
@@ -744,7 +744,7 @@
         formMessage.textContent = '';
     };
 
-    // ==================== Preview Invoice (Updated) ====================
+    // ==================== Preview Invoice ====================
     document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
         const preview = generateInvoiceHTML();
         invoicePreviewContainer.innerHTML = preview;
@@ -762,7 +762,6 @@
 
         if (items.length === 0) return '<p style="color:red;">Add at least one item.</p>';
 
-        // Build items rows: show original price, adjusted price (with multiplier), and total (adjusted * qty)
         let itemsHtml = '';
         items.forEach(it => {
             itemsHtml += `<tr>
@@ -770,17 +769,21 @@
                 <td>${it.qty}</td>
                 <td>₦${it.originalPrice.toFixed(2)}</td>
                 <td>₦${it.updatedPrice.toFixed(2)}</td>
+                <td>${it.discPct}%</td>
+                <td>₦${it.discAmt.toFixed(2)}</td>
+                <td>${it.vatPct}%</td>
+                <td>₦${it.itemVAT.toFixed(2)}</td>
                 <td>₦${it.total.toFixed(2)}</td>
             </tr>`;
         });
 
-        // Build group totals rows
+        // Group totals row
         const totalsHtml = `
-            <tr><td colspan="4"><strong>Subtotal (before discount)</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="4"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="4"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="4"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="4"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
+            <tr><td colspan="7"><strong>Subtotal</strong></td><td></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+            <tr><td colspan="7"><strong>Total Discount</strong></td><td></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+            <tr><td colspan="7"><strong>Total VAT</strong></td><td></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+            <tr><td colspan="7"><strong>Total WHT</strong></td><td></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+            <tr><td colspan="7"><strong>Grand Total</strong></td><td></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
         `;
 
         const html = `
@@ -796,8 +799,12 @@
                 <tr>
                     <th>Item</th>
                     <th>Qty</th>
-                    <th>Original Unit Price</th>
-                    <th>Adjusted Unit Price</th>
+                    <th>Original Price</th>
+                    <th>Adjusted Price</th>
+                    <th>Disc %</th>
+                    <th>Disc ₦</th>
+                    <th>VAT %</th>
+                    <th>VAT ₦</th>
                     <th>Total</th>
                 </tr>
                 ${itemsHtml}
@@ -948,7 +955,7 @@
         }
     });
 
-    // ==================== Generate CSV (Updated) ====================
+    // ==================== Generate CSV ====================
     document.getElementById('generateCSVBtn').addEventListener('click', () => {
         const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
         if (items.length === 0) {
@@ -957,16 +964,16 @@
         }
         try {
             const rows = [
-                ['Item', 'Quantity', 'Original Unit Price', 'Adjusted Unit Price', 'Total']
+                ['Item', 'Qty', 'Original Price', 'Adjusted Price', 'Disc %', 'Disc ₦', 'VAT %', 'VAT ₦', 'Total']
             ];
             items.forEach(it => {
-                rows.push([it.name, it.qty, it.originalPrice, it.updatedPrice, it.total]);
+                rows.push([it.name, it.qty, it.originalPrice, it.updatedPrice, it.discPct, it.discAmt, it.vatPct, it.itemVAT, it.total]);
             });
-            rows.push(['Subtotal', '', '', '', subtotal]);
-            rows.push(['Total Discount', '', '', '', totalDisc]);
-            rows.push(['Total VAT', '', '', '', totalVAT]);
-            rows.push(['Total WHT', '', '', '', totalWHT]);
-            rows.push(['Grand Total', '', '', '', grandTotal]);
+            rows.push(['Subtotal', '', '', '', '', '', '', '', subtotal]);
+            rows.push(['Total Discount', '', '', '', '', '', '', '', totalDisc]);
+            rows.push(['Total VAT', '', '', '', '', '', '', '', totalVAT]);
+            rows.push(['Total WHT', '', '', '', '', '', '', '', totalWHT]);
+            rows.push(['Grand Total', '', '', '', '', '', '', '', grandTotal]);
 
             const csvContent = rows.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1074,7 +1081,7 @@
     refreshBtn.addEventListener('click', loadInvoices);
     searchInvoices.addEventListener('input', loadInvoices);
 
-    // ==================== View Invoice (Updated) ====================
+    // ==================== View Invoice (Detailed: shows discount & VAT per item) ====================
     window.viewInvoice = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
@@ -1092,11 +1099,19 @@
                     grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
                     const origPrice = it.originalPrice || it.unitPrice || 0;
                     const adjPrice = it.updatedPrice || origPrice;
+                    const discPct = it.discountPercent || 0;
+                    const discAmt = it.discountAmount || 0;
+                    const vatPct = it.vatPercent || 0;
+                    const vatAmt = it.vat || 0;
                     itemsHtml += `<tr>
                         <td>${escapeHtml(it.itemName)}</td>
                         <td>${it.quantity}</td>
                         <td>₦${origPrice.toFixed(2)}</td>
                         <td>₦${adjPrice.toFixed(2)}</td>
+                        <td>${discPct}%</td>
+                        <td>₦${discAmt.toFixed(2)}</td>
+                        <td>${vatPct}%</td>
+                        <td>₦${vatAmt.toFixed(2)}</td>
                         <td>₦${(it.total || 0).toFixed(2)}</td>
                     </tr>`;
                 });
@@ -1115,24 +1130,21 @@
                     ${multiplier !== 1.00 ? `<p><strong>Transport Multiplier:</strong> ${multiplier.toFixed(2)}</p>` : ''}
                     <div class="scroll"><table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                         <tr style="background:#f0f0f0;">
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Original Unit Price</th>
-                            <th>Adjusted Unit Price</th>
-                            <th>Total</th>
+                            <th>Item</th><th>Qty</th><th>Orig Price</th><th>Adj Price</th>
+                            <th>Disc %</th><th>Disc ₦</th><th>VAT %</th><th>VAT ₦</th><th>Total</th>
                         </tr>
                         ${itemsHtml}
-                        <tr><td colspan="4"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Subtotal</strong></td><td></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Total Discount</strong></td><td></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Total VAT</strong></td><td></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Total WHT</strong></td><td></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Grand Total</strong></td><td></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table></div>
                     ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
                     <p><em>Created by ${escapeHtml(d.createdBy)}</em></p>
                 </div>
             `;
-            const win = window.open('', '_blank', 'width=900,height=700');
+            const win = window.open('', '_blank', 'width=1000,height=700');
             if (win) {
                 win.document.write(html);
                 win.document.close();
@@ -1164,11 +1176,19 @@
                     grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
                     const origPrice = it.originalPrice || it.unitPrice || 0;
                     const adjPrice = it.updatedPrice || origPrice;
+                    const discPct = it.discountPercent || 0;
+                    const discAmt = it.discountAmount || 0;
+                    const vatPct = it.vatPercent || 0;
+                    const vatAmt = it.vat || 0;
                     itemsHtml += `<tr>
                         <td>${escapeHtml(it.itemName)}</td>
                         <td>${it.quantity}</td>
                         <td>₦${origPrice.toFixed(2)}</td>
                         <td>₦${adjPrice.toFixed(2)}</td>
+                        <td>${discPct}%</td>
+                        <td>₦${discAmt.toFixed(2)}</td>
+                        <td>${vatPct}%</td>
+                        <td>₦${vatAmt.toFixed(2)}</td>
                         <td>₦${(it.total || 0).toFixed(2)}</td>
                     </tr>`;
                 });
@@ -1187,18 +1207,15 @@
                     ${multiplier !== 1.00 ? `<p><strong>Transport Multiplier:</strong> ${multiplier.toFixed(2)}</p>` : ''}
                     <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                         <tr style="background:#f0f0f0;">
-                            <th>Item</th>
-                            <th>Qty</th>
-                            <th>Original Unit Price</th>
-                            <th>Adjusted Unit Price</th>
-                            <th>Total</th>
+                            <th>Item</th><th>Qty</th><th>Orig Price</th><th>Adj Price</th>
+                            <th>Disc %</th><th>Disc ₦</th><th>VAT %</th><th>VAT ₦</th><th>Total</th>
                         </tr>
                         ${itemsHtml}
-                        <tr><td colspan="4"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="4"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Subtotal</strong></td><td></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Total Discount</strong></td><td></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Total VAT</strong></td><td></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Total WHT</strong></td><td></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                        <tr><td colspan="7"><strong>Grand Total</strong></td><td></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
                     <p><em>Created by ${escapeHtml(d.createdBy)}</em></p>
@@ -1233,7 +1250,7 @@
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             const d = doc.data();
-            const rows = [['Item', 'Quantity', 'Original Unit Price', 'Adjusted Unit Price', 'Total']];
+            const rows = [['Item','Qty','Orig Price','Adj Price','Disc %','Disc ₦','VAT %','VAT ₦','Total']];
             let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
@@ -1250,15 +1267,19 @@
                         it.quantity,
                         origPrice,
                         adjPrice,
+                        it.discountPercent || 0,
+                        it.discountAmount || 0,
+                        it.vatPercent || 0,
+                        it.vat || 0,
                         it.total || 0
                     ]);
                 });
             }
-            rows.push(['Subtotal', '', '', '', subtotal]);
-            rows.push(['Total Discount', '', '', '', totalDisc]);
-            rows.push(['Total VAT', '', '', '', totalVAT]);
-            rows.push(['Total WHT', '', '', '', totalWHT]);
-            rows.push(['Grand Total', '', '', '', d.total || grandTotal]);
+            rows.push(['Subtotal','','','','','','','',subtotal]);
+            rows.push(['Total Discount','','','','','','','',totalDisc]);
+            rows.push(['Total VAT','','','','','','','',totalVAT]);
+            rows.push(['Total WHT','','','','','','','',totalWHT]);
+            rows.push(['Grand Total','','','','','','','',d.total || grandTotal]);
 
             const csvContent = rows.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1759,7 +1780,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded – updated invoice view with transport multiplier and group totals.');
+    console.log('NEVAMAK Invoice Repository loaded – detailed invoice view with discount and VAT per item.');
 </script>
 </body>
 </html>
