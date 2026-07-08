@@ -20,7 +20,7 @@
         .info { color: #27ae60; text-align: center; margin-top: 12px; font-size: 0.85rem; }
         .forgot-link { display: block; text-align: center; margin-top: 12px; color: #0a3d62; text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
         .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
-        .debug-box { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; text-align: left; color: #333; border: 1px solid #ddd; }
+        .debug-box { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; text-align: left; color: #333; border: 1px solid #ddd; max-height: 200px; overflow: auto; }
         .debug-box pre { background: #f0f0f0; padding: 8px; border-radius: 4px; overflow: auto; font-size: 0.75rem; margin: 4px 0; }
         .fix-link { color: #0a3d62; text-decoration: underline; cursor: pointer; font-weight: bold; }
         .fix-link:hover { color: #1e3799; }
@@ -28,6 +28,10 @@
         #setupAdminContainer { margin-top: 16px; }
         .setup-btn { background: #e67e22; }
         .setup-btn:hover { background: #d35400; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 40px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s ease; font-size: 0.95rem; max-width: 90%; text-align: center; }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
     </style>
 </head>
 <body>
@@ -41,6 +45,9 @@
     <a id="forgotPasswordLink" class="forgot-link">🔑 Forgot Password?</a>
     <div id="verificationMessage" class="info" style="display:none;"></div>
     <div id="debugInfo" class="debug-box hidden"></div>
+</div>
+<div id="toast" class="toast"></div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // ==================== Firebase Config ====================
@@ -67,10 +74,21 @@
         const forgotLink = document.getElementById('forgotPasswordLink');
         const setupContainer = document.getElementById('setupAdminContainer');
         const setupBtn = document.getElementById('setupAdminBtn');
+        const toast = document.getElementById('toast');
 
-        let currentAdminEmail = ''; // will be set if admin logs in
+        // ==================== Helpers ====================
+        function showToast(message, type = 'info', duration = 3000) {
+            toast.textContent = message;
+            toast.className = 'toast ' + type;
+            void toast.offsetWidth;
+            toast.classList.add('show');
+            clearTimeout(toast._hideTimer);
+            toast._hideTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
 
-        // ==================== Check if admin exists ====================
+        // ==================== Check admin exists ====================
         async function checkAdminExists() {
             if (!setupContainer) return;
             try {
@@ -131,22 +149,6 @@
             if (e.key === 'Enter') handleLogin();
         });
 
-async function hasPermission(permName) {
-    const user = firebase.auth().currentUser;
-    if (!user) return false;
-    const doc = await firebase.firestore().collection('users').doc(user.uid).get();
-    const data = doc.data();
-    const perms = data.permissions || {};
-    // If explicitly set, use that; else fallback to role default
-    if (perms.hasOwnProperty(permName)) return perms[permName];
-    // Get default role permissions
-    const role = data.role || '';
-    const defaultDoc = await firebase.firestore().collection('permissions').doc('defaults').get();
-    const defaults = defaultDoc.exists ? defaultDoc.data() : {};
-    const roleDefaults = defaults[role] || {};
-    return roleDefaults[permName] || false;
-}
-        
         async function handleLogin() {
             const email = emailInput.value.trim();
             const password = passwordInput.value;
@@ -164,10 +166,11 @@ async function hasPermission(permName) {
             }
 
             try {
+                // 1. Sign in
                 const userCred = await auth.signInWithEmailAndPassword(email, password);
                 const user = userCred.user;
 
-                // Optional email verification warning (allow login anyway)
+                // 2. Show verification warning (optional)
                 if (!user.emailVerified) {
                     verificationMsg.style.display = 'block';
                     verificationMsg.innerHTML = `⚠️ Your email (${email}) is not verified. You can still log in, but some features may require verification.
@@ -182,10 +185,22 @@ async function hasPermission(permName) {
                     });
                 }
 
-                // Get Firestore user document
-                const userDoc = await db.collection('users').doc(user.uid).get();
+                // 3. Read Firestore user document
+                let userDoc;
+                try {
+                    userDoc = await db.collection('users').doc(user.uid).get();
+                } catch (firestoreError) {
+                    console.error('Firestore read error:', firestoreError);
+                    messageDiv.innerHTML = `
+                        ❌ Could not read user data from Firestore.
+                        <br><small style="color:#666;">Error: ${firestoreError.message}</small>
+                        <br><small style="color:#666;">Please check Firestore security rules.</small>
+                    `;
+                    await auth.signOut();
+                    return;
+                }
 
-                // If document doesn't exist, try auto-create for admin default
+                // 4. If document doesn't exist, auto-create for admin default
                 if (!userDoc.exists) {
                     if (email === 'admin@nevamak.com') {
                         await db.collection('users').doc(user.uid).set({
@@ -202,20 +217,28 @@ async function hasPermission(permName) {
                             return;
                         }
                     }
-                    // No document, show error
+                    // No document, show error with debug info
                     await auth.signOut();
                     messageDiv.innerHTML = `
                         ❌ User role not found.
-                        <br><small style="color:#666;">Your account exists but is missing configuration. Please contact your administrator to fix your account.</small>
-                        <br><small style="color:#666;">Admin: Go to User Management and click the "Fix" button for this user.</small>
+                        <br><small style="color:#666;">Your account exists but has no Firestore profile.</small>
+                        <br><small style="color:#666;">Please ask admin to create your user document.</small>
+                    `;
+                    // Show debug info: the document is missing
+                    debugDiv.classList.remove('hidden');
+                    debugDiv.innerHTML = `
+                        <strong>📄 User Document</strong><br>
+                        <pre>Document does not exist for uid: ${user.uid}</pre>
+                        <p><span class="fix-link" onclick="attemptFixRole('${user.uid}', '${email}')">🔧 Click here to attempt auto-fix (if you are admin)</span></p>
                     `;
                     return;
                 }
 
+                // 5. Check role
                 const data = userDoc.data();
                 const role = data.role;
 
-                // If role is missing or empty, show debug info and allow manual fix
+                // 6. If role is missing, show debug and allow fix
                 if (!role) {
                     await auth.signOut();
                     debugDiv.classList.remove('hidden');
@@ -233,7 +256,7 @@ async function hasPermission(permName) {
                     return;
                 }
 
-                // Role exists – proceed to redirect
+                // 7. Role exists – proceed to redirect
                 redirectUser(role);
             } catch (err) {
                 console.error('Login error:', err);
@@ -244,6 +267,7 @@ async function hasPermission(permName) {
                 else if (err.code === 'auth/too-many-requests') msg = 'Too many failed attempts. Please try again later.';
                 else if (err.code === 'auth/user-disabled') msg = 'This account has been disabled. Please contact admin.';
                 messageDiv.innerText = '❌ ' + msg;
+                showToast(msg, 'error');
             }
         }
 
@@ -257,17 +281,17 @@ async function hasPermission(permName) {
             try {
                 await auth.sendPasswordResetEmail(email);
                 messageDiv.innerHTML = `<span style="color:#27ae60;">✅ Password reset email sent to ${email}. Please check your inbox.</span>`;
+                showToast('Password reset email sent.', 'success');
             } catch (err) {
                 let msg = err.message;
                 if (err.code === 'auth/user-not-found') msg = 'No user found with this email address.';
                 messageDiv.innerHTML = `<span style="color:#e74c3c;">❌ ${msg}</span>`;
+                showToast(msg, 'error');
             }
         });
 
         // ==================== Auto-fix role from login (for admins) ====================
         window.attemptFixRole = async function(uid, email) {
-            // This function will only work if the user is an admin.
-            // It will prompt for password to re-authenticate.
             const password = prompt('Please enter your admin password to authorize this fix:');
             if (!password) return;
 
@@ -284,7 +308,7 @@ async function hasPermission(permName) {
                 // Now fix the target user
                 const role = prompt('Enter role for user (admin, lagos_sender, abuja_rep, ph_rep, vendor):', 'lagos_sender');
                 if (!role) return;
-                const valid = ['admin','lagos_sender','abuja_rep','ph_rep','vendor'];
+                const valid = ['admin','lagos_sender','abuja_rep','ph_rep','vendor','external_vendor'];
                 if (!valid.includes(role)) { alert('Invalid role.'); return; }
                 await db.collection('users').doc(uid).set({ role, enabled: true }, { merge: true });
                 alert(`✅ Role set to ${role}. Please refresh and log in again.`);
@@ -307,7 +331,7 @@ async function hasPermission(permName) {
                 window.location.href = 'external_vendor.html';
             } else {
                 alert('Unknown role: ' + role);
-                // Fallback: stay on login page
+                // Stay on login page
             }
         }
 
