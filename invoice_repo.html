@@ -52,8 +52,70 @@
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 1000px; width: 95%; max-height: 90vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.8rem; }
         .invoice-preview { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; margin-top: 12px; }
-        .invoice-preview table { width: 100%; border-collapse: collapse; }
-        .invoice-preview th, .invoice-preview td { border: 1px solid #ddd; padding: 8px; }
+        /* Improved Invoice Table Styles */
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            margin: 12px 0;
+        }
+        .invoice-table th,
+        .invoice-table td {
+            border: 1px solid #333;
+            padding: 8px 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .invoice-table th {
+            background-color: #0a3d62;
+            color: white;
+            font-weight: 600;
+            text-align: center;
+        }
+        .invoice-table td {
+            background-color: #fff;
+        }
+        .invoice-table .totals td {
+            font-weight: bold;
+            background-color: #f0f4f8;
+        }
+        .invoice-table .grand-total td {
+            font-weight: bold;
+            font-size: 1.1rem;
+            background-color: #d4e2f0;
+        }
+        .invoice-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .invoice-header h2 {
+            margin: 0;
+            color: #0a3d62;
+            font-size: 1.8rem;
+        }
+        .invoice-header h3 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.2rem;
+        }
+        .invoice-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .invoice-details p {
+            margin: 4px 0;
+            font-size: 0.95rem;
+        }
+        .invoice-details .label {
+            font-weight: 600;
+        }
+        @media print {
+            .invoice-table th { background-color: #0a3d62 !important; color: white !important; }
+            .invoice-table td { border-color: #000 !important; }
+            .no-print { display: none !important; }
+        }
         .import-preview { background: #f0f8ff; padding: 12px; border-radius: 16px; margin: 12px 0; }
         .moved-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
         .search-hint { font-size: 0.8rem; color: #888; margin-left: 8px; }
@@ -100,7 +162,6 @@
         <button class="tab-btn" data-tab="shared">📨 Shared with Me</button>
     </div>
 
-    
     <!-- Create Invoice Tab -->
     <div id="tab-create" class="tab-content active">
         <div class="card">
@@ -745,7 +806,7 @@
         formMessage.textContent = '';
     };
 
-    // ==================== Preview Invoice ====================
+    // ==================== Preview Invoice (Updated with clear table styling) ====================
     document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
         const preview = generateInvoiceHTML();
         invoicePreviewContainer.innerHTML = preview;
@@ -780,37 +841,49 @@
 
         // Group totals row
         const totalsHtml = `
-            <tr><td colspan="7"><strong>Subtotal</strong></td><td></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="7"><strong>Total Discount</strong></td><td></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="7"><strong>Total VAT</strong></td><td></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="7"><strong>Total WHT</strong></td><td></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-            <tr><td colspan="7"><strong>Grand Total</strong></td><td></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
         `;
 
         const html = `
-            <h2>NEVAMAK Enterprises</h2>
-            <h3>Invoice</h3>
-            <p><strong>Invoice #:</strong> ${escapeHtml(invNum)}</p>
-            <p><strong>Date:</strong> ${escapeHtml(date)}</p>
-            <p><strong>Customer:</strong> ${escapeHtml(customer)}</p>
-            <p><strong>Branch:</strong> ${escapeHtml(branch)}</p>
-            ${email !== 'N/A' ? `<p><strong>Email:</strong> ${escapeHtml(email)}</p>` : ''}
-            ${multiplier !== 1.00 ? `<p><strong>Transport Multiplier:</strong> ${multiplier.toFixed(2)} (applied to unit prices)</p>` : ''}
-            <div class="scroll"><table style="width:100%; border-collapse:collapse;">
-                <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Original Price</th>
-                    <th>Adjusted Price</th>
-                    <th>Disc %</th>
-                    <th>Disc ₦</th>
-                    <th>VAT %</th>
-                    <th>VAT ₦</th>
-                    <th>Total</th>
-                </tr>
-                ${itemsHtml}
-                ${totalsHtml}
-            </table></div>
+            <div class="invoice-header">
+                <h2>NEVAMAK Enterprises</h2>
+                <h3>Invoice</h3>
+            </div>
+            <div class="invoice-details">
+                <div style="flex:1;">
+                    <p><span class="label">Invoice #:</span> ${escapeHtml(invNum)}</p>
+                    <p><span class="label">Date:</span> ${escapeHtml(date)}</p>
+                    <p><span class="label">Branch:</span> ${escapeHtml(branch)}</p>
+                </div>
+                <div style="flex:1;">
+                    <p><span class="label">Customer:</span> ${escapeHtml(customer)}</p>
+                    ${email !== 'N/A' ? `<p><span class="label">Email:</span> ${escapeHtml(email)}</p>` : ''}
+                    ${multiplier !== 1.00 ? `<p><span class="label">Transport Multiplier:</span> ${multiplier.toFixed(2)}</p>` : ''}
+                </div>
+            </div>
+            <table class="invoice-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Original Price</th>
+                        <th>Adjusted Price</th>
+                        <th>Disc %</th>
+                        <th>Disc ₦</th>
+                        <th>VAT %</th>
+                        <th>VAT ₦</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemsHtml}
+                    ${totalsHtml}
+                </tbody>
+            </table>
             ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ''}
             <p><em>Generated by ${escapeHtml(currentUserEmail)}</em></p>
         `;
@@ -1082,7 +1155,7 @@
     refreshBtn.addEventListener('click', loadInvoices);
     searchInvoices.addEventListener('input', loadInvoices);
 
-    // ==================== View Invoice (Detailed: shows discount & VAT per item) ====================
+    // ==================== View Invoice (Detailed with clear table) ====================
     window.viewInvoice = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
@@ -1119,28 +1192,48 @@
             }
             const total = d.total || grandTotal;
             const multiplier = d.transportMultiplier || 1.00;
+
             const html = `
-                <div style="font-family:sans-serif; padding:16px; background:white;">
-                    <h2>NEVAMAK Enterprises</h2>
-                    <h3>Invoice</h3>
-                    <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
-                    <p><strong>Date:</strong> ${escapeHtml(d.date)}</p>
-                    <p><strong>Customer:</strong> ${escapeHtml(d.customer)}</p>
-                    <p><strong>Branch:</strong> ${escapeHtml(d.branch || 'N/A')}</p>
-                    ${d.customerEmail ? `<p><strong>Email:</strong> ${escapeHtml(d.customerEmail)}</p>` : ''}
-                    ${multiplier !== 1.00 ? `<p><strong>Transport Multiplier:</strong> ${multiplier.toFixed(2)}</p>` : ''}
-                    <div class="scroll"><table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
-                        <tr style="background:#f0f0f0;">
-                            <th>Item</th><th>Qty</th><th>Orig Price</th><th>Adj Price</th>
-                            <th>Disc %</th><th>Disc ₦</th><th>VAT %</th><th>VAT ₦</th><th>Total</th>
-                        </tr>
-                        ${itemsHtml}
-                        <tr><td colspan="7"><strong>Subtotal</strong></td><td></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Total Discount</strong></td><td></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Total VAT</strong></td><td></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Total WHT</strong></td><td></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Grand Total</strong></td><td></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
-                    </table></div>
+                <div style="font-family:'Segoe UI',sans-serif; background:white; padding:16px; max-width:1000px; margin:auto;">
+                    <div class="invoice-header">
+                        <h2>NEVAMAK Enterprises</h2>
+                        <h3>Invoice</h3>
+                    </div>
+                    <div class="invoice-details">
+                        <div style="flex:1;">
+                            <p><span class="label">Invoice #:</span> ${escapeHtml(d.invoiceNumber)}</p>
+                            <p><span class="label">Date:</span> ${escapeHtml(d.date)}</p>
+                            <p><span class="label">Branch:</span> ${escapeHtml(d.branch || 'N/A')}</p>
+                        </div>
+                        <div style="flex:1;">
+                            <p><span class="label">Customer:</span> ${escapeHtml(d.customer)}</p>
+                            ${d.customerEmail ? `<p><span class="label">Email:</span> ${escapeHtml(d.customerEmail)}</p>` : ''}
+                            ${multiplier !== 1.00 ? `<p><span class="label">Transport Multiplier:</span> ${multiplier.toFixed(2)}</p>` : ''}
+                        </div>
+                    </div>
+                    <table class="invoice-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Original Price</th>
+                                <th>Adjusted Price</th>
+                                <th>Disc %</th>
+                                <th>Disc ₦</th>
+                                <th>VAT %</th>
+                                <th>VAT ₦</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        </tbody>
+                    </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
                     <p><em>Created by ${escapeHtml(d.createdBy)}</em></p>
                 </div>
@@ -1197,26 +1290,45 @@
             const total = d.total || grandTotal;
             const multiplier = d.transportMultiplier || 1.00;
             const html = `
-                <div id="pdfContent" style="padding:20px; font-family:sans-serif; background:white;">
-                    <h2>NEVAMAK Enterprises</h2>
-                    <h3>Invoice</h3>
-                    <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
-                    <p><strong>Date:</strong> ${escapeHtml(d.date)}</p>
-                    <p><strong>Customer:</strong> ${escapeHtml(d.customer)}</p>
-                    <p><strong>Branch:</strong> ${escapeHtml(d.branch || 'N/A')}</p>
-                    ${d.customerEmail ? `<p><strong>Email:</strong> ${escapeHtml(d.customerEmail)}</p>` : ''}
-                    ${multiplier !== 1.00 ? `<p><strong>Transport Multiplier:</strong> ${multiplier.toFixed(2)}</p>` : ''}
-                    <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
-                        <tr style="background:#f0f0f0;">
-                            <th>Item</th><th>Qty</th><th>Orig Price</th><th>Adj Price</th>
-                            <th>Disc %</th><th>Disc ₦</th><th>VAT %</th><th>VAT ₦</th><th>Total</th>
-                        </tr>
-                        ${itemsHtml}
-                        <tr><td colspan="7"><strong>Subtotal</strong></td><td></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Total Discount</strong></td><td></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Total VAT</strong></td><td></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Total WHT</strong></td><td></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                        <tr><td colspan="7"><strong>Grand Total</strong></td><td></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                <div id="pdfContent" style="font-family:'Segoe UI',sans-serif; padding:20px; background:white; max-width:1000px; margin:auto;">
+                    <div class="invoice-header">
+                        <h2>NEVAMAK Enterprises</h2>
+                        <h3>Invoice</h3>
+                    </div>
+                    <div class="invoice-details">
+                        <div style="flex:1;">
+                            <p><span class="label">Invoice #:</span> ${escapeHtml(d.invoiceNumber)}</p>
+                            <p><span class="label">Date:</span> ${escapeHtml(d.date)}</p>
+                            <p><span class="label">Branch:</span> ${escapeHtml(d.branch || 'N/A')}</p>
+                        </div>
+                        <div style="flex:1;">
+                            <p><span class="label">Customer:</span> ${escapeHtml(d.customer)}</p>
+                            ${d.customerEmail ? `<p><span class="label">Email:</span> ${escapeHtml(d.customerEmail)}</p>` : ''}
+                            ${multiplier !== 1.00 ? `<p><span class="label">Transport Multiplier:</span> ${multiplier.toFixed(2)}</p>` : ''}
+                        </div>
+                    </div>
+                    <table class="invoice-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>Qty</th>
+                                <th>Original Price</th>
+                                <th>Adjusted Price</th>
+                                <th>Disc %</th>
+                                <th>Disc ₦</th>
+                                <th>VAT %</th>
+                                <th>VAT ₦</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
+                            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
+                            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
+                            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
+                            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
+                        </tbody>
                     </table>
                     ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
                     <p><em>Created by ${escapeHtml(d.createdBy)}</em></p>
@@ -1251,7 +1363,7 @@
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             const d = doc.data();
-            const rows = [['Item','Qty','Orig Price','Adj Price','Disc %','Disc ₦','VAT %','VAT ₦','Total']];
+            const rows = [['Item','Qty','Original Price','Adjusted Price','Disc %','Disc ₦','VAT %','VAT ₦','Total']];
             let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
@@ -1543,7 +1655,6 @@
         const container = document.getElementById('sharedList');
         container.innerHTML = '<div class="loading-spinner"></div> Loading...';
 
-        // Try with orderBy (requires index)
         sharedUnsubscribe = db.collection('sharedInvoices')
             .where('recipientId', '==', currentUser.uid)
             .orderBy('timestamp', 'desc')
@@ -1586,7 +1697,6 @@
                 let docs = [];
                 snap.forEach(doc => docs.push({ id: doc.id, data: doc.data() }));
                 docs.sort((a, b) => (b.data.timestamp?.toDate() || 0) - (a.data.timestamp?.toDate() || 0));
-                // Convert to a snapshot-like object for rendering
                 const filteredSnap = {
                     empty: docs.length === 0,
                     forEach: (callback) => docs.forEach(d => callback({
@@ -1596,7 +1706,6 @@
                     docs: docs.map(d => ({ id: d.id, data: d.data }))
                 };
                 renderSharedInvoices(filteredSnap);
-                // Add a note
                 const note = document.createElement('div');
                 note.style.cssText = 'font-size:0.75rem; color:#888; text-align:center; margin-top:8px;';
                 note.textContent = 'ℹ️ Using fallback mode (all shared invoices loaded, sorted client-side).';
@@ -1607,7 +1716,6 @@
             });
     }
 
-    // FIX: make this async
     async function renderSharedInvoices(snap) {
         const container = document.getElementById('sharedList');
         if (snap.empty || snap.docs?.length === 0) {
@@ -1781,7 +1889,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded – detailed invoice view with discount and VAT per item.');
+    console.log('NEVAMAK Invoice Repository loaded with improved invoice table styling.');
 </script>
 </body>
 </html>
