@@ -26,6 +26,8 @@
         .filters input, .filters select { padding: 8px 16px; border-radius: 40px; border: 1px solid #ccc; }
         .filters button { padding: 8px 20px; border-radius: 40px; border: none; background: #0a3d62; color: white; cursor: pointer; }
         .filters button.export { background: #27ae60; }
+        .filters button.clear { background: #e74c3c; }
+        .filters .search-input { flex: 1; min-width: 180px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
         th { background: #f8f9fa; font-weight: 600; }
@@ -51,7 +53,9 @@
         .permission-error { background: #f8d7da; border-left: 4px solid #e74c3c; padding: 16px; border-radius: 12px; margin: 12px 0; }
         .permission-error a { color: #0a3d62; font-weight: 600; }
         .permission-error .index-link { word-break: break-all; }
-        @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } }
+        .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @media (max-width: 600px) { .filters { flex-direction: column; align-items: stretch; } .filters input, .filters select { width: 100%; } .filters .search-input { width: 100%; } }
     </style>
 </head>
 <body>
@@ -80,49 +84,57 @@
     <!-- Invoices Tab -->
     <div id="tab-invoices" class="tab-content active">
         <div class="filters">
+            <input type="text" id="invSearch" class="search-input" placeholder="🔍 Search by item, GRN, supplier...">
             <input type="date" id="invDateStart">
             <input type="date" id="invDateEnd">
             <select id="invBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
             <button id="invFilterBtn">Filter</button>
+            <button id="invClearBtn" class="clear">✖ Clear</button>
             <button class="export" onclick="exportCSV('invTable')">📄 Export CSV</button>
         </div>
-        <div id="invoiceList">Loading...</div>
+        <div class="scroll" id="invoiceList">Loading...</div>
     </div>
 
     <!-- Returns Tab -->
     <div id="tab-returns" class="tab-content">
         <div class="filters">
+            <input type="text" id="retSearch" class="search-input" placeholder="🔍 Search by item, shipment ID...">
             <input type="date" id="retDateStart">
             <input type="date" id="retDateEnd">
             <select id="retBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
             <button id="retFilterBtn">Filter</button>
+            <button id="retClearBtn" class="clear">✖ Clear</button>
             <button class="export" onclick="exportCSV('retTable')">📄 Export CSV</button>
         </div>
-        <div id="returnsList">Loading...</div>
+        <div class="scroll" id="returnsList">Loading...</div>
     </div>
 
     <!-- Dispatched Tab -->
     <div id="tab-dispatched" class="tab-content">
         <div class="filters">
+            <input type="text" id="dispSearch" class="search-input" placeholder="🔍 Search by item, sender, destination...">
             <input type="date" id="dispDateStart">
             <input type="date" id="dispDateEnd">
             <select id="dispStatus"><option value="">All Status</option><option value="Dispatched">Dispatched</option><option value="Delivered">Delivered</option><option value="Partially Delivered">Partial</option><option value="Rejected">Rejected</option></select>
             <button id="dispFilterBtn">Filter</button>
+            <button id="dispClearBtn" class="clear">✖ Clear</button>
             <button class="export" onclick="exportCSV('dispTable')">📄 Export CSV</button>
         </div>
-        <div id="dispatchedList">Loading...</div>
+        <div class="scroll" id="dispatchedList">Loading...</div>
     </div>
 
     <!-- Received Tab -->
     <div id="tab-received" class="tab-content">
         <div class="filters">
+            <input type="text" id="recvSearch" class="search-input" placeholder="🔍 Search by item, GRN, supplier...">
             <input type="date" id="recvDateStart">
             <input type="date" id="recvDateEnd">
             <select id="recvBranch"><option value="">All Branches</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
             <button id="recvFilterBtn">Filter</button>
+            <button id="recvClearBtn" class="clear">✖ Clear</button>
             <button class="export" onclick="exportCSV('recvTable')">📄 Export CSV</button>
         </div>
-        <div id="receivedList">Loading...</div>
+        <div class="scroll" id="receivedList">Loading...</div>
     </div>
 
     <!-- Chat History Tab -->
@@ -134,7 +146,7 @@
             <button id="chatFilterBtn">Filter</button>
             <button class="export" onclick="exportCSV('chatTable')">📄 Export CSV</button>
         </div>
-        <div id="chatList">Loading...</div>
+        <div class="scroll" id="chatList">Loading...</div>
     </div>
 
     <!-- Invoice Modal -->
@@ -169,7 +181,7 @@
 
     let currentUser = null;
     let currentRole = '';
-    let currentShipmentId = null; // to reference the shipment when saving
+    let currentShipmentId = null;
 
     // ==================== Auth ====================
     auth.onAuthStateChanged(async (user) => {
@@ -177,18 +189,18 @@
         currentUser = user;
         const userDoc = await db.collection('users').doc(user.uid).get();
         currentRole = userDoc.data()?.role || '';
-        // If vendor, redirect away
         if (currentRole === 'vendor' || currentRole === 'external_vendor') {
             alert('Access denied. Vendors cannot view reports.');
             window.location.href = 'external_vendor.html';
             return;
         }
-        // Load all tabs with role-based filtering
         loadInvoices();
         loadReturns();
         loadDispatched();
         loadReceived();
         loadChatHistory();
+        setupSearchListeners();
+        setupClearButtons();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => auth.signOut().then(() => window.location.href = 'login.html'));
@@ -225,18 +237,77 @@
     // ==================== Build Role-Based Query ====================
     function addRoleFilter(q, branchField = 'destinationBranch') {
         if (currentRole === 'admin' || currentRole === 'lagos_sender') {
-            // No filter needed; can see all
             return q;
         } else if (currentRole === 'abuja_rep') {
-            // Abuja rep sees only Abuja branch
             return q.where(branchField, '==', 'Abuja');
         } else if (currentRole === 'ph_rep') {
-            // PH rep sees only Port Harcourt branch
             return q.where(branchField, '==', 'Portharcourt');
         } else {
-            // If any other role, deny access (should not happen)
-            return q.limit(0); // force empty result
+            return q.limit(0);
         }
+    }
+
+    // ==================== Setup Search Listeners ====================
+    function setupSearchListeners() {
+        // Invoices
+        document.getElementById('invSearch').addEventListener('input', function() {
+            filterTable('invTable', this.value);
+        });
+        // Returns
+        document.getElementById('retSearch').addEventListener('input', function() {
+            filterTable('retTable', this.value);
+        });
+        // Dispatched
+        document.getElementById('dispSearch').addEventListener('input', function() {
+            filterTable('dispTable', this.value);
+        });
+        // Received
+        document.getElementById('recvSearch').addEventListener('input', function() {
+            filterTable('recvTable', this.value);
+        });
+    }
+
+    function filterTable(tableId, searchText) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const rows = table.querySelectorAll('tbody tr');
+        const search = searchText.toLowerCase().trim();
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            row.style.display = text.includes(search) ? '' : 'none';
+        });
+    }
+
+    // ==================== Setup Clear Buttons ====================
+    function setupClearButtons() {
+        document.getElementById('invClearBtn').addEventListener('click', function() {
+            document.getElementById('invSearch').value = '';
+            document.getElementById('invDateStart').value = '';
+            document.getElementById('invDateEnd').value = '';
+            document.getElementById('invBranch').value = '';
+            loadInvoices();
+        });
+        document.getElementById('retClearBtn').addEventListener('click', function() {
+            document.getElementById('retSearch').value = '';
+            document.getElementById('retDateStart').value = '';
+            document.getElementById('retDateEnd').value = '';
+            document.getElementById('retBranch').value = '';
+            loadReturns();
+        });
+        document.getElementById('dispClearBtn').addEventListener('click', function() {
+            document.getElementById('dispSearch').value = '';
+            document.getElementById('dispDateStart').value = '';
+            document.getElementById('dispDateEnd').value = '';
+            document.getElementById('dispStatus').value = '';
+            loadDispatched();
+        });
+        document.getElementById('recvClearBtn').addEventListener('click', function() {
+            document.getElementById('recvSearch').value = '';
+            document.getElementById('recvDateStart').value = '';
+            document.getElementById('recvDateEnd').value = '';
+            document.getElementById('recvBranch').value = '';
+            loadReceived();
+        });
     }
 
     // ==================== Invoices ====================
@@ -250,7 +321,6 @@
             let q = db.collection('shipments')
                         .where('status', '==', 'Delivered')
                         .where('grnNumber', '!=', null);
-            // Role filtering
             q = addRoleFilter(q);
             if (start) q = q.where('receivedDate', '>=', new Date(start));
             if (end) {
@@ -261,39 +331,35 @@
             if (branch && (currentRole === 'admin' || currentRole === 'lagos_sender')) {
                 q = q.where('destinationBranch', '==', branch);
             }
-            // Branch filter for branch reps is already applied via addRoleFilter
-            // But if they select a branch in the dropdown, respect it (but they only have one branch)
-            // For branch reps, branch filter is forced, so dropdown won't matter much
-
             const snap = await q.get();
             if (snap.empty) {
                 container.innerHTML = '<p class="empty">No invoices found. Try adjusting filters.</p>';
                 return;
             }
-            let html = '<table id="invTable"><tr><th>GRN</th><th>Date</th><th>Branch</th><th>Supplier</th><th>Total Goods</th><th>Transport</th><th>Action</th></tr>';
+            let html = '<table id="invTable"><thead><tr><th>GRN</th><th>Date</th><th>Branch</th><th>Supplier</th><th>Items</th><th>Total Goods</th><th>Transport</th><th>Action</th></tr></thead><tbody>';
             snap.forEach(doc => {
                 const d = doc.data();
                 const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
+                const itemsShort = d.items ? d.items.map(i => i.itemName).join(", ").substring(0,60) : '-';
                 html += `<tr>
                     <td>${d.grnNumber || 'N/A'}</td>
                     <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
                     <td>${d.destinationBranch}</td>
                     <td>${d.senderName}</td>
+                    <td>${itemsShort}</td>
                     <td>₦${totalGoods.toLocaleString()}</td>
                     <td>₦${(d.transportCost||0).toLocaleString()}</td>
                     <td><button onclick="viewInvoice('${doc.id}')" style="background:#f39c12; border:none; color:white; padding:4px 16px; border-radius:40px; cursor:pointer;">Preview</button></td>
                 </tr>`;
             });
-            html += '</table>';
+            html += '</tbody></table>';
             container.innerHTML = html;
+            // Apply search filter if search text exists
+            const searchVal = document.getElementById('invSearch').value.trim();
+            if (searchVal) filterTable('invTable', searchVal);
         } catch (error) {
             console.error('Invoices load error:', error);
-            let errorHtml = `<div class="permission-error">
-                <strong>⚠️ Error loading invoices:</strong> ${error.message}
-                ${error.message && error.message.includes('https://console.firebase.google.com') ? 
-                    `<br><br><strong>🔗 Create Required Index:</strong><br>
-                     <a href="${error.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/)[0]}" target="_blank" style="color:#0a3d62;">Click here to create index</a>` : ''}
-            </div>`;
+            let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading invoices:</strong> ${error.message}</div>`;
             container.innerHTML = errorHtml;
         }
     }
@@ -408,7 +474,6 @@
             const end = document.getElementById('retDateEnd').value;
             const branch = document.getElementById('retBranch').value;
             let q = db.collection('returns');
-            // Role filtering: use branch field (returns have a 'branch' field)
             q = addRoleFilter(q, 'branch');
             if (start) q = q.where('date', '>=', new Date(start));
             if (end) {
@@ -427,7 +492,7 @@
                 container.innerHTML = '<p class="empty">No returns found.</p>';
                 return;
             }
-            let html = '<table id="retTable"><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr>';
+            let html = '<table id="retTable"><thead><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th><th>By</th></tr></thead><tbody>';
             docs.forEach(r => {
                 html += `<tr>
                     <td>${r.date ? new Date(r.date.toDate()).toLocaleDateString() : ''}</td>
@@ -439,8 +504,10 @@
                     <td>${r.createdBy || '-'}</td>
                 </tr>`;
             });
-            html += '</table>';
+            html += '</tbody></table>';
             container.innerHTML = html;
+            const searchVal = document.getElementById('retSearch').value.trim();
+            if (searchVal) filterTable('retTable', searchVal);
         } catch (error) {
             console.error('Returns load error:', error);
             let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading returns:</strong> ${error.message}</div>`;
@@ -473,9 +540,9 @@
                 container.innerHTML = '<p class="empty">No dispatched shipments found.</p>';
                 return;
             }
-            let html = '<table id="dispTable"><tr><th>ID</th><th>Date</th><th>Destination</th><th>Sender</th><th>Items</th><th>Goods Value</th><th>Status</th></tr>';
+            let html = '<table id="dispTable"><thead><tr><th>ID</th><th>Date</th><th>Destination</th><th>Sender</th><th>Items</th><th>Goods Value</th><th>Status</th></tr></thead><tbody>';
             docs.forEach(d => {
-                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : '-';
+                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,60) : '-';
                 const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
                 const statusClass = `status-${d.status?.toLowerCase().replace(/\s/g,'') || 'dispatched'}`;
                 html += `<tr>
@@ -488,8 +555,10 @@
                     <td><span class="status-badge ${statusClass}">${d.status}</span></td>
                 </tr>`;
             });
-            html += '</table>';
+            html += '</tbody></table>';
             container.innerHTML = html;
+            const searchVal = document.getElementById('dispSearch').value.trim();
+            if (searchVal) filterTable('dispTable', searchVal);
         } catch (error) {
             console.error('Dispatched load error:', error);
             let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading dispatched:</strong> ${error.message}</div>`;
@@ -525,9 +594,9 @@
                 container.innerHTML = '<p class="empty">No received shipments found.</p>';
                 return;
             }
-            let html = '<table id="recvTable"><tr><th>Date</th><th>Branch</th><th>GRN</th><th>Supplier</th><th>Items</th><th>Goods Value</th><th>Received By</th></tr>';
+            let html = '<table id="recvTable"><thead><tr><th>Date</th><th>Branch</th><th>GRN</th><th>Supplier</th><th>Items</th><th>Goods Value</th><th>Received By</th></tr></thead><tbody>';
             docs.forEach(d => {
-                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0})`).join(", ").substring(0,40) : '-';
+                const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.receivedQty||0})`).join(", ").substring(0,60) : '-';
                 const totalGoods = d.items ? d.items.reduce((s,i) => s + (i.totalItemCost||0), 0) : 0;
                 html += `<tr>
                     <td>${d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() : ''}</td>
@@ -539,8 +608,10 @@
                     <td>${d.receivingRep || '-'}</td>
                 </tr>`;
             });
-            html += '</table>';
+            html += '</tbody></table>';
             container.innerHTML = html;
+            const searchVal = document.getElementById('recvSearch').value.trim();
+            if (searchVal) filterTable('recvTable', searchVal);
         } catch (error) {
             console.error('Received load error:', error);
             let errorHtml = `<div class="permission-error"><strong>⚠️ Error loading received:</strong> ${error.message}</div>`;
@@ -556,37 +627,6 @@
             const start = document.getElementById('chatDateStart').value;
             const end = document.getElementById('chatDateEnd').value;
             const search = document.getElementById('chatSearch').value.toLowerCase().trim();
-            // Chat messages are per user; we only see messages sent by this user (or global)
-            // But we want to see all messages the user participated in.
-            // Security rules restrict to messages where chatId contains user uid.
-            // So we can query messages where senderId == currentUser.uid (sent messages)
-            // Or where chatId contains currentUser.uid (received messages)
-            // For simplicity, we'll query messages where senderId == currentUser.uid
-            // and also messages where chatId contains currentUser.uid (to see received).
-            // Actually better: query messages where chatId == 'global' or chatId contains currentUser.uid
-            let q = db.collection('messages')
-                        .where('chatId', 'in', ['global', currentUser.uid + '_any']) // can't use in with dynamic. We'll use simple query.
-                        .orderBy('timestamp', 'desc');
-            // Better approach: query all messages and filter client-side? Not efficient.
-            // Let's just query messages where senderId == currentUser.uid (sent messages) and also messages where chatId contains currentUser.uid.
-            // Since we can't do complex OR, we'll combine two queries.
-            // For now, we'll just fetch messages where senderId == currentUser.uid (sent messages).
-            // This limits to user's own sent messages, but we want all their chat history.
-            // We'll modify to include all messages where user is participant (chatId contains uid).
-            // We'll need a composite index on chatId and timestamp.
-            // Since that may not exist, we'll query all messages and filter client-side.
-            // But that would require read access to all messages, which is denied by rules.
-            // So the correct approach: query messages where chatId contains currentUser.uid.
-            // We'll use a workaround: query where chatId >= currentUser.uid and chatId <= currentUser.uid + '\uf8ff' (prefix search)
-            // But chatId format is e.g., "uid1_uid2". So we can query where chatId starts with currentUser.uid.
-            // That will get all chats where user is first part. For chats where user is second part, we need another query.
-            // This is complex. Since this is a reports page and we want to show chat history for the user,
-            // we can simply query messages where senderId == currentUser.uid (sent messages) and also messages where receiverId == currentUser.uid (if we had that field).
-            // Without receiverId, we'll just show sent messages for now, plus global chat.
-            // We'll modify to get global messages as well.
-            // Simpler: fetch messages where senderId == currentUser.uid (sent) and also where chatId == 'global'.
-            // Global messages are public; user can read them.
-            // We'll combine two queries manually.
             let sentSnapshot = await db.collection('messages')
                                         .where('senderId', '==', currentUser.uid)
                                         .orderBy('timestamp', 'desc')
@@ -600,7 +640,6 @@
             let docs = [];
             sentSnapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
             globalSnapshot.forEach(doc => docs.push({ id: doc.id, ...doc.data() }));
-            // Remove duplicates
             const uniqueDocs = Array.from(new Map(docs.map(d => [d.id, d])).values());
             uniqueDocs.sort((a, b) => (b.timestamp?.toDate() || 0) - (a.timestamp?.toDate() || 0));
             if (search) {
@@ -613,7 +652,7 @@
                 container.innerHTML = '<p class="empty">No messages found.</p>';
                 return;
             }
-            let html = '<table id="chatTable"><tr><th>Time</th><th>Chat</th><th>Text</th><th>File</th></tr>';
+            let html = '<table id="chatTable"><thead><tr><th>Time</th><th>Chat</th><th>Text</th><th>File</th></tr></thead><tbody>';
             docs.forEach(m => {
                 let chatDisplay = 'Global';
                 if (m.chatId !== 'global') {
@@ -631,7 +670,7 @@
                     <td>${file}</td>
                 </tr>`;
             });
-            html += '</table>';
+            html += '</tbody></table>';
             container.innerHTML = html;
         } catch (error) {
             console.error('Chat history load error:', error);
@@ -648,7 +687,7 @@
     document.getElementById('chatFilterBtn').addEventListener('click', loadChatHistory);
     document.getElementById('chatSearch').addEventListener('input', loadChatHistory);
 
-    console.log('NEVAMAK Reports loaded with role-based filtering and error handling.');
+    console.log('NEVAMAK Reports loaded with search functionality in all tabs.');
 </script>
 </body>
 </html>
