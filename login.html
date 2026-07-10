@@ -10,7 +10,7 @@
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: linear-gradient(135deg, #0a3d62, #3c6382); min-height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; padding: 16px; }
-        .card { background: white; max-width: 520px; width: 100%; padding: 24px 20px; border-radius: 32px; box-shadow: 0 20px 35px rgba(0,0,0,0.2); }
+        .card { background: white; max-width: 500px; width: 100%; padding: 24px 20px; border-radius: 32px; box-shadow: 0 20px 35px rgba(0,0,0,0.2); }
         h1 { color: #0a3d62; margin: 0 0 5px; font-size: 1.8rem; text-align: center; }
         .sub { color: #555; margin-bottom: 25px; font-size: 0.9rem; text-align: center; }
         input { width: 100%; padding: 14px 16px; margin: 8px 0; border: 1px solid #ccc; border-radius: 48px; font-size: 1rem; }
@@ -21,29 +21,12 @@
         .info { color: #27ae60; text-align: center; margin-top: 12px; font-size: 0.85rem; }
         .forgot-link { display: block; text-align: center; margin-top: 12px; color: #0a3d62; text-decoration: underline; cursor: pointer; font-size: 0.9rem; }
         .help-text { font-size: 0.8rem; color: #888; text-align: center; margin-top: 16px; border-top: 1px solid #eee; padding-top: 12px; }
-        .debug-box { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 12px; font-size: 0.8rem; text-align: left; color: #333; border: 1px solid #ddd; max-height: 200px; overflow: auto; }
-        .debug-box pre { background: #f0f0f0; padding: 8px; border-radius: 4px; overflow: auto; font-size: 0.75rem; margin: 4px 0; }
-        .fix-link { color: #0a3d62; text-decoration: underline; cursor: pointer; font-weight: bold; }
-        .fix-link:hover { color: #1e3799; }
-        .hidden { display: none; }
         .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .setup-btn { background: #e67e22; }
-        .setup-btn:hover { background: #d35400; }
         .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 40px; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.3); opacity: 0; transition: opacity 0.3s ease; font-size: 0.95rem; max-width: 90%; text-align: center; }
         .toast.show { opacity: 1; }
         .toast.success { background: #27ae60; }
         .toast.error { background: #e74c3c; }
-        .role-selector { margin: 12px 0; }
-        .role-selector select { width: 100%; padding: 12px; border-radius: 40px; border: 1px solid #ccc; }
-        .action-row { display: flex; gap: 8px; margin-top: 12px; }
-        .action-row button { width: auto; flex: 1; padding: 10px; }
-        .btn-secondary { background: #6c757d; }
-        .btn-secondary:hover { background: #5a6268; }
-        .btn-success { background: #27ae60; }
-        .btn-success:hover { background: #229954; }
-        .btn-warning { background: #f39c12; }
-        .btn-warning:hover { background: #d68910; }
     </style>
 </head>
 <body>
@@ -56,29 +39,9 @@
     <div id="message" class="error"></div>
     <a id="forgotPasswordLink" class="forgot-link">🔑 Forgot Password?</a>
     <div id="verificationMessage" class="info" style="display:none;"></div>
-    <div id="profileSetup" style="display:none; margin-top:16px;">
-        <h3 style="margin:0 0 8px; font-size:1rem;">🔧 Complete Your Profile</h3>
-        <p style="font-size:0.9rem; color:#555;">Your account is active but needs a role assigned. Please choose an option below.</p>
-        <div class="role-selector">
-            <label style="font-weight:600; font-size:0.9rem;">Select your role:</label>
-            <select id="roleSelect">
-                <option value="lagos_sender">Lagos Sender</option>
-                <option value="abuja_rep">Abuja Rep</option>
-                <option value="ph_rep">PH Rep</option>
-                <option value="vendor">External Vendor</option>
-            </select>
-        </div>
-        <div id="vendorSupplierField" style="display:none; margin-top:8px;">
-            <label style="font-weight:600; font-size:0.9rem;">Select Supplier/Vendor:</label>
-            <select id="vendorSupplierSelect"><option value="">-- Select --</option></select>
-        </div>
-        <div class="action-row">
-            <button id="requestProfileBtn" class="btn-warning" style="flex:1;">📩 Request Profile</button>
-            <button id="createProfileBtn" class="btn-success" style="flex:1;">✅ Create Profile</button>
-        </div>
-        <div id="profileMessage" style="margin-top:8px; color:#666; font-size:0.9rem;"></div>
+    <div class="help-text">
+        <small>Contact your administrator if you don't have an account.</small>
     </div>
-   
 </div>
 <div id="toast" class="toast"></div>
 
@@ -94,9 +57,7 @@
             appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
             measurementId: "G-MZ8NT6KK8N"
         };
-        if (firebase.apps.length) {
-            firebase.apps[0].delete();
-        }
+        if (firebase.apps.length) { firebase.apps[0].delete(); }
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
@@ -108,18 +69,7 @@
         const messageDiv = document.getElementById('message');
         const verificationMsg = document.getElementById('verificationMessage');
         const forgotLink = document.getElementById('forgotPasswordLink');
-        const setupContainer = document.getElementById('setupAdminContainer');
-        const setupBtn = document.getElementById('setupAdminBtn');
         const toast = document.getElementById('toast');
-        const profileSetup = document.getElementById('profileSetup');
-        const roleSelect = document.getElementById('roleSelect');
-        const vendorSupplierField = document.getElementById('vendorSupplierField');
-        const vendorSupplierSelect = document.getElementById('vendorSupplierSelect');
-        const requestProfileBtn = document.getElementById('requestProfileBtn');
-        const createProfileBtn = document.getElementById('createProfileBtn');
-        const profileMessage = document.getElementById('profileMessage');
-
-        let pendingUser = null; // stores the signed-in user object when profile is missing
 
         // ==================== Helpers ====================
         function showToast(message, type = 'info', duration = 3000) {
@@ -133,85 +83,6 @@
             }, duration);
         }
 
-        // ==================== Check admin exists ====================
-        async function checkAdminExists() {
-            if (!setupContainer) return;
-            try {
-                const snap = await db.collection('users').where('role', '==', 'admin').limit(1).get();
-                setupContainer.style.display = snap.empty ? 'block' : 'none';
-            } catch (err) {
-                setupContainer.style.display = 'block';
-            }
-        }
-        checkAdminExists().catch(() => { if(setupContainer) setupContainer.style.display = 'block'; });
-
-        // ==================== Create Default Admin ====================
-        setupBtn?.addEventListener('click', async () => {
-            const adminEmail = 'admin@nevamak.com';
-            const adminPassword = 'admin123';
-            const btn = setupBtn;
-            const originalText = btn.textContent;
-            btn.textContent = 'Creating...';
-            btn.disabled = true;
-
-            try {
-                let uid, user;
-                try {
-                    const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
-                    uid = userCred.user.uid;
-                    user = userCred.user;
-                    await user.sendEmailVerification();
-                } catch (err) {
-                    if (err.code === 'auth/email-already-in-use') {
-                        const userCred = await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
-                        uid = userCred.user.uid;
-                        user = userCred.user;
-                        await auth.signOut();
-                    } else {
-                        throw err;
-                    }
-                }
-                await db.collection('users').doc(uid).set({
-                    email: adminEmail,
-                    role: 'admin',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    enabled: true,
-                    emailVerified: user?.emailVerified || false
-                });
-                alert('✅ Admin account is ready!\nEmail: admin@nevamak.com\nPassword: admin123\nYou can sign in now.');
-                setupContainer.style.display = 'none';
-            } catch (err) {
-                alert('Error creating admin: ' + err.message);
-            } finally {
-                btn.textContent = originalText;
-                btn.disabled = false;
-            }
-        });
-
-        // ==================== Load Suppliers for Vendor Role ====================
-        async function loadSuppliers() {
-            try {
-                const snap = await db.collection('suppliers').get();
-                const sel = vendorSupplierSelect;
-                sel.innerHTML = '<option value="">-- Select Supplier --</option>';
-                snap.forEach(doc => {
-                    const s = doc.data();
-                    const opt = document.createElement('option');
-                    opt.value = doc.id;
-                    opt.textContent = s.name;
-                    sel.appendChild(opt);
-                });
-            } catch (err) {
-                console.warn('Suppliers load error:', err);
-                vendorSupplierField.innerHTML = '<p style="color:red;">Could not load suppliers. Please contact admin.</p>';
-            }
-        }
-
-        roleSelect.addEventListener('change', function() {
-            vendorSupplierField.style.display = this.value === 'vendor' ? 'block' : 'none';
-            if (this.value === 'vendor') loadSuppliers();
-        });
-
         // ==================== Login Handler ====================
         loginBtn.addEventListener('click', handleLogin);
         passwordInput.addEventListener('keydown', function(e) {
@@ -222,12 +93,10 @@
             const email = emailInput.value.trim();
             const password = passwordInput.value;
 
-            // Reset UI
+            // Reset messages
             messageDiv.innerText = '';
             verificationMsg.style.display = 'none';
             verificationMsg.innerText = '';
-            profileSetup.style.display = 'none';
-            profileMessage.innerText = '';
             loginBtn.disabled = true;
             loginBtn.innerHTML = '<span class="loading-spinner"></span> Signing in...';
 
@@ -239,10 +108,14 @@
             }
 
             try {
+                console.log('Attempting sign-in for:', email);
+
+                // 1. Sign in
                 const userCred = await auth.signInWithEmailAndPassword(email, password);
                 const user = userCred.user;
+                console.log('Sign-in successful for:', user.uid);
 
-                // If email not verified, show warning but proceed
+                // 2. Show verification warning (optional)
                 if (!user.emailVerified) {
                     verificationMsg.style.display = 'block';
                     verificationMsg.innerHTML = `⚠️ Your email (${email}) is not verified. You can still log in, but some features may require verification.
@@ -257,16 +130,20 @@
                     });
                 }
 
-                // Check Firestore document
+                // 3. Read Firestore user document
                 let userDoc;
                 try {
                     userDoc = await db.collection('users').doc(user.uid).get();
+                    console.log('Firestore document exists:', userDoc.exists);
+                    if (userDoc.exists) {
+                        console.log('Document data:', userDoc.data());
+                    }
                 } catch (firestoreError) {
                     console.error('Firestore read error:', firestoreError);
                     messageDiv.innerHTML = `
                         ❌ Could not read user data from Firestore.
                         <br><small style="color:#666;">Error: ${firestoreError.message}</small>
-                        <br><small style="color:#666;">Please check Firestore security rules.</small>
+                        <br><small style="color:#666;">Please check Firestore security rules or contact admin.</small>
                     `;
                     await auth.signOut();
                     loginBtn.disabled = false;
@@ -274,73 +151,56 @@
                     return;
                 }
 
-                // If document exists and has role, redirect
-                if (userDoc.exists && userDoc.data().role) {
-                    const role = userDoc.data().role;
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = 'Sign In';
-                    redirectUser(role);
-                    return;
-                }
-
-                // If document doesn't exist or missing role, we'll keep user signed in and show setup
+                // 4. If document doesn't exist, show error and sign out
                 if (!userDoc.exists) {
-                    // Auto-create for admin default
-                    if (email === 'admin@nevamak.com') {
-                        await db.collection('users').doc(user.uid).set({
-                            email: email,
-                            role: 'admin',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            enabled: true,
-                            emailVerified: user.emailVerified
-                        });
-                        const newDoc = await db.collection('users').doc(user.uid).get();
-                        if (newDoc.exists && newDoc.data().role) {
-                            redirectUser(newDoc.data().role);
-                            loginBtn.disabled = false;
-                            loginBtn.textContent = 'Sign In';
-                            return;
-                        }
-                    }
-                    // Missing or incomplete doc
-                    pendingUser = user;
-                    profileSetup.style.display = 'block';
+                    await auth.signOut();
                     messageDiv.innerHTML = `
-                        ℹ️ Your account is active but needs a profile.
-                        <br><small style="color:#666;">Select your role and click "Create Profile" or request admin assistance.</small>
+                        ❌ User role not found.
+                        <br><small style="color:#666;">Your account exists but has no Firestore profile.</small>
+                        <br><small style="color:#666;">Please ask your administrator to create your user profile.</small>
                     `;
                     loginBtn.disabled = false;
                     loginBtn.textContent = 'Sign In';
                     return;
                 }
 
-                // If doc exists but role missing
-                if (userDoc.exists && !userDoc.data().role) {
-                    pendingUser = user;
-                    profileSetup.style.display = 'block';
+                // 5. Check role
+                const data = userDoc.data();
+                const role = data.role;
+
+                // 6. If role is missing, show error and sign out
+                if (!role) {
+                    await auth.signOut();
                     messageDiv.innerHTML = `
-                        ℹ️ Your account is active but missing a role.
-                        <br><small style="color:#666;">Select your role and click "Create Profile".</small>
+                        ❌ User role is missing.
+                        <br><small style="color:#666;">Your Firestore profile does not have a role assigned.</small>
+                        <br><small style="color:#666;">Please contact your administrator to fix your account.</small>
                     `;
                     loginBtn.disabled = false;
                     loginBtn.textContent = 'Sign In';
                     return;
                 }
 
-                // Should never reach here
-                await auth.signOut();
-                messageDiv.innerText = 'Unexpected error. Please try again.';
+                // 7. Role exists – proceed to redirect
                 loginBtn.disabled = false;
                 loginBtn.textContent = 'Sign In';
+                redirectUser(role);
             } catch (err) {
                 console.error('Login error:', err);
                 let msg = err.message;
-                if (err.code === 'auth/user-not-found') msg = 'User not found. Please check your email.';
-                else if (err.code === 'auth/wrong-password') msg = 'Incorrect password. Please try again.';
-                else if (err.code === 'auth/invalid-email') msg = 'Invalid email format.';
-                else if (err.code === 'auth/too-many-requests') msg = 'Too many failed attempts. Try later.';
-                else if (err.code === 'auth/user-disabled') msg = 'Account disabled. Contact admin.';
-                else if (err.message.includes('400')) msg = 'Invalid credentials. Please check email/password.';
+                if (err.code === 'auth/user-not-found') {
+                    msg = 'User not found. Please check your email or contact admin.';
+                } else if (err.code === 'auth/wrong-password') {
+                    msg = 'Incorrect password. Please try again.';
+                } else if (err.code === 'auth/invalid-email') {
+                    msg = 'Invalid email format.';
+                } else if (err.code === 'auth/too-many-requests') {
+                    msg = 'Too many failed attempts. Please try again later.';
+                } else if (err.code === 'auth/user-disabled') {
+                    msg = 'This account has been disabled. Please contact admin.';
+                } else if (err.message && err.message.includes('400')) {
+                    msg = 'Sign-in failed. Please check your email and password.';
+                }
                 messageDiv.innerHTML = `❌ ${msg}`;
                 showToast(msg, 'error');
                 loginBtn.disabled = false;
@@ -348,96 +208,22 @@
             }
         }
 
-        // ==================== Create Profile (Self-Service) ====================
-        createProfileBtn.addEventListener('click', async function() {
-            if (!pendingUser) {
-                profileMessage.innerText = 'No user session found. Please sign in again.';
-                return;
-            }
-            const role = roleSelect.value;
-            if (!role) {
-                profileMessage.innerText = 'Please select a role.';
-                return;
-            }
-            if (role === 'vendor') {
-                const supplierId = vendorSupplierSelect.value;
-                if (!supplierId) {
-                    profileMessage.innerText = 'Please select a supplier for vendor role.';
-                    return;
-                }
-                // Get supplier name
-                let supplierName = '';
-                try {
-                    const supplierDoc = await db.collection('suppliers').doc(supplierId).get();
-                    if (supplierDoc.exists) supplierName = supplierDoc.data().name || 'Unknown';
-                } catch (e) { /* ignore */ }
-                // Create vendor profile
-                try {
-                    await db.collection('users').doc(pendingUser.uid).set({
-                        email: pendingUser.email,
-                        role: 'vendor',
-                        supplierId: supplierId,
-                        supplierName: supplierName,
-                        vendorName: supplierName,
-                        enabled: true,
-                        emailVerified: pendingUser.emailVerified || false,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
-                    profileMessage.innerHTML = '✅ Vendor profile created. Redirecting...';
-                    setTimeout(() => {
-                        window.location.href = 'external_vendor.html';
-                    }, 1500);
-                    return;
-                } catch (err) {
-                    profileMessage.innerText = 'Error creating profile: ' + err.message;
-                    return;
-                }
-            } else {
-                // Non-vendor (admin, lagos_sender, etc.) – just create with role
-                try {
-                    await db.collection('users').doc(pendingUser.uid).set({
-                        email: pendingUser.email,
-                        role: role,
-                        enabled: true,
-                        emailVerified: pendingUser.emailVerified || false,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }, { merge: true });
-                    profileMessage.innerHTML = `✅ Profile created as ${role}. Redirecting...`;
-                    setTimeout(() => {
-                        redirectUser(role);
-                    }, 1500);
-                } catch (err) {
-                    profileMessage.innerText = 'Error creating profile: ' + err.message;
-                }
-            }
-        });
-
-        // ==================== Request Profile (Admin Notification) ====================
-        requestProfileBtn.addEventListener('click', async function() {
-            if (!pendingUser) {
-                profileMessage.innerText = 'No user session found. Please sign in again.';
+        // ==================== Forgot Password ====================
+        forgotLink.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            if (!email) {
+                messageDiv.innerText = 'Please enter your email address first.';
                 return;
             }
             try {
-                const role = roleSelect.value || 'unknown';
-                // Send notification to admin
-                await db.collection('notifications').add({
-                    userId: 'admin', // We'll use a system notification, but we need to find admin user
-                    message: `User ${pendingUser.email} (${pendingUser.uid}) requests profile creation with role: ${role}`,
-                    read: false,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                // Also log activity
-                await db.collection('activityLog').add({
-                    actionType: 'profile_request',
-                    userEmail: pendingUser.email,
-                    requestedRole: role,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                profileMessage.innerHTML = '✅ Request sent to admin. You will be notified when your profile is ready.';
-                showToast('Request sent to admin.', 'success');
+                await auth.sendPasswordResetEmail(email);
+                messageDiv.innerHTML = `<span style="color:#27ae60;">✅ Password reset email sent to ${email}. Please check your inbox.</span>`;
+                showToast('Password reset email sent.', 'success');
             } catch (err) {
-                profileMessage.innerText = 'Error sending request: ' + err.message;
+                let msg = err.message;
+                if (err.code === 'auth/user-not-found') msg = 'No user found with this email address.';
+                messageDiv.innerHTML = `<span style="color:#e74c3c;">❌ ${msg}</span>`;
+                showToast(msg, 'error');
             }
         });
 
@@ -463,24 +249,11 @@
             if (user) {
                 try {
                     const userDoc = await db.collection('users').doc(user.uid).get();
-                    if (userDoc.exists && userDoc.data().role) {
-                        redirectUser(userDoc.data().role);
-                    } else if (userDoc.exists && !userDoc.data().role) {
-                        // If already signed in and missing role, show profile setup
-                        pendingUser = user;
-                        profileSetup.style.display = 'block';
-                        messageDiv.innerHTML = `
-                            ℹ️ Your account is active but missing a role.
-                            <br><small style="color:#666;">Select your role and click "Create Profile".</small>
-                        `;
-                    } else {
-                        // no doc, show setup
-                        pendingUser = user;
-                        profileSetup.style.display = 'block';
-                        messageDiv.innerHTML = `
-                            ℹ️ Your account is active but needs a profile.
-                            <br><small style="color:#666;">Select your role and click "Create Profile".</small>
-                        `;
+                    if (userDoc.exists) {
+                        const role = userDoc.data().role;
+                        if (role) {
+                            redirectUser(role);
+                        }
                     }
                 } catch (err) {
                     console.warn('Auto-redirect error:', err);
