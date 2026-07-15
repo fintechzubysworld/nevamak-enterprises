@@ -263,6 +263,7 @@
                 <textarea id="editNotes" placeholder="Additional notes"></textarea>
                 <div style="display:flex; gap:12px; flex-wrap:wrap;">
                     <button type="submit" id="editUpdateBtn" class="btn-primary" style="flex:2;">💾 Update Draft</button>
+                    <button type="button" id="editDispatchBtn" class="btn-success" style="flex:1;">🚛 Dispatch Now</button>
                     <button type="button" id="editDeleteBtn" class="btn-danger" style="flex:1;">🗑️ Delete Draft</button>
                 </div>
             </form>
@@ -1246,7 +1247,7 @@
         }
     };
 
-    // ==================== Edit Draft (FIXED with validation) ====================
+    // ==================== Edit Draft (with validation and Dispatch Now) ====================
     let editDraftId = null;
 
     function validateEditForm() {
@@ -1261,6 +1262,7 @@
         });
         const isValid = senderName !== '' && hasValidItem;
         document.getElementById('editUpdateBtn').disabled = !isValid;
+        document.getElementById('editDispatchBtn').disabled = !isValid;
     }
 
     window.editDraft = async function(id) {
@@ -1295,8 +1297,9 @@
             document.getElementById('editDraftModal').style.display = 'flex';
             document.getElementById('editMessage').textContent = '';
 
-            // Disable submit button initially and validate
+            // Disable buttons initially and validate
             document.getElementById('editUpdateBtn').disabled = true;
+            document.getElementById('editDispatchBtn').disabled = true;
             // Attach validation events
             document.getElementById('editSenderName').addEventListener('input', validateEditForm);
             container.addEventListener('input', validateEditForm);
@@ -1361,7 +1364,6 @@
 
     // Override the global add button click to also validate
     document.getElementById('editAddItemBtn').addEventListener('click', function() {
-        // This will be replaced by the dynamic one in editDraft, but we keep a fallback.
         const container = document.getElementById('editItemsContainer');
         container.appendChild(createEditItemRow());
         updateEditPreview();
@@ -1439,7 +1441,7 @@
     document.getElementById('editItemsContainer').addEventListener('input', updateEditPreview);
     document.getElementById('editTransportMultiplier').addEventListener('input', updateEditPreview);
 
-    // ==================== Update Draft (FIXED) ====================
+    // ==================== Update Draft (Update) ====================
     document.getElementById('editDraftForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!editDraftId) { showToast('No draft selected.', 'error'); return; }
@@ -1490,6 +1492,70 @@
             showToast('Error updating draft: ' + error.message, 'error');
         } finally {
             setButtonLoading(updateBtn, false);
+        }
+    });
+
+    // ==================== Dispatch Now from Edit Draft ====================
+    document.getElementById('editDispatchBtn').addEventListener('click', async () => {
+        if (!editDraftId) { showToast('No draft selected.', 'error'); return; }
+        if (!confirm('Dispatch this shipment now? It will be marked as Dispatched.')) return;
+
+        const senderName = document.getElementById('editSenderName').value.trim();
+        const destBranch = document.getElementById('editDestBranch').value;
+        const vehicleNo = document.getElementById('editVehicleNo').value.trim();
+        const expectedDate = document.getElementById('editExpectedDate').value;
+        const driver = document.getElementById('editDriverName').value.trim();
+        const trackingNo = document.getElementById('editTrackingNo').value.trim();
+        const notes = document.getElementById('editNotes').value.trim();
+        const multiplier = validateNumber(document.getElementById('editTransportMultiplier').value, 0.01) || 1.00;
+
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('editItemsContainer', 'editTransportMultiplier');
+        if (items.length === 0 || !senderName) {
+            document.getElementById('editMessage').innerText = 'Please fill all fields and add valid items.';
+            return;
+        }
+
+        const dispatchBtn = document.getElementById('editDispatchBtn');
+        setButtonLoading(dispatchBtn, true);
+        document.getElementById('editMessage').textContent = '';
+
+        try {
+            await db.collection('shipments').doc(editDraftId).update({
+                senderName,
+                destinationBranch: destBranch,
+                vehicleNo,
+                expectedDate,
+                driver,
+                trackingNo,
+                notes,
+                transportMultiplier: multiplier,
+                items: items,
+                subtotal,
+                totalDiscount: totalDisc,
+                totalVAT,
+                totalWHT,
+                total: grandTotal,
+                status: 'Dispatched',
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await db.collection('activityLog').add({
+                actionType: 'dispatch',
+                shipmentId: editDraftId,
+                branch: 'Lagos',
+                details: `Draft ${editDraftId} dispatched via edit modal by ${currentUserEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+            showToast('✅ Shipment dispatched successfully.', 'success');
+            closeModal('editDraftModal');
+            editDraftId = null;
+            loadShipments();
+            loadStats();
+        } catch (error) {
+            document.getElementById('editMessage').innerText = 'Error: ' + error.message;
+            showToast('Error dispatching: ' + error.message, 'error');
+        } finally {
+            setButtonLoading(dispatchBtn, false);
         }
     });
 
