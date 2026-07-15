@@ -1270,6 +1270,7 @@
             container.innerHTML = '';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
+                    // Use the same class names as main items so calculateTotals works
                     const div = createEditItemRow(it.itemName, it.orderedQty, it.unitPrice,
                         it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent);
                     container.appendChild(div);
@@ -1290,20 +1291,23 @@
         const div = document.createElement('div');
         div.className = 'item-row';
         div.dataset.rowId = rowId;
+        // Use the same class names as main items (itemName, itemQty, etc.) so calculateTotals works.
         div.innerHTML = `
             <input type="checkbox" class="item-checkbox" data-row-id="${rowId}" style="width:auto; margin:0 4px;">
-            <input type="text" placeholder="Item name" class="editItemName" value="${escapeHtml(itemName)}" style="flex:1.5;">
-            <input type="number" placeholder="Qty" class="editItemQty" value="${Math.max(0, qty)}" min="0" step="1" style="flex:0.8;">
-            <input type="number" placeholder="Price/unit" class="editItemPrice" value="${Math.max(0, price)}" min="0" step="0.01" style="flex:1;">
+            <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:1.5;">
+            <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" min="0" step="1" style="flex:0.8;">
+            <input type="number" placeholder="Price/unit" class="itemPrice" value="${Math.max(0, price)}" min="0" step="0.01" style="flex:1;">
             <div class="item-tax-fields">
-                <input type="number" placeholder="Disc %" class="editItemDiscPct" value="${Math.max(0, discPct)}" step="0.01" min="0" max="100">
-                <input type="number" placeholder="Disc ₦" class="editItemDiscAmt" value="${Math.max(0, discAmt)}" step="0.01" min="0">
-                <input type="number" placeholder="VAT %" class="editItemVAT" value="${Math.max(0, vatPct)}" step="0.01" min="0" max="100">
-                <input type="number" placeholder="WHT %" class="editItemWHT" value="${Math.max(0, whtPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="Disc %" class="itemDiscPct" value="${Math.max(0, discPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="Disc ₦" class="itemDiscAmt" value="${Math.max(0, discAmt)}" step="0.01" min="0">
+                <input type="number" placeholder="VAT %" class="itemVAT" value="${Math.max(0, vatPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="WHT %" class="itemWHT" value="${Math.max(0, whtPct)}" step="0.01" min="0" max="100">
             </div>
             <button type="button" class="removeItem editRemoveItem">✖</button>
         `;
         const container = document.getElementById('editItemsContainer');
+        // Remove button handler (the button has class removeItem, but we need to differentiate)
+        // We'll use a separate class for the remove button in edit rows.
         div.querySelector('.editRemoveItem').onclick = () => {
             if (container.querySelectorAll('.item-row').length <= 1) {
                 showToast('Cannot remove last item', 'error');
@@ -1366,10 +1370,10 @@
         if (wht === null) return;
 
         rows.forEach(row => {
-            row.querySelector('.editItemDiscPct').value = Math.max(0, parseFloat(discPct) || 0);
-            row.querySelector('.editItemDiscAmt').value = Math.max(0, parseFloat(discAmt) || 0);
-            row.querySelector('.editItemVAT').value = Math.max(0, parseFloat(vat) || 0);
-            row.querySelector('.editItemWHT').value = Math.max(0, parseFloat(wht) || 0);
+            row.querySelector('.itemDiscPct').value = Math.max(0, parseFloat(discPct) || 0);
+            row.querySelector('.itemDiscAmt').value = Math.max(0, parseFloat(discAmt) || 0);
+            row.querySelector('.itemVAT').value = Math.max(0, parseFloat(vat) || 0);
+            row.querySelector('.itemWHT').value = Math.max(0, parseFloat(wht) || 0);
         });
         updateEditPreview();
         showToast('✅ Applied to all items.', 'success');
@@ -1378,10 +1382,10 @@
     document.getElementById('editClearTaxesBtn').addEventListener('click', () => {
         if (!confirm('Clear all tax/discount fields on all items?')) return;
         document.querySelectorAll('#editItemsContainer .item-row').forEach(row => {
-            row.querySelector('.editItemDiscPct').value = '0';
-            row.querySelector('.editItemDiscAmt').value = '0';
-            row.querySelector('.editItemVAT').value = '0';
-            row.querySelector('.editItemWHT').value = '0';
+            row.querySelector('.itemDiscPct').value = '0';
+            row.querySelector('.itemDiscAmt').value = '0';
+            row.querySelector('.itemVAT').value = '0';
+            row.querySelector('.itemWHT').value = '0';
         });
         updateEditPreview();
         showToast('🧹 Taxes cleared.', 'info');
@@ -1415,7 +1419,7 @@
         const notes = document.getElementById('editNotes').value.trim();
         const multiplier = validateNumber(document.getElementById('editTransportMultiplier').value, 0.01) || 1.00;
 
-        // Get items from the edit container
+        // Get items from edit container – now uses same class names as main, so calculateTotals works
         const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('editItemsContainer', 'editTransportMultiplier');
         if (items.length === 0 || !senderName) {
             document.getElementById('editMessage').innerText = 'Please fill all fields and add valid items.';
