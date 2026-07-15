@@ -1246,8 +1246,22 @@
         }
     };
 
-    // ==================== Edit Draft (FIXED) ====================
+    // ==================== Edit Draft (FIXED with validation) ====================
     let editDraftId = null;
+
+    function validateEditForm() {
+        const senderName = document.getElementById('editSenderName').value.trim();
+        const rows = document.querySelectorAll('#editItemsContainer .item-row');
+        let hasValidItem = false;
+        rows.forEach(row => {
+            const name = row.querySelector('.itemName')?.value.trim();
+            const qty = parseFloat(row.querySelector('.itemQty')?.value) || 0;
+            const price = parseFloat(row.querySelector('.itemPrice')?.value) || 0;
+            if (name && qty > 0 && price >= 0) hasValidItem = true;
+        });
+        const isValid = senderName !== '' && hasValidItem;
+        document.getElementById('editUpdateBtn').disabled = !isValid;
+    }
 
     window.editDraft = async function(id) {
         try {
@@ -1270,7 +1284,6 @@
             container.innerHTML = '';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
-                    // Use the same class names as main items so calculateTotals works
                     const div = createEditItemRow(it.itemName, it.orderedQty, it.unitPrice,
                         it.discountPercent, it.discountAmount, it.vatPercent, it.whtPercent);
                     container.appendChild(div);
@@ -1281,6 +1294,19 @@
             updateEditPreview();
             document.getElementById('editDraftModal').style.display = 'flex';
             document.getElementById('editMessage').textContent = '';
+
+            // Disable submit button initially and validate
+            document.getElementById('editUpdateBtn').disabled = true;
+            // Attach validation events
+            document.getElementById('editSenderName').addEventListener('input', validateEditForm);
+            container.addEventListener('input', validateEditForm);
+            // Override add button to validate after add
+            document.getElementById('editAddItemBtn').onclick = function() {
+                container.appendChild(createEditItemRow());
+                updateEditPreview();
+                validateEditForm();
+            };
+            validateEditForm();
         } catch (err) {
             showToast('Error loading draft: ' + err.message, 'error');
         }
@@ -1291,7 +1317,6 @@
         const div = document.createElement('div');
         div.className = 'item-row';
         div.dataset.rowId = rowId;
-        // Use the same class names as main items (itemName, itemQty, etc.) so calculateTotals works.
         div.innerHTML = `
             <input type="checkbox" class="item-checkbox" data-row-id="${rowId}" style="width:auto; margin:0 4px;">
             <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:1.5;">
@@ -1306,8 +1331,6 @@
             <button type="button" class="removeItem editRemoveItem">✖</button>
         `;
         const container = document.getElementById('editItemsContainer');
-        // Remove button handler (the button has class removeItem, but we need to differentiate)
-        // We'll use a separate class for the remove button in edit rows.
         div.querySelector('.editRemoveItem').onclick = () => {
             if (container.querySelectorAll('.item-row').length <= 1) {
                 showToast('Cannot remove last item', 'error');
@@ -1315,15 +1338,20 @@
             }
             div.remove();
             updateEditPreview();
+            validateEditForm();
         };
         div.querySelectorAll('input').forEach(inp => {
-            inp.addEventListener('input', updateEditPreview);
+            inp.addEventListener('input', () => {
+                updateEditPreview();
+                validateEditForm();
+            });
             if (inp.type === 'number' && inp.min) {
                 inp.addEventListener('blur', function() {
                     const min = parseFloat(this.min);
                     if (!isNaN(min) && parseFloat(this.value) < min) {
                         this.value = min;
                         updateEditPreview();
+                        validateEditForm();
                     }
                 });
             }
@@ -1331,10 +1359,13 @@
         return div;
     }
 
-    document.getElementById('editAddItemBtn').addEventListener('click', () => {
+    // Override the global add button click to also validate
+    document.getElementById('editAddItemBtn').addEventListener('click', function() {
+        // This will be replaced by the dynamic one in editDraft, but we keep a fallback.
         const container = document.getElementById('editItemsContainer');
         container.appendChild(createEditItemRow());
         updateEditPreview();
+        validateEditForm();
     });
 
     // Edit draft bulk actions
@@ -1376,6 +1407,7 @@
             row.querySelector('.itemWHT').value = Math.max(0, parseFloat(wht) || 0);
         });
         updateEditPreview();
+        validateEditForm();
         showToast('✅ Applied to all items.', 'success');
     });
 
@@ -1388,6 +1420,7 @@
             row.querySelector('.itemWHT').value = '0';
         });
         updateEditPreview();
+        validateEditForm();
         showToast('🧹 Taxes cleared.', 'info');
     });
 
@@ -1419,7 +1452,6 @@
         const notes = document.getElementById('editNotes').value.trim();
         const multiplier = validateNumber(document.getElementById('editTransportMultiplier').value, 0.01) || 1.00;
 
-        // Get items from edit container – now uses same class names as main, so calculateTotals works
         const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('editItemsContainer', 'editTransportMultiplier');
         if (items.length === 0 || !senderName) {
             document.getElementById('editMessage').innerText = 'Please fill all fields and add valid items.';
@@ -1450,9 +1482,7 @@
             });
             showToast('✅ Draft updated successfully.', 'success');
             closeModal('editDraftModal');
-            // Reset the edit state
             editDraftId = null;
-            // Reload the shipments list
             loadShipments();
             loadStats();
         } catch (error) {
