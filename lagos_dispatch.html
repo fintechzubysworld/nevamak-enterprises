@@ -443,7 +443,7 @@
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
             currentUserRole = userDoc.data().role || '';
-            // ====== ROLE CHECK ======
+            // Role check
             if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
                 alert('⛔ Access Denied. Only Lagos Senders and Admins can access the Dispatch page.');
                 window.location.href = 'index.html';
@@ -1069,7 +1069,7 @@
         }
     };
 
-    // ==================== Recall Shipment (New) ====================
+    // ==================== Recall Shipment ====================
     window.recallShipment = async function(id) {
         if (!['admin', 'lagos_sender'].includes(currentUserRole)) {
             showToast('Permission denied.', 'error');
@@ -1246,7 +1246,7 @@
         }
     };
 
-    // ==================== Edit Draft ====================
+    // ==================== Edit Draft (FIXED) ====================
     let editDraftId = null;
 
     window.editDraft = async function(id) {
@@ -1402,6 +1402,7 @@
     document.getElementById('editItemsContainer').addEventListener('input', updateEditPreview);
     document.getElementById('editTransportMultiplier').addEventListener('input', updateEditPreview);
 
+    // ==================== Update Draft (FIXED) ====================
     document.getElementById('editDraftForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!editDraftId) { showToast('No draft selected.', 'error'); return; }
@@ -1414,6 +1415,7 @@
         const notes = document.getElementById('editNotes').value.trim();
         const multiplier = validateNumber(document.getElementById('editTransportMultiplier').value, 0.01) || 1.00;
 
+        // Get items from the edit container
         const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateTotals('editItemsContainer', 'editTransportMultiplier');
         if (items.length === 0 || !senderName) {
             document.getElementById('editMessage').innerText = 'Please fill all fields and add valid items.';
@@ -1422,6 +1424,8 @@
 
         const updateBtn = document.getElementById('editUpdateBtn');
         setButtonLoading(updateBtn, true);
+        document.getElementById('editMessage').textContent = '';
+
         try {
             await db.collection('shipments').doc(editDraftId).update({
                 senderName,
@@ -1440,8 +1444,11 @@
                 total: grandTotal,
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
             });
-            showToast('Draft updated.', 'success');
+            showToast('✅ Draft updated successfully.', 'success');
             closeModal('editDraftModal');
+            // Reset the edit state
+            editDraftId = null;
+            // Reload the shipments list
             loadShipments();
             loadStats();
         } catch (error) {
@@ -1808,7 +1815,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Dispatch with Recall and Edit functionality loaded.');
+    console.log('NEVAMAK Dispatch with fixed draft editing loaded.');
 </script>
 </body>
 </html>
