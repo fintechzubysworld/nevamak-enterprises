@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>NEVAMAK – Share Invoice</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body {
+            background: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            max-width: 500px;
+            width: 95%;
+            background: white;
+            border-radius: 32px;
+            padding: 32px 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+        }
+        h1 {
+            font-size: 1.6rem;
+            color: #0a3d62;
+            margin: 0 0 8px 0;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #555;
+            font-size: 0.95rem;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 16px;
+        }
+        .invoice-preview {
+            background: #f8f9fa;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            border-left: 4px solid #0a3d62;
+        }
+        .invoice-preview p {
+            margin: 4px 0;
+            font-size: 0.95rem;
+        }
+        .invoice-preview .label {
+            font-weight: 600;
+            color: #0a3d62;
+        }
+        .share-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .share-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px 20px;
+            border: none;
+            border-radius: 48px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            color: white;
+        }
+        .share-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .share-btn:active {
+            transform: translateY(0);
+        }
+        .share-btn .icon {
+            font-size: 1.4rem;
+        }
+        .btn-email {
+            background: #ea4335;
+        }
+        .btn-email:hover {
+            background: #d33426;
+        }
+        .btn-chat {
+            background: #1a73e8;
+        }
+        .btn-chat:hover {
+            background: #1557b0;
+        }
+        .btn-whatsapp {
+            background: #25D366;
+        }
+        .btn-whatsapp:hover {
+            background: #1da851;
+        }
+        .back-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            color: #0a3d62;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .status-msg {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 500;
+            display: none;
+        }
+        .status-msg.success {
+            display: block;
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-msg.error {
+            display: block;
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-msg.info {
+            display: block;
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0a3d62;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-backdrop.active {
+            display: flex;
+        }
+        .modal-box {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+        .modal-box h3 {
+            margin: 0 0 8px 0;
+            color: #0a3d62;
+        }
+        .modal-box p {
+            color: #555;
+            margin: 0 0 16px 0;
+            white-space: pre-line;
+        }
+        .modal-box .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .modal-box .btn-group button {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .modal-box .btn-group .btn-confirm {
+            background: #0a3d62;
+            color: white;
+        }
+        .modal-box .btn-group .btn-confirm:hover {
+            background: #1a5276;
+        }
+        .modal-box .btn-group .btn-cancel {
+            background: #e74c3c;
+            color: white;
+        }
+        .modal-box .btn-group .btn-cancel:hover {
+            background: #c0392b;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 20px 16px; }
+            .share-btn { padding: 14px 16px; font-size: 0.95rem; }
+            .invoice-preview { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📤 Share Invoice</h1>
+    <div class="subtitle">Choose how to share this invoice</div>
+
+    <div id="invoicePreview" class="invoice-preview">
+        <p><span class="label">📄 Invoice #:</span> <span id="invNumber">Loading...</span></p>
+        <p><span class="label">👤 Customer:</span> <span id="invCustomer">Loading...</span></p>
+        <p><span class="label">💰 Total:</span> <span id="invTotal">Loading...</span></p>
+        <p><span class="label">📅 Date:</span> <span id="invDate">Loading...</span></p>
+        <p><span class="label">🏢 Branch:</span> <span id="invBranch">Loading...</span></p>
+    </div>
+
+    <div class="share-options">
+        <button id="emailBtn" class="share-btn btn-email">
+            <span class="icon">📧</span> Email via Gmail
+        </button>
+        <button id="chatBtn" class="share-btn btn-chat">
+            <span class="icon">💬</span> Chat via Google Chat
+        </button>
+        <button id="whatsappBtn" class="share-btn btn-whatsapp">
+            <span class="icon">📱</span> WhatsApp Messenger
+        </button>
+    </div>
+
+    <div id="statusMsg" class="status-msg"></div>
+
+    <a href="invoice_repo.html" class="back-link">← Back to Invoices</a>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="confirmModal" class="modal-backdrop">
+    <div class="modal-box">
+        <h3 id="confirmTitle">Confirm</h3>
+        <p id="confirmMessage">Are you sure you want to proceed?</p>
+        <div class="btn-group">
+            <button id="confirmOk" class="btn-confirm">Yes, Proceed</button>
+            <button id="confirmCancel" class="btn-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==================== Firebase Config ====================
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8N"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ==================== State ====================
+    let currentUser = null;
+    let invoiceData = null;
+    let invoiceId = null;
+
+    // ==================== DOM ====================
+    const statusMsg = document.getElementById('statusMsg');
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmOk = document.getElementById('confirmOk');
+    const confirmCancel = document.getElementById('confirmCancel');
+    const confirmTitle = document.getElementById('confirmTitle');
+    const confirmMessage = document.getElementById('confirmMessage');
+
+    // ==================== Helpers ====================
+    function showStatus(message, type = 'info') {
+        statusMsg.textContent = message;
+        statusMsg.className = 'status-msg ' + type;
+        statusMsg.style.display = 'block';
+        setTimeout(() => {
+            statusMsg.style.display = 'none';
+        }, 5000);
+    }
+
+    function showConfirm(title, message) {
+        return new Promise((resolve) => {
+            confirmTitle.textContent = title;
+            confirmMessage.textContent = message;
+            confirmModal.classList.add('active');
+            const handleOk = () => {
+                confirmModal.classList.remove('active');
+                confirmOk.removeEventListener('click', handleOk);
+                confirmCancel.removeEventListener('click', handleCancel);
+                resolve(true);
+            };
+            const handleCancel = () => {
+                confirmModal.classList.remove('active');
+                confirmOk.removeEventListener('click', handleOk);
+                confirmCancel.removeEventListener('click', handleCancel);
+                resolve(false);
+            };
+            confirmOk.addEventListener('click', handleOk);
+            confirmCancel.addEventListener('click', handleCancel);
+        });
+    }
+
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+    }
+
+    // ==================== Load Invoice Data ====================
+    async function loadInvoiceData() {
+        const params = new URLSearchParams(window.location.search);
+        invoiceId = params.get('id');
+
+        if (!invoiceId) {
+            document.getElementById('invNumber').textContent = 'No invoice selected';
+            showStatus('No invoice ID provided. Please go back and select an invoice.', 'error');
+            return;
+        }
+
+        try {
+            const doc = await db.collection('invoices').doc(invoiceId).get();
+            if (!doc.exists) {
+                document.getElementById('invNumber').textContent = 'Invoice not found';
+                showStatus('Invoice not found. It may have been deleted.', 'error');
+                return;
+            }
+
+            invoiceData = doc.data();
+            document.getElementById('invNumber').textContent = invoiceData.invoiceNumber || 'N/A';
+            document.getElementById('invCustomer').textContent = invoiceData.customer || 'N/A';
+            document.getElementById('invTotal').textContent = invoiceData.total ? `₦${invoiceData.total.toLocaleString()}` : '₦0';
+            document.getElementById('invDate').textContent = invoiceData.date || 'N/A';
+            document.getElementById('invBranch').textContent = invoiceData.branch || 'N/A';
+
+        } catch (err) {
+            console.error('Error loading invoice:', err);
+            document.getElementById('invNumber').textContent = 'Error loading';
+            showStatus('Error loading invoice: ' + err.message, 'error');
+        }
+    }
+
+    // ==================== Share Functions ====================
+
+    // 1. Email via Gmail (using @nevamakenterprises.net domain)
+    async function shareViaEmail() {
+        if (!invoiceData) {
+            showStatus('Invoice data not loaded.', 'error');
+            return;
+        }
+
+        const recipient = invoiceData.customerEmail || '';
+        const subject = `Invoice ${invoiceData.invoiceNumber} from NEVAMAK Enterprises`;
+        
+        // Build items list for the email body
+        let itemsList = '';
+        if (invoiceData.items && invoiceData.items.length > 0) {
+            itemsList = invoiceData.items.map(item => 
+                `  - ${item.itemName} (${item.quantity} x ₦${(item.updatedPrice || item.unitPrice || 0).toFixed(2)}) = ₦${(item.total || 0).toFixed(2)}`
+            ).join('\n');
+        }
+
+        const body = `Dear ${invoiceData.customer || 'Customer'},\n\n` +
+            `Please find attached invoice ${invoiceData.invoiceNumber} for ₦${(invoiceData.total || 0).toFixed(2)}.\n\n` +
+            `Invoice Details:\n` +
+            `- Date: ${invoiceData.date || 'N/A'}\n` +
+            `- Branch: ${invoiceData.branch || 'N/A'}\n` +
+            `- Items: ${(invoiceData.items || []).length} item(s)\n` +
+            `${itemsList ? '\nItems:\n' + itemsList : ''}\n\n` +
+            `Thank you for your business.\n\n` +
+            `Best regards,\n` +
+            `NEVAMAK Enterprises\n` +
+            `📧 info@nevamakenterprises.net`;
+
+        // Use the nevamakenterprises.net domain for email
+        const emailDomain = 'nevamakenterprises.net';
+
+        let emailAddress = recipient;
+        if (!emailAddress || emailAddress === '') {
+            // If no customer email, send to default info@nevamakenterprises.net
+            emailAddress = `info@${emailDomain}`;
+        } else if (!emailAddress.includes('@')) {
+            // If it's just a name, append the domain
+            emailAddress = `${emailAddress}@${emailDomain}`;
+        }
+
+        const confirmed = await showConfirm(
+            '📧 Send via Gmail',
+            `This will open Gmail to send to:\n${emailAddress}\n\nSubject: ${subject}`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailAddress)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            window.open(gmailUrl, '_blank');
+            showStatus('📧 Gmail opened. Please complete the email and send.', 'success');
+        } catch (err) {
+            showStatus('Error opening Gmail: ' + err.message, 'error');
+        }
+    }
+
+    // 2. Chat via Google Chat (using nevamakenterprises.net domain)
+    async function shareViaChat() {
+        if (!invoiceData) {
+            showStatus('Invoice data not loaded.', 'error');
+            return;
+        }
+
+        const domain = 'nevamakenterprises.net';
+        const recipient = invoiceData.customerEmail || '';
+        let chatRecipient = recipient;
+
+        if (!chatRecipient || chatRecipient === '') {
+            chatRecipient = `info@${domain}`;
+        } else if (!chatRecipient.includes('@')) {
+            chatRecipient = `${chatRecipient}@${domain}`;
+        }
+
+        const message = `📄 *Invoice ${invoiceData.invoiceNumber}*\n` +
+            `👤 Customer: ${invoiceData.customer || 'N/A'}\n` +
+            `💰 Total: ₦${(invoiceData.total || 0).toFixed(2)}\n` +
+            `📅 Date: ${invoiceData.date || 'N/A'}\n` +
+            `🏢 Branch: ${invoiceData.branch || 'N/A'}\n` +
+            `📦 Items: ${(invoiceData.items || []).length} item(s)\n\n` +
+            `Please review this invoice. For any questions, contact NEVAMAK Enterprises.\n` +
+            `📧 ${chatRecipient}`;
+
+        const confirmed = await showConfirm(
+            '💬 Send via Google Chat',
+            `This will open Google Chat to send to:\n${chatRecipient}`
+        );
+
+        if (!confirmed) return;
+
+        try {
+            // Google Chat uses the same URL scheme as Gmail for chat
+            const chatUrl = `https://mail.google.com/chat/?to=${encodeURIComponent(chatRecipient)}&body=${encodeURIComponent(message)}`;
+            window.open(chatUrl, '_blank');
+            showStatus('💬 Google Chat opened. Please send the message.', 'success');
+        } catch (err) {
+            showStatus('Error opening Google Chat: ' + err.message, 'error');
+        }
+    }
+
+    // 3. WhatsApp Messenger
+    async function shareViaWhatsApp() {
+        if (!invoiceData) {
+            showStatus('Invoice data not loaded.', 'error');
+            return;
+        }
+
+        const message = `📄 *Invoice ${invoiceData.invoiceNumber}* from NEVAMAK Enterprises\n\n` +
+            `👤 Customer: ${invoiceData.customer || 'N/A'}\n` +
+            `💰 Total: ₦${(invoiceData.total || 0).toFixed(2)}\n` +
+            `📅 Date: ${invoiceData.date || 'N/A'}\n` +
+            `🏢 Branch: ${invoiceData.branch || 'N/A'}\n` +
+            `📦 Items: ${(invoiceData.items || []).length} item(s)\n\n` +
+            `Please review this invoice. Thank you for your business!\n` +
+            `NEVAMAK Enterprises`;
+
+        const confirmed = await showConfirm(
+            '📱 Send via WhatsApp',
+            'This will open WhatsApp Messenger on your device.'
+        );
+
+        if (!confirmed) return;
+
+        try {
+            // Try both mobile and web WhatsApp
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            let whatsappUrl;
+
+            if (isMobile) {
+                // Mobile: use whatsapp:// app protocol
+                whatsappUrl = `whatsapp://send?text=${encodeURIComponent(message)}`;
+            } else {
+                // Desktop: use web.whatsapp.com
+                whatsappUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+            }
+
+            window.open(whatsappUrl, '_blank');
+            showStatus('📱 WhatsApp opened. Please choose a contact and send.', 'success');
+        } catch (err) {
+            showStatus('Error opening WhatsApp: ' + err.message, 'error');
+        }
+    }
+
+    // ==================== Event Listeners ====================
+    document.getElementById('emailBtn').addEventListener('click', shareViaEmail);
+    document.getElementById('chatBtn').addEventListener('click', shareViaChat);
+    document.getElementById('whatsappBtn').addEventListener('click', shareViaWhatsApp);
+
+    // ==================== Auth ====================
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
+        currentUser = user;
+        await loadInvoiceData();
+    });
+
+    // ==================== Init ====================
+    console.log('NEVAMAK Share Invoice loaded.');
+</script>
+</body>
+</html>
