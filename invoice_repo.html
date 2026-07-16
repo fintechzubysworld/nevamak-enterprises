@@ -245,12 +245,14 @@
 <div id="sendModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('sendModal')">&times;</span>
-        <h3>📤 Send Invoice</h3>
+        <h3>📤 Share Invoice</h3>
         <p><strong>Invoice #:</strong> <span id="sendInvoiceNumber"></span></p>
+        <p><strong>Customer:</strong> <span id="sendInvoiceCustomer"></span></p>
         <p><strong>Total:</strong> ₦<span id="sendInvoiceTotal"></span></p>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
-            <button onclick="sendViaEmail()" class="btn-primary" style="flex:1;">📧 Email</button>
-            <button onclick="sendViaChat()" class="btn-info" style="flex:1;">💬 Chat</button>
+            <button onclick="openSharePage()" class="btn-primary" style="flex:1;">📤 Open Share Page</button>
+            <button onclick="sendViaEmail()" class="btn-info" style="flex:1;">📧 Email</button>
+            <button onclick="sendViaChat()" class="btn-success" style="flex:1;">💬 Chat</button>
             <button onclick="sendViaWhatsApp()" class="btn-success" style="flex:1;">📱 WhatsApp</button>
         </div>
         <div id="sendMessage" style="color:red; margin-top:8px;"></div>
@@ -354,6 +356,7 @@
     let currentUserRole = '';
     let currentUserEmail = '';
     let sendInvoiceId = null;
+    let sendInvoiceData = null;
     let shareInvoiceId = null;
     let importedItems = [];
     let moveInvoiceId = null;
@@ -1618,72 +1621,124 @@
         }
     };
 
-    // ==================== Send Modal ====================
+    // ==================== Send/Share Functions (Updated) ====================
     window.openSendModal = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
-            const d = doc.data();
             sendInvoiceId = id;
-            document.getElementById('sendInvoiceNumber').textContent = d.invoiceNumber;
-            document.getElementById('sendInvoiceTotal').textContent = d.total.toLocaleString();
+            sendInvoiceData = doc.data();
+            document.getElementById('sendInvoiceNumber').textContent = sendInvoiceData.invoiceNumber;
+            document.getElementById('sendInvoiceCustomer').textContent = sendInvoiceData.customer || 'N/A';
+            document.getElementById('sendInvoiceTotal').textContent = sendInvoiceData.total.toLocaleString();
+            document.getElementById('sendMessage').textContent = '';
             document.getElementById('sendModal').style.display = 'flex';
         } catch (err) {
             showToast('Error: ' + err.message, 'error');
         }
     };
 
-    window.sendViaEmail = async function() {
-        if (!sendInvoiceId) return;
-        try {
-            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
-            const d = doc.data();
-            const customerEmail = d.customerEmail || '';
-            if (!customerEmail) {
-                document.getElementById('sendMessage').textContent = 'Customer email not set.';
-                return;
-            }
-            const subject = `Invoice ${d.invoiceNumber} from NEVAMAK`;
-            const body = `Dear ${d.customer},\n\nPlease find attached invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)}.\n\nThank you for your business.\n\nNEVAMAK Enterprises`;
-            window.location.href = `mailto:${customerEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            closeModal('sendModal');
-            showToast('📧 Email client opened.', 'success');
-        } catch (err) {
-            document.getElementById('sendMessage').textContent = 'Error: ' + err.message;
-            showToast('Error: ' + err.message, 'error');
+    // New function to open the dedicated share.html page
+    window.openSharePage = function() {
+        if (!sendInvoiceId) {
+            document.getElementById('sendMessage').textContent = 'No invoice selected.';
+            return;
         }
+        closeModal('sendModal');
+        window.location.href = `share.html?id=${sendInvoiceId}`;
+    };
+
+    window.sendViaEmail = async function() {
+        if (!sendInvoiceId || !sendInvoiceData) {
+            document.getElementById('sendMessage').textContent = 'No invoice selected.';
+            return;
+        }
+        const recipient = sendInvoiceData.customerEmail || '';
+        const subject = `Invoice ${sendInvoiceData.invoiceNumber} from NEVAMAK Enterprises`;
+        const emailDomain = 'nevamakenterprises.net';
+        
+        let emailAddress = recipient;
+        if (!emailAddress || emailAddress === '') {
+            emailAddress = `info@${emailDomain}`;
+        } else if (!emailAddress.includes('@')) {
+            emailAddress = `${emailAddress}@${emailDomain}`;
+        }
+
+        let itemsList = '';
+        if (sendInvoiceData.items && sendInvoiceData.items.length > 0) {
+            itemsList = sendInvoiceData.items.map(item => 
+                `  - ${item.itemName} (${item.quantity} x ₦${(item.updatedPrice || item.unitPrice || 0).toFixed(2)}) = ₦${(item.total || 0).toFixed(2)}`
+            ).join('\n');
+        }
+
+        const body = `Dear ${sendInvoiceData.customer || 'Customer'},\n\n` +
+            `Please find attached invoice ${sendInvoiceData.invoiceNumber} for ₦${(sendInvoiceData.total || 0).toFixed(2)}.\n\n` +
+            `Invoice Details:\n` +
+            `- Date: ${sendInvoiceData.date || 'N/A'}\n` +
+            `- Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `${itemsList ? 'Items:\n' + itemsList : ''}\n\n` +
+            `Thank you for your business.\n\n` +
+            `Best regards,\n` +
+            `NEVAMAK Enterprises\n` +
+            `📧 info@nevamakenterprises.net`;
+
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailAddress)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(gmailUrl, '_blank');
+        closeModal('sendModal');
+        showToast('📧 Gmail opened.', 'success');
     };
 
     window.sendViaChat = async function() {
-        if (!sendInvoiceId) return;
-        try {
-            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
-            const d = doc.data();
-            const message = `Invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)} - ${d.customer}. Please check.`;
-            window.location.href = `chat.html?message=${encodeURIComponent(message)}`;
-            closeModal('sendModal');
-            showToast('💬 Chat opened.', 'success');
-        } catch (err) {
-            document.getElementById('sendMessage').textContent = 'Error: ' + err.message;
-            showToast('Error: ' + err.message, 'error');
+        if (!sendInvoiceId || !sendInvoiceData) {
+            document.getElementById('sendMessage').textContent = 'No invoice selected.';
+            return;
         }
+        const domain = 'nevamakenterprises.net';
+        const recipient = sendInvoiceData.customerEmail || '';
+        let chatRecipient = recipient;
+        if (!chatRecipient || chatRecipient === '') {
+            chatRecipient = `info@${domain}`;
+        } else if (!chatRecipient.includes('@')) {
+            chatRecipient = `${chatRecipient}@${domain}`;
+        }
+
+        const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}*\n` +
+            `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
+            `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
+            `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
+            `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `📦 Items: ${(sendInvoiceData.items || []).length} item(s)\n\n` +
+            `Please review this invoice. For any questions, contact NEVAMAK Enterprises.\n` +
+            `📧 ${chatRecipient}`;
+
+        const chatUrl = `https://mail.google.com/chat/?to=${encodeURIComponent(chatRecipient)}&body=${encodeURIComponent(message)}`;
+        window.open(chatUrl, '_blank');
+        closeModal('sendModal');
+        showToast('💬 Google Chat opened.', 'success');
     };
 
     window.sendViaWhatsApp = async function() {
-        if (!sendInvoiceId) return;
-        try {
-            const doc = await db.collection('invoices').doc(sendInvoiceId).get();
-            const d = doc.data();
-            const message = `Invoice ${d.invoiceNumber} for ₦${d.total.toFixed(2)} - ${d.customer}. Please check.`;
-            const phone = prompt('Enter recipient WhatsApp number (with country code, e.g., 2348012345678):');
-            if (!phone) return;
-            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
-            closeModal('sendModal');
-            showToast('📱 WhatsApp opened.', 'success');
-        } catch (err) {
-            document.getElementById('sendMessage').textContent = 'Error: ' + err.message;
-            showToast('Error: ' + err.message, 'error');
+        if (!sendInvoiceId || !sendInvoiceData) {
+            document.getElementById('sendMessage').textContent = 'No invoice selected.';
+            return;
         }
+        const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}* from NEVAMAK Enterprises\n\n` +
+            `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
+            `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
+            `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
+            `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `📦 Items: ${(sendInvoiceData.items || []).length} item(s)\n\n` +
+            `Please review this invoice. Thank you for your business!\n` +
+            `NEVAMAK Enterprises`;
+
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const whatsappUrl = isMobile 
+            ? `whatsapp://send?text=${encodeURIComponent(message)}`
+            : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+        
+        window.open(whatsappUrl, '_blank');
+        closeModal('sendModal');
+        showToast('📱 WhatsApp opened.', 'success');
     };
 
     // ==================== Share Modal ====================
