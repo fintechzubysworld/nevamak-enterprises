@@ -363,6 +363,7 @@
     let invoicesUnsubscribe = null;
     let sharedUnsubscribe = null;
     let suppliers = [];
+    let itemRowCounter = 0;
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -437,54 +438,7 @@
         }
     };
 
-    // ==================== Auth ====================
-    auth.onAuthStateChanged(async (user) => {
-        if (!user) { window.location.href = 'login.html'; return; }
-        currentUser = user;
-        currentUserEmail = user.email;
-        try {
-            const userDoc = await db.collection('users').doc(user.uid).get();
-            if (userDoc.exists) {
-                currentUserRole = userDoc.data().role || '';
-                if (currentUserRole === 'abuja_rep') {
-                    invoiceBranch.value = 'Abuja';
-                    invoiceBranch.disabled = true;
-                } else if (currentUserRole === 'ph_rep') {
-                    invoiceBranch.value = 'Portharcourt';
-                    invoiceBranch.disabled = true;
-                } else {
-                    invoiceBranch.disabled = false;
-                }
-            }
-        } catch (err) {
-            showToast('Error loading user role: ' + err.message, 'error');
-        }
-        document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
-        document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
-        await loadSuppliers();
-        loadInvoices();
-        loadSharedInvoices();
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
-                if (btn.dataset.tab === 'shared') loadSharedInvoices();
-            });
-        });
-        addItemRow();
-        updateCostPreview();
-        transportMultiplier.addEventListener('input', updateCostPreview);
-    });
-
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        auth.signOut().then(() => window.location.href = 'login.html');
-    });
-
     // ==================== Items Management ====================
-    let itemRowCounter = 0;
-
     function addItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
         const rowId = ++itemRowCounter;
         const div = document.createElement('div');
@@ -588,6 +542,56 @@
             <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
         `;
     }
+
+    // ==================== Auth ====================
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserEmail = user.email;
+        try {
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (userDoc.exists) {
+                currentUserRole = userDoc.data().role || '';
+                if (currentUserRole === 'abuja_rep') {
+                    invoiceBranch.value = 'Abuja';
+                    invoiceBranch.disabled = true;
+                } else if (currentUserRole === 'ph_rep') {
+                    invoiceBranch.value = 'Portharcourt';
+                    invoiceBranch.disabled = true;
+                } else {
+                    invoiceBranch.disabled = false;
+                }
+            }
+        } catch (err) {
+            showToast('Error loading user role: ' + err.message, 'error');
+        }
+        document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+        document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
+        await loadSuppliers();
+        loadInvoices();
+        loadSharedInvoices();
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                if (btn.dataset.tab === 'shared') loadSharedInvoices();
+            });
+        });
+        addItemRow();
+        updateCostPreview();
+        transportMultiplier.addEventListener('input', updateCostPreview);
+        
+        // Add event listener for Add Product button (moved here to ensure it's available)
+        addItemBtn.addEventListener('click', function() {
+            addItemRow();
+        });
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
 
     // ==================== Bulk Actions ====================
     document.getElementById('applyToSelectedBtn').addEventListener('click', () => {
@@ -1621,7 +1625,7 @@
         }
     };
 
-    // ==================== Send/Share Functions (Updated) ====================
+    // ==================== Send/Share Functions ====================
     window.openSendModal = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
@@ -2140,7 +2144,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with 1pt border invoice tables (inline styles).');
+    console.log('NEVAMAK Invoice Repository loaded with fixed Add Product button.');
 </script>
 </body>
 </html>
