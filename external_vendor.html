@@ -73,6 +73,7 @@
         .ack-signature { border: 1px solid #ccc; padding: 12px; border-radius: 16px; background: #f9f9f9; margin: 12px 0; }
         .ack-signature textarea { width: 100%; border-radius: 12px; padding: 8px; border: 1px solid #ccc; }
         .acknowledged-badge { background: #2e86de; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .ack-footnote { font-size: 0.85rem; color: #555; margin-top: 8px; border-top: 1px solid #ddd; padding-top: 8px; }
         @media (max-width: 600px) {
             .flex-row { flex-direction: column; }
             .item-row { flex-direction: column; align-items: stretch; }
@@ -1050,6 +1051,7 @@
                     let invoiceDate = '';
                     let acknowledged = false;
                     let ackBy = '';
+                    let ackSignature = '';
                     try {
                         const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
                         if (invDoc.exists) {
@@ -1058,12 +1060,16 @@
                             invoiceDate = invData.date || '';
                             acknowledged = invData.acknowledged || false;
                             ackBy = invData.acknowledgedBy || '';
+                            ackSignature = invData.ackSignature || '';
                         }
                     } catch (e) { /* ignore */ }
 
                     const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
                     const isRead = d.read ? '' : ' style="font-weight:bold;"';
-                    const statusText = acknowledged ? `✅ Ack (${ackBy})` : '⏳ Pending';
+                    let statusText = '⏳ Pending';
+                    if (acknowledged) {
+                        statusText = `✅ ${escapeHtml(ackSignature || ackBy)}`;
+                    }
                     html += `<tr${isRead}>
                         <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                         <td>${escapeHtml(d.senderName || 'Unknown')}</td>
@@ -1148,6 +1154,7 @@
             let invoiceDate = '';
             let acknowledged = false;
             let ackBy = '';
+            let ackSignature = '';
             try {
                 const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
                 if (invDoc.exists) {
@@ -1156,11 +1163,15 @@
                     invoiceDate = invData.date || '';
                     acknowledged = invData.acknowledged || false;
                     ackBy = invData.acknowledgedBy || '';
+                    ackSignature = invData.ackSignature || '';
                 }
             } catch (e) { /* ignore */ }
             const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
             const isRead = d.read ? '' : ' style="font-weight:bold;"';
-            const statusText = acknowledged ? `✅ Ack (${ackBy})` : '⏳ Pending';
+            let statusText = '⏳ Pending';
+            if (acknowledged) {
+                statusText = `✅ ${escapeHtml(ackSignature || ackBy)}`;
+            }
             html += `<tr${isRead}>
                 <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                 <td>${escapeHtml(d.senderName || 'Unknown')}</td>
@@ -1201,6 +1212,18 @@
             }
             itemsHtml += '</table></div>';
             const total = d.total || 0;
+
+            // Build acknowledgment footnote
+            let ackFootnote = '';
+            if (d.acknowledged) {
+                const ackName = d.ackSignature || d.acknowledgedBy || 'GRO';
+                const ackEmail = d.acknowledgedBy || '';
+                ackFootnote = `<div class="ack-footnote">
+                    <strong>✅ Acknowledged by:</strong> ${escapeHtml(ackName)}
+                    ${ackEmail ? ` <span style="color:#666; font-size:0.8rem;">(${escapeHtml(ackEmail)})</span>` : ''}
+                </div>`;
+            }
+
             const html = `
                 <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
                 <p><strong>Customer:</strong> ${escapeHtml(d.customer)}</p>
@@ -1212,7 +1235,7 @@
                 <p><strong>Total VAT:</strong> ₦${(d.totalVAT||0).toLocaleString()}</p>
                 <p><strong>Total WHT:</strong> ₦${(d.totalWHT||0).toLocaleString()}</p>
                 ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
-                <p><strong>Acknowledged:</strong> ${d.acknowledged ? '✅ Yes by ' + (d.acknowledgedBy||'GRO') : '❌ No'}</p>
+                ${ackFootnote}
                 <h4>Items</h4>
                 ${itemsHtml}
             `;
@@ -1248,7 +1271,8 @@
             document.getElementById('ackBranch').textContent = d.branch || 'N/A';
             const statusBadge = document.getElementById('ackStatusBadge');
             if (d.acknowledged) {
-                statusBadge.textContent = '✅ Acknowledged by ' + (d.acknowledgedBy || 'GRO');
+                const displayName = d.ackSignature || d.acknowledgedBy || 'GRO';
+                statusBadge.textContent = '✅ Acknowledged by ' + displayName;
                 statusBadge.style.background = '#27ae60';
                 statusBadge.style.color = 'white';
                 document.getElementById('ackSignature').value = d.ackSignature || '';
@@ -1284,9 +1308,10 @@
                 document.getElementById('ackMessage').textContent = 'This invoice is already acknowledged.';
                 setButtonLoading(btn, false); return;
             }
+            // Store both the signature (name) and the email as acknowledgedBy
             await db.collection('invoices').doc(ackInvoiceId).update({
                 acknowledged: true,
-                acknowledgedBy: currentUserEmail + ' (External)',
+                acknowledgedBy: currentUserEmail,
                 ackSignature: signature,
                 ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -1299,7 +1324,7 @@
             });
             document.getElementById('ackMessage').textContent = '✅ Invoice acknowledged successfully!';
             document.getElementById('ackMessage').style.color = 'green';
-            document.getElementById('ackStatusBadge').textContent = '✅ Acknowledged by ' + currentUserEmail;
+            document.getElementById('ackStatusBadge').textContent = '✅ Acknowledged by ' + signature;
             document.getElementById('ackStatusBadge').style.background = '#27ae60';
             document.getElementById('ackStatusBadge').style.color = 'white';
             btn.disabled = true;
@@ -1469,6 +1494,15 @@
             });
         }
         const total = d.total || 0;
+        let ackFootnote = '';
+        if (d.acknowledged) {
+            const ackName = d.ackSignature || d.acknowledgedBy || 'GRO';
+            const ackEmail = d.acknowledgedBy || '';
+            ackFootnote = `<div style="margin-top:8px; border-top:1px solid #ddd; padding-top:8px; font-size:0.85rem; color:#555;">
+                <strong>✅ Acknowledged by:</strong> ${escapeHtml(ackName)}
+                ${ackEmail ? ` <span style="color:#666; font-size:0.8rem;">(${escapeHtml(ackEmail)})</span>` : ''}
+            </div>`;
+        }
         const html = `
             <div style="padding:20px; font-family:sans-serif;">
                 <h2>NEVAMAK – Shared Invoice</h2>
@@ -1487,7 +1521,7 @@
                     <tr><td colspan="7"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
                 </table>
                 ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
-                <p><em>Acknowledged: ${d.acknowledged ? '✅ Yes by ' + (d.acknowledgedBy||'GRO') : '❌ No'}</em></p>
+                ${ackFootnote}
             </div>
         `;
         const tempDiv = document.createElement('div');
@@ -1637,7 +1671,7 @@
     });
 
     // ==================== Init ====================
-    console.log('External Vendor page loaded with acknowledgment modal.');
+    console.log('External Vendor page loaded with acknowledgment modal and email footnote.');
 </script>
 </body>
 </html>
