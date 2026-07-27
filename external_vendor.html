@@ -1083,6 +1083,21 @@
             const invoiceData = doc.data();
             await collectionRef.delete();
 
+            // If deleting from 'invoices' collection, also clean up related shared entries
+            if (adminDeleteCollection === 'invoices') {
+                // Find and delete all sharedInvoices entries referencing this invoice
+                const sharedSnap = await db.collection('sharedInvoices')
+                    .where('invoiceId', '==', adminDeleteTargetId)
+                    .get();
+                const batch = db.batch();
+                sharedSnap.forEach(sharedDoc => {
+                    batch.delete(sharedDoc.ref);
+                });
+                if (sharedSnap.size > 0) {
+                    await batch.commit();
+                }
+            }
+
             // Log the admin deletion
             await db.collection('activityLog').add({
                 actionType: 'admin_delete_invoice',
@@ -1116,7 +1131,7 @@
         }
     });
 
-    // ==================== Shared Invoices (with Acknowledgment) ====================
+    // ==================== Shared Invoices (with Acknowledgment & Admin Delete) ====================
     function loadSharedInvoices() {
         if (sharedUnsubscribe) {
             sharedUnsubscribe();
@@ -1765,7 +1780,7 @@
     });
 
     // ==================== Init ====================
-    console.log('External Vendor page loaded with admin delete auth.');
+    console.log('External Vendor page loaded with admin delete for shared invoices.');
 </script>
 </body>
 </html>
