@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>User Management</title>
+  <style>
+    :root{--accent:#2b7cff;--danger:#e05353;--muted:#666}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.4;margin:0;padding:24px;background:#f7f9fc;color:#111}
+    .container{max-width:980px;margin:0 auto}
+    h1{margin:0 0 12px}
+    .card{background:#fff;border:1px solid #e6eef8;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 0 rgba(0,0,0,0.02)}
+    form .row{display:flex;gap:12px;margin-bottom:8px}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input,select{padding:8px;border:1px solid #d9e6f8;border-radius:6px;flex:1}
+    button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:6px;cursor:pointer}
+    button.secondary{background:#fff;color:var(--accent);border:1px solid #cfe0ff}
+    button.danger{background:var(--danger)}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{padding:10px;border-bottom:1px solid #eef6ff;text-align:left}
+    th{background:#fbfdff;color:var(--muted);font-weight:600}
+    .actions button{margin-right:6px}
+    .muted{color:var(--muted);font-size:13px}
+    .hidden{display:none}
+    .message{padding:10px;border-radius:6px;margin-bottom:10px}
+    .message.ok{background:#e9f7ff;color:#034a8f}
+    .message.err{background:#ffecec;color:#5a1d1d}
+    @media(max-width:720px){.row{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>User Management</h1>
+
+    <div id="msg" class="message hidden" aria-live="polite"></div>
+
+    <section class="card" aria-labelledby="create-heading">
+      <h2 id="create-heading">Create / Edit User</h2>
+      <form id="user-form">
+        <input type="hidden" id="user-id" />
+        <div class="row">
+          <div style="flex:2">
+            <label for="name">Full name</label>
+            <input id="name" name="name" placeholder="Jane Doe" required />
+          </div>
+          <div style="flex:3">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" placeholder="jane@example.com" required />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="role">Role</label>
+            <select id="role" name="role">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+            </select>
+          </div>
+          <div>
+            <label for="password">Password (create only)</label>
+            <input id="password" name="password" type="password" placeholder="••••••" />
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="save-btn">Save user</button>
+          <button type="button" id="cancel-btn" class="secondary hidden">Cancel edit</button>
+        </div>
+        <p class="muted" style="margin-top:12px">This page expects REST endpoints at <code>/api/users</code> (GET/POST) and <code>/api/users/:id</code> (PUT/DELETE). Adjust URLs in the script if needed.</p>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Existing users</h2>
+      <div id="users-wrap">
+        <p class="muted">Loading users...</p>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const apiBase = '/api/users';
+    const msgEl = document.getElementById('msg');
+    const usersWrap = document.getElementById('users-wrap');
+    const form = document.getElementById('user-form');
+    const userIdInput = document.getElementById('user-id');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const saveBtn = document.getElementById('save-btn');
+
+    function showMessage(text, type='ok'){
+      msgEl.textContent = text;
+      msgEl.className = `message ${type}`;
+      msgEl.classList.remove('hidden');
+      setTimeout(()=> msgEl.classList.add('hidden'), 4000);
+    }
+
+    async function fetchUsers(){
+      usersWrap.innerHTML = '<p class="muted">Loading users...</p>';
+      try{
+        const res = await fetch(apiBase);
+        if(!res.ok) throw new Error('Failed to load users');
+        const users = await res.json();
+        renderUsers(users || []);
+      }catch(err){
+        usersWrap.innerHTML = `<p class="muted">Unable to fetch users: ${err.message}</p>`;
+      }
+    }
+
+    function renderUsers(users){
+      if(!users.length){
+        usersWrap.innerHTML = '<p class="muted">No users yet.</p>';
+        return;
+      }
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      thead.innerHTML = '<tr><th>Name</th><th>Email</th><th>Role</th><th>Created</th><th>Actions</th></tr>';
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      users.forEach(u=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(u.name||'—')}</td>
+          <td>${escapeHtml(u.email||'—')}</td>
+          <td>${escapeHtml(u.role||'user')}</td>
+          <td>${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</td>
+          <td class="actions">
+            <button data-id="${u.id}" class="edit">Edit</button>
+            <button data-id="${u.id}" class="delete" style="background:#fff;color:var(--danger);border:1px solid #ffd6d6">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      usersWrap.innerHTML = '';
+      usersWrap.appendChild(table);
+      attachRowHandlers();
+    }
+
+    function attachRowHandlers(){
+      document.querySelectorAll('button.edit').forEach(b=>{
+        b.addEventListener('click', async e=>{
+          const id = e.currentTarget.dataset.id;
+          await loadUserForEdit(id);
+        });
+      });
+      document.querySelectorAll('button.delete').forEach(b=>{
+        b.addEventListener('click', async e=>{
+          const id = e.currentTarget.dataset.id;
+          if(!confirm('Delete this user? This cannot be undone.')) return;
+          await deleteUser(id);
+        });
+      });
+    }
+
+    async function loadUserForEdit(id){
+      try{
+        const res = await fetch(`${apiBase}/${id}`);
+        if(!res.ok) throw new Error('User not found');
+        const u = await res.json();
+        userIdInput.value = u.id;
+        document.getElementById('name').value = u.name || '';
+        document.getElementById('email').value = u.email || '';
+        document.getElementById('role').value = u.role || 'user';
+        document.getElementById('password').value = '';
+        cancelBtn.classList.remove('hidden');
+        saveBtn.textContent = 'Update user';
+      }catch(err){
+        showMessage('Could not load user: '+err.message, 'err');
+      }
+    }
+
+    form.addEventListener('submit', async e=>{
+      e.preventDefault();
+      const id = userIdInput.value;
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        role: document.getElementById('role').value
+      };
+      const password = document.getElementById('password').value;
+      if(!payload.name || !payload.email){
+        showMessage('Name and email are required', 'err');
+        return;
+      }
+      try{
+        let res;
+        if(id){
+          // update (omit password if empty)
+          if(password) payload.password = password;
+          res = await fetch(`${apiBase}/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+          if(!res.ok) throw new Error('Update failed');
+          showMessage('User updated');
+        } else {
+          if(password) payload.password = password;
+          res = await fetch(apiBase, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+          if(!res.ok) throw new Error('Create failed');
+          showMessage('User created');
+        }
+        form.reset();
+        userIdInput.value = '';
+        cancelBtn.classList.add('hidden');
+        saveBtn.textContent = 'Save user';
+        await fetchUsers();
+      }catch(err){
+        showMessage(err.message, 'err');
+      }
+    });
+
+    cancelBtn.addEventListener('click', ()=>{
+      form.reset();
+      userIdInput.value = '';
+      cancelBtn.classList.add('hidden');
+      saveBtn.textContent = 'Save user';
+    });
+
+    async function deleteUser(id){
+      try{
+        const res = await fetch(`${apiBase}/${id}`, {method:'DELETE'});
+        if(!res.ok) throw new Error('Delete failed');
+        showMessage('User deleted');
+        await fetchUsers();
+      }catch(err){
+        showMessage(err.message, 'err');
+      }
+    }
+
+    // small helper to avoid XSS when rendering
+    function escapeHtml(str){
+      if(!str) return '';
+      return String(str).replace(/[&<>"']/g, function(s) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
+      });
+    }
+
+    // initial load
+    fetchUsers();
+  </script>
+</body>
+</html>
