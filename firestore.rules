@@ -1,21 +1,11 @@
-// Firestore security rules for users collection
-// Save as: firestore.rules
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{userId} {
-      // Allow a user to read their own document
-      allow get: if request.auth != null && request.auth.uid == userId;
-
-      // Allow listing only to admins
-      allow list: if request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-
-      // Allow create/update/delete only to admins
-      allow create, update, delete: if request.auth != null
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-
-    // You can add additional rules for other collections below
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
   }
 }
