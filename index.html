@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <!-- ===== FIX: Add referrer policy for CDN ===== -->
+    <meta name="referrer" content="no-referrer-when-crossorigin">
     <title>NEVAMAK – Dashboard</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- ===== FIX: Load Chart.js with crossOrigin attribute ===== -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin="anonymous"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
@@ -109,7 +112,7 @@
         <div id="notificationList" style="max-height:200px; overflow-y:auto;"></div>
     </div>
 
-    <!-- Pending Invoice Requests -->
+    <!-- ===== FIX: Pending Invoice Requests Section (now fully functional) ===== -->
     <div id="pendingRequestsSection" class="section-card" style="display:none;">
         <div class="section-title">📋 Pending Invoice Requests</div>
         <div id="pendingRequestsList">Loading...</div>
@@ -206,6 +209,175 @@
     const auth2 = firebase.auth();
     const db2 = firebase.firestore();
     let currentUser, currentRole;
+
+    // ============================================================
+    // ===== FIX 1: DEFINE loadPendingRequests GLOBALLY =====
+    // ============================================================
+    window.loadPendingRequests = function() {
+        console.log("🔄 loadPendingRequests: Fetching pending invoice requests...");
+        const container = document.getElementById('pendingRequestsList');
+        container.innerHTML = '<div style="color:#888; padding:10px;">Loading pending requests...</div>';
+
+        // Query for pending invoice requests
+        db2.collection('invoiceRequests')
+            .where('status', '==', 'pending')
+            .orderBy('createdAt', 'desc')
+            .limit(20)
+            .get()
+            .then((snapshot) => {
+                if (snapshot.empty) {
+                    container.innerHTML = '<div style="color:#888; padding:10px;">✅ No pending invoice requests.</div>';
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Requested By</th>
+                                <th>Items</th>
+                                <th>Total Value</th>
+                                <th>Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const itemsCount = data.items ? data.items.length : 0;
+                    const totalValue = data.items ? data.items.reduce((sum, i) => sum + (i.totalItemCost || 0), 0) : 0;
+                    const dateStr = data.createdAt ? new Date(data.createdAt.toDate()).toLocaleDateString() : 'N/A';
+                    
+                    html += `
+                        <tr>
+                            <td><strong>#${doc.id.slice(0, 8)}</strong></td>
+                            <td>${data.requestedBy || 'N/A'}</td>
+                            <td>${itemsCount} items</td>
+                            <td class="cost-cell">₦${totalValue.toLocaleString()}</td>
+                            <td>${dateStr}</td>
+                            <td>
+                                <button onclick="approveInvoiceRequest('${doc.id}')" class="btn-sm btn-success">✅ Approve</button>
+                                <button onclick="rejectInvoiceRequest('${doc.id}')" class="btn-sm btn-danger">❌ Reject</button>
+                                <button onclick="viewInvoiceRequest('${doc.id}')" class="btn-sm btn-info">👁️ View</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            })
+            .catch((error) => {
+                console.error('Error loading pending requests:', error);
+                container.innerHTML = `<div style="color:#e74c3c; padding:10px;">❌ Error loading: ${error.message}</div>`;
+            });
+    };
+
+    // ============================================================
+    // ===== FIX 2: DEFINE showOneChild for extension compatibility =====
+    // ============================================================
+    window.showOneChild = function() {
+        console.log("👶 showOneChild: Called (placeholder for extension compatibility)");
+        // This function exists solely to prevent extension errors.
+        // Add actual logic if needed, or leave as-is.
+    };
+
+    // ============================================================
+    // ===== Additional functions for pending requests =====
+    // ============================================================
+    window.approveInvoiceRequest = function(requestId) {
+        if (!confirm('✅ Approve this invoice request?')) return;
+        db2.collection('invoiceRequests').doc(requestId).update({
+            status: 'approved',
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            approvedBy: currentUser?.uid || 'system'
+        }).then(() => {
+            alert('✅ Invoice request approved!');
+            loadPendingRequests();
+        }).catch(err => {
+            alert('❌ Error: ' + err.message);
+            console.error('Approve error:', err);
+        });
+    };
+
+    window.rejectInvoiceRequest = function(requestId) {
+        if (!confirm('❌ Reject this invoice request?')) return;
+        const reason = prompt('Reason for rejection (optional):');
+        db2.collection('invoiceRequests').doc(requestId).update({
+            status: 'rejected',
+            rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            rejectedBy: currentUser?.uid || 'system',
+            rejectionReason: reason || 'No reason provided'
+        }).then(() => {
+            alert('❌ Invoice request rejected.');
+            loadPendingRequests();
+        }).catch(err => {
+            alert('❌ Error: ' + err.message);
+            console.error('Reject error:', err);
+        });
+    };
+
+    window.viewInvoiceRequest = async function(requestId) {
+        try {
+            const doc = await db2.collection('invoiceRequests').doc(requestId).get();
+            if (!doc.exists) {
+                alert('Request not found.');
+                return;
+            }
+            const data = doc.data();
+            let itemsHtml = '<table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>';
+            if (data.items && data.items.length > 0) {
+                data.items.forEach(item => {
+                    itemsHtml += `<tr>
+                        <td>${item.itemName || 'N/A'}</td>
+                        <td>${item.orderedQty || 0}</td>
+                        <td>₦${(item.unitPrice || 0).toLocaleString()}</td>
+                        <td>₦${(item.totalItemCost || 0).toLocaleString()}</td>
+                    </tr>`;
+                });
+            } else {
+                itemsHtml += '<tr><td colspan="4">No items</td></tr>';
+            }
+            itemsHtml += '</table>';
+
+            const totalValue = data.items ? data.items.reduce((s, i) => s + (i.totalItemCost || 0), 0) : 0;
+
+            alert(`
+📄 INVOICE REQUEST DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━
+Request ID: ${requestId}
+Requested By: ${data.requestedBy || 'N/A'}
+Status: ${data.status || 'pending'}
+Date: ${data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : 'N/A'}
+Total Value: ₦${totalValue.toLocaleString()}
+Notes: ${data.notes || 'N/A'}
+
+Items:
+${data.items ? data.items.map(i => `  • ${i.itemName} x${i.orderedQty} = ₦${(i.totalItemCost || 0).toLocaleString()}`).join('\n') : '  No items'}
+            `);
+        } catch (error) {
+            alert('Error viewing request: ' + error.message);
+        }
+    };
+
+    // ============================================================
+    // ===== FIX 3: Suppress extension errors =====
+    // ============================================================
+    window.addEventListener('error', function(e) {
+        // Ignore errors that are clearly from extensions
+        if (e.filename && e.filename.includes('chrome-extension://')) {
+            console.warn('🛑 Extension error ignored:', e.message);
+            e.preventDefault();
+            return true;
+        }
+    }, true);
+
+    // ============================================================
+    // ===== End of FIXES - Original code continues below =====
+    // ============================================================
 
     auth2.onAuthStateChanged(async (user) => {
         if (!user) { window.location.href = 'login.html'; return; }
@@ -411,7 +583,7 @@
                 itemsHtml += '<tr><td colspan="6">No items</td></tr>';
             }
             const totalGoods = d.items ? d.items.reduce((s,i)=>s+(i.totalItemCost||0),0) : 0;
-            const statusClass = `status-badge status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
+            const statusClass = `status status-${d.status?.toLowerCase().replace(/\s/g,'')||'dispatched'}`;
             const html = `
                 <p><strong>Shipment ID:</strong> ${id.slice(0,8)}</p>
                 <p><strong>Sender:</strong> ${d.senderName}</p>
@@ -420,9 +592,9 @@
                 <p><strong>Tracking #:</strong> ${d.trackingNo || 'N/A'}</p>
                 <p><strong>Expected Date:</strong> ${d.expectedDate || 'N/A'}</p>
                 <p><strong>Driver:</strong> ${d.driver || 'N/A'}</p>
-                <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${d.status}</span></p>
+                <p><strong>Status:</strong> <span class="status ${statusClass}">${d.status}</span></p>
                 <p><strong>Total Goods Value:</strong> ₦${totalGoods.toLocaleString()}</p>
-                <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleDateString()}</p>
+                <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
                 <p><strong>Created:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ''}</p>
                 ${d.receivedDate ? `<p><strong>Received:</strong> ${new Date(d.receivedDate.toDate()).toLocaleDateString()}</p>` : ''}
                 ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
@@ -453,7 +625,7 @@
         }
     };
 
-    console.log('NEVAMAK Dashboard loaded with users link and role-based header visibility.');
+    console.log('🚀 NEVAMAK Dashboard loaded successfully with all fixes applied.');
 </script>
 </body>
 </html>
