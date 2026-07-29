@@ -4,6 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>User Management</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
   <style>
     :root{--accent:#2b7cff;--danger:#e05353;--muted:#666}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.4;margin:0;padding:24px;background:#f7f9fc;color:#111}
@@ -81,6 +84,38 @@
   </div>
 
   <script>
+    // Firebase auth & role guard
+    const firebaseConfig = {
+      apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+      authDomain: "nevamak-enterprises.firebaseapp.com",
+      projectId: "nevamak-enterprises",
+      storageBucket: "nevamak-enterprises.firebasestorage.app",
+      messagingSenderId: "144324172534",
+      appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+      measurementId: "G-MZ8NT6KK8N"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) { window.location.href = 'login.html'; return; }
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const role = userDoc.data()?.role || '';
+        if (role !== 'admin') {
+          alert('Access denied. Admins only.');
+          window.location.href = 'index.html';
+          return;
+        }
+        // allowed: initial load
+        fetchUsers();
+      } catch (err) {
+        console.error('Auth check failed:', err);
+        showMessage('Authentication check failed. See console.', 'err');
+      }
+    });
+
     const apiBase = '/api/users';
     const msgEl = document.getElementById('msg');
     const usersWrap = document.getElementById('users-wrap');
@@ -234,8 +269,7 @@
       });
     }
 
-    // initial load
-    fetchUsers();
+    // DO NOT call fetchUsers() here — it's invoked after auth check above
   </script>
 </body>
 </html>
