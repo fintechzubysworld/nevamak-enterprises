@@ -38,7 +38,7 @@
         .cost-cell { font-family: monospace; font-weight: bold; white-space: nowrap; }
         .notification-bell { position: relative; cursor: pointer; }
         .notification-badge { position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; }
-        .notification-panel { background: white; border-radius: 20px; padding: 16px; max-height: 300px; overflow-y: auto; display: none; position: absolute; right: 0; width: 300px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); z-index: 1000; }
+        .notification-panel { background: white; border-radius: 20px; padding: 16px; max-height: 300px; overflow-y: auto; display: none; position: absolute; right: 0; width: 300px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
         .notification-panel.show { display: block; }
         footer { text-align: center; margin-top: 24px; font-size: 0.75rem; color: #7f8c8d; }
         .lang-toggle { background: #3c6382; color: white; border: none; padding: 6px 12px; border-radius: 40px; cursor: pointer; }
@@ -74,6 +74,7 @@
             <a href="request_invoice.html">📄 Request Invoice</a>
             <a href="invoice_repo.html">🧾 Invoice Repo</a>
             <a href="returns.html">🔄 Returns</a>
+            <a href="user.html" id="usersLink" style="display:none;">👥 Users</a>
             <a href="admin_create_user.html" id="adminPanelLink" style="display:none;">👑 Admin</a>
             <a href="permissions.html" id="permissionsLink" style="display:none;">🔐 Permissions</a>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
@@ -116,7 +117,7 @@
 
     <!-- Shipments Table -->
     <div class="section-card">
-        <div class="section-title">📋 Live Shipments <span><input type="text" id="shipmentSearch" placeholder="🔍 Search..." style="padding:6px; border-radius:40px; border:1px solid #ccc; font-size:0.8rem;"></span></div>
+        <div class="section-title">📋 Live Shipments <span><input type="text" id="shipmentSearch" placeholder="🔍 Search..." style="padding:6px; border-radius:40px; border:1px solid #ccc; font-size:0.9rem;"></span></div>
         <div style="overflow-x:auto;">
             <table>
                 <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
@@ -155,33 +156,6 @@
         <span class="close" onclick="closeModal('viewShipmentModal')">&times;</span>
         <h2>📄 Shipment Details</h2>
         <div id="viewShipmentContent"></div>
-    </div>
-</div>
-
-<!-- Modal: Approve Request (convert to dispatch or draft) -->
-<div id="approveRequestModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeModal('approveRequestModal')">&times;</span>
-        <h2>✅ Approve Invoice Request</h2>
-        <form id="approveRequestForm">
-            <p><strong>Branch:</strong> <span id="approveBranch"></span></p>
-            <p><strong>Requested By:</strong> <span id="approveRequestedBy"></span></p>
-            <input type="text" id="approveSenderName" placeholder="Sender Name" required>
-            <input type="text" id="approveVehicleNo" placeholder="Vehicle / Waybill">
-            <input type="date" id="approveExpectedDate">
-            <input type="number" id="approveTransportCost" placeholder="Transport Cost (₦)" value="0">
-            <label>Items:</label>
-            <div id="approveItemsContainer"></div>
-            <button type="button" id="addApproveItemBtn" class="btn-success">+ Add product</button>
-            <div class="cost-summary" id="approveCostPreview">Total goods value: ₦0</div>
-            <textarea id="approveNotes" placeholder="Additional notes"></textarea>
-            <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                <button type="submit" class="btn-primary" style="flex:2;">🚛 Approve & Dispatch</button>
-                <button type="button" id="saveDraftRequestBtn" class="btn-warning" style="flex:1;">💾 Save Draft</button>
-                <button type="button" id="rejectRequestBtn" class="btn-danger" style="flex:1;">❌ Reject</button>
-            </div>
-            <div id="approveMessage" style="color:red; margin-top:8px;"></div>
-        </form>
     </div>
 </div>
 
@@ -242,8 +216,12 @@
         if (currentRole === 'admin') {
             document.getElementById('adminPanelLink').style.display = 'inline-block';
             document.getElementById('permissionsLink').style.display = 'inline-block';
+            const usersLink = document.getElementById('usersLink'); if (usersLink) usersLink.style.display = 'inline-block';
         } else if (currentRole === 'lagos_sender') {
             document.getElementById('permissionsLink').style.display = 'inline-block';
+            const usersLink = document.getElementById('usersLink'); if (usersLink) usersLink.style.display = 'none';
+        } else {
+            const usersLink = document.getElementById('usersLink'); if (usersLink) usersLink.style.display = 'none';
         }
 
         // Show pending requests only for admin or lagos_sender
@@ -336,7 +314,7 @@
             snap.forEach(doc => {
                 const r = doc.data();
                 totalReturned += r.returnedQty;
-                returnRows += `<tr><td>${new Date(r.date?.toDate()).toLocaleDateString()}</td><td>${r.branch}</td><td>${r.shipmentId.slice(0,6)}</td><td>${r.itemName}</td><td>${r.returnedQty}</td><td>${r.reason||"-"}</td><td>${r.createdBy||"-"}</td></tr>`;
+                returnRows += `<tr><td>${new Date(r.date?.toDate()).toLocaleDateString()}</td><td>${r.branch}</td><td>${r.shipmentId.slice(0,6)}</td><td>${r.itemName}</td><td>${r.returnedQty}</td><td>${r.reason||''}</td><td>${r.by||''}</td></tr>`;
             });
             document.getElementById("returnedCount").innerText = totalReturned;
             document.getElementById("returnsBody").innerHTML = returnRows || "<tr><td colspan='7'>No returns</td></tr>";
@@ -376,7 +354,7 @@
             let html = '';
             snap.forEach(doc => {
                 const a = doc.data();
-                html += `<div style="border-bottom:1px solid #eee; padding:4px 0;">${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : ''} - <strong>${a.user}</strong> ${a.actionType}: ${a.details}</div>`;
+                html += `<div style="border-bottom:1px solid #eee; padding:4px 0;">${a.timestamp ? new Date(a.timestamp.toDate()).toLocaleDateString() : ''} - <strong>${a.user}</strong> ${a.actionType || ''}</div>`;
             });
             document.getElementById('auditLog').innerHTML = html || 'No activity';
         } catch (error) {
@@ -393,7 +371,7 @@
             snap.forEach(doc => {
                 const n = doc.data();
                 if (!n.read) count++;
-                html += `<div style="border-bottom:1px solid #eee; padding:4px 0; ${n.read ? 'opacity:0.7;' : ''}">${n.message} - ${new Date(n.timestamp?.toDate()).toLocaleString()}</div>`;
+                html += `<div style="border-bottom:1px solid #eee; padding:4px 0; ${n.read ? 'opacity:0.7;' : ''}">${n.message} - ${new Date(n.timestamp?.toDate()).toLocaleDateString()}</div>`;
                 if (!n.read) doc.ref.update({ read: true });
             });
             document.getElementById('notifCount').innerText = count;
@@ -444,9 +422,9 @@
                 <p><strong>Driver:</strong> ${d.driver || 'N/A'}</p>
                 <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${d.status}</span></p>
                 <p><strong>Total Goods Value:</strong> ₦${totalGoods.toLocaleString()}</p>
-                <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
-                <p><strong>Created:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleString() : ''}</p>
-                ${d.receivedDate ? `<p><strong>Received:</strong> ${new Date(d.receivedDate.toDate()).toLocaleString()}</p>` : ''}
+                <p><strong>Transport Cost:</strong> ₦${(d.transportCost||0).toLocaleDateString()}</p>
+                <p><strong>Created:</strong> ${d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : ''}</p>
+                ${d.receivedDate ? `<p><strong>Received:</strong> ${new Date(d.receivedDate.toDate()).toLocaleDateString()}</p>` : ''}
                 ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
                 <h4>Items</h4>
                 ${itemsHtml}
@@ -475,345 +453,7 @@
         }
     };
 
-    // ==================== Pending Invoice Requests (Fixed with Role-Based Filtering) ====================
-    function loadPendingRequests() {
-        const container = document.getElementById('pendingRequestsList');
-        container.innerHTML = '<div style="text-align:center; padding:10px; color:#888;">Loading requests...</div>';
-
-        // Build query based on role
-        let q = db2.collection('invoiceRequests');
-        if (currentRole === 'admin' || currentRole === 'lagos_sender') {
-            // Admins and Lagos senders can see all pending requests
-            q = q.where('status', '==', 'pending').orderBy('requestedAt', 'desc');
-        } else if (currentRole === 'abuja_rep') {
-            // Abuja rep sees only Abuja requests
-            q = q.where('status', '==', 'pending').where('branch', '==', 'Abuja').orderBy('requestedAt', 'desc');
-        } else if (currentRole === 'ph_rep') {
-            // PH rep sees only PH requests
-            q = q.where('status', '==', 'pending').where('branch', '==', 'Portharcourt').orderBy('requestedAt', 'desc');
-        } else {
-            // Others (vendors, etc.) don't see pending requests
-            container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">You do not have permission to view pending requests.</p>';
-            return;
-        }
-
-        q.onSnapshot(
-            (snap) => {
-                renderRequests(snap);
-            },
-            (error) => {
-                console.error('Invoice requests error:', error);
-                // Handle different error types
-                if (error.message && error.message.includes('requires an index')) {
-                    const match = error.message.match(/https:\/\/console\.firebase\.google\.com\/.*/);
-                    const indexUrl = match ? match[0] : '#';
-                    container.innerHTML = `
-                        <div style="background:#fff3cd; padding:12px; border-radius:8px; margin:8px 0;">
-                            <strong>⚠️ Missing Firestore Index</strong>
-                            <p>To load pending invoice requests, you need to create a composite index.</p>
-                            <p><a href="${indexUrl}" target="_blank" style="color:#0a3d62; font-weight:bold;">Click here to create the required index</a></p>
-                            <p style="font-size:0.8rem; color:#666;">After creating the index, refresh this page.</p>
-                        </div>
-                    `;
-                } else if (error.code === 'permission-denied' || error.message.includes('permission')) {
-                    container.innerHTML = `
-                        <div style="background:#f8d7da; padding:12px; border-radius:8px; margin:8px 0; border:1px solid #f5c6cb;">
-                            <strong>🔒 Permission Denied</strong>
-                            <p>You don't have permission to view pending invoice requests.</p>
-                            <p style="font-size:0.85rem; color:#666;">This is a security configuration issue. Please ask your administrator to update Firestore security rules.</p>
-                        </div>
-                    `;
-                } else {
-                    container.innerHTML = `<p style="color:red;">Error loading requests: ${error.message}</p>`;
-                }
-            }
-        );
-    }
-
-    // Render the requests
-    function renderRequests(snap) {
-        const container = document.getElementById('pendingRequestsList');
-        let html = '';
-        if (snap.empty || snap.docs?.length === 0) {
-            html = '<p style="text-align:center; color:#888; padding:20px;">No pending requests.</p>';
-        } else {
-            html = '<table><tr><th>Date</th><th>Branch</th><th>Requested By</th><th>Items</th><th>Est. Total</th><th>Action</th></tr>';
-            snap.forEach(doc => {
-                const d = doc.data();
-                const total = d.items.reduce((sum, it) => sum + (it.quantity * (it.estimatedPrice || 0)), 0);
-                const itemsShort = d.items.map(it => `${it.itemName}(${it.quantity})`).join(", ").substring(0,40);
-                html += `<tr>
-                    <td>${d.requestedAt ? new Date(d.requestedAt.toDate()).toLocaleDateString() : ''}</td>
-                    <td>${d.branch}</td>
-                    <td>${d.requestedBy}</td>
-                    <td class="items-cell">${itemsShort}</td>
-                    <td class="cost-cell">₦${total.toLocaleString()}</td>
-                    <td>
-                        <button class="btn-sm btn-success" onclick="openApproveModal('${doc.id}')">✅ Approve</button>
-                        <button class="btn-sm btn-danger" onclick="rejectRequest('${doc.id}')">❌ Reject</button>
-                    </td>
-                </tr>`;
-            });
-            html += '</table>';
-        }
-        container.innerHTML = html;
-    }
-
-    // ---- Approve / Reject / Draft ----
-    let currentRequestId = null;
-    let currentRequestData = null;
-
-    window.openApproveModal = async function(requestId) {
-        try {
-            const doc = await db2.collection('invoiceRequests').doc(requestId).get();
-            if (!doc.exists) return;
-            currentRequestId = requestId;
-            currentRequestData = doc.data();
-
-            document.getElementById('approveBranch').innerText = currentRequestData.branch;
-            document.getElementById('approveRequestedBy').innerText = currentRequestData.requestedBy;
-            document.getElementById('approveSenderName').value = currentUser.email.split('@')[0] + ' (Lagos Sender)';
-            document.getElementById('approveVehicleNo').value = '';
-            document.getElementById('approveExpectedDate').value = '';
-            document.getElementById('approveTransportCost').value = '0';
-            document.getElementById('approveNotes').value = currentRequestData.notes || '';
-
-            const container = document.getElementById('approveItemsContainer');
-            container.innerHTML = '';
-            if (currentRequestData.items && currentRequestData.items.length > 0) {
-                currentRequestData.items.forEach(it => {
-                    const div = document.createElement('div');
-                    div.className = 'item-row';
-                    div.innerHTML = `
-                        <input type="text" placeholder="Item name" class="appItemName" value="${it.itemName}">
-                        <input type="number" placeholder="Qty" class="appItemQty" value="${it.quantity}">
-                        <input type="number" placeholder="Price/unit (₦)" class="appItemPrice" value="${it.estimatedPrice || 0}">
-                        <button type="button" class="removeItem appRemoveItem">✖</button>
-                    `;
-                    container.appendChild(div);
-                    div.querySelector('.appRemoveItem').onclick = () => div.remove();
-                });
-            } else {
-                const div = document.createElement('div');
-                div.className = 'item-row';
-                div.innerHTML = `
-                    <input type="text" placeholder="Item name" class="appItemName">
-                    <input type="number" placeholder="Qty" class="appItemQty">
-                    <input type="number" placeholder="Price/unit (₦)" class="appItemPrice">
-                    <button type="button" class="removeItem appRemoveItem">✖</button>
-                `;
-                container.appendChild(div);
-                div.querySelector('.appRemoveItem').onclick = () => div.remove();
-            }
-            updateApprovePreview();
-            document.getElementById('approveRequestModal').style.display = 'flex';
-        } catch (error) {
-            alert('Error opening approve modal: ' + error.message);
-        }
-    };
-
-    document.getElementById('addApproveItemBtn').addEventListener('click', () => {
-        const container = document.getElementById('approveItemsContainer');
-        const div = document.createElement('div');
-        div.className = 'item-row';
-        div.innerHTML = `
-            <input type="text" placeholder="Item name" class="appItemName">
-            <input type="number" placeholder="Qty" class="appItemQty">
-            <input type="number" placeholder="Price/unit (₦)" class="appItemPrice">
-            <button type="button" class="removeItem appRemoveItem">✖</button>
-        `;
-        container.appendChild(div);
-        div.querySelector('.appRemoveItem').onclick = () => div.remove();
-        updateApprovePreview();
-    });
-
-    function updateApprovePreview() {
-        let total = 0;
-        document.querySelectorAll('#approveItemsContainer .item-row').forEach(r => {
-            const qty = parseInt(r.querySelector('.appItemQty')?.value || 0);
-            const price = parseFloat(r.querySelector('.appItemPrice')?.value || 0);
-            total += qty * price;
-        });
-        document.getElementById('approveCostPreview').innerHTML = `Total goods value: ₦${total.toLocaleString()}`;
-    }
-    document.getElementById('approveItemsContainer').addEventListener('input', updateApprovePreview);
-
-    // ---- Submit Approve (Dispatch) ----
-    document.getElementById('approveRequestForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!currentRequestId) return alert('No request selected.');
-        const senderName = document.getElementById('approveSenderName').value.trim();
-        const vehicleNo = document.getElementById('approveVehicleNo').value.trim();
-        const expectedDate = document.getElementById('approveExpectedDate').value;
-        const transportCost = parseFloat(document.getElementById('approveTransportCost').value) || 0;
-        const notes = document.getElementById('approveNotes').value.trim();
-        const items = [];
-        document.querySelectorAll('#approveItemsContainer .item-row').forEach(row => {
-            const name = row.querySelector('.appItemName').value.trim();
-            const qty = parseInt(row.querySelector('.appItemQty').value);
-            const price = parseFloat(row.querySelector('.appItemPrice').value);
-            if (name && qty > 0 && price >= 0) {
-                items.push({
-                    itemName: name,
-                    orderedQty: qty,
-                    unitPrice: price,
-                    totalItemCost: qty * price,
-                    receivedQty: 0,
-                    damageQty: 0
-                });
-            }
-        });
-        if (!items.length || !senderName) {
-            document.getElementById('approveMessage').innerText = 'Please fill all fields and add items.';
-            return;
-        }
-
-        try {
-            const shipmentRef = await db2.collection('shipments').add({
-                senderName,
-                destinationBranch: currentRequestData.branch,
-                supplierId: '',
-                vehicleNo,
-                expectedDate,
-                driver: '',
-                trackingNo: 'NEV-' + Date.now().toString(36).toUpperCase(),
-                notes: notes,
-                transportCost,
-                items,
-                status: 'Dispatched',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            await db2.collection('invoiceRequests').doc(currentRequestId).update({
-                status: 'approved',
-                shipmentId: shipmentRef.id,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            await db2.collection('activityLog').add({
-                actionType: 'approve_request',
-                shipmentId: shipmentRef.id,
-                branch: currentRequestData.branch,
-                details: `Approved invoice request from ${currentRequestData.requestedBy} and dispatched`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUser.email
-            });
-
-            alert('Request approved and dispatched successfully!');
-            closeModal('approveRequestModal');
-            loadPendingRequests();
-        } catch (error) {
-            document.getElementById('approveMessage').innerText = 'Error: ' + error.message;
-        }
-    });
-
-    // ---- Save Draft ----
-    document.getElementById('saveDraftRequestBtn').addEventListener('click', async function() {
-        if (!currentRequestId) return alert('No request selected.');
-        const senderName = document.getElementById('approveSenderName').value.trim();
-        const vehicleNo = document.getElementById('approveVehicleNo').value.trim();
-        const expectedDate = document.getElementById('approveExpectedDate').value;
-        const transportCost = parseFloat(document.getElementById('approveTransportCost').value) || 0;
-        const notes = document.getElementById('approveNotes').value.trim();
-        const items = [];
-        document.querySelectorAll('#approveItemsContainer .item-row').forEach(row => {
-            const name = row.querySelector('.appItemName').value.trim();
-            const qty = parseInt(row.querySelector('.appItemQty').value);
-            const price = parseFloat(row.querySelector('.appItemPrice').value);
-            if (name && qty > 0 && price >= 0) {
-                items.push({
-                    itemName: name,
-                    orderedQty: qty,
-                    unitPrice: price,
-                    totalItemCost: qty * price,
-                    receivedQty: 0,
-                    damageQty: 0
-                });
-            }
-        });
-        if (!items.length || !senderName) {
-            document.getElementById('approveMessage').innerText = 'Please fill all fields and add items.';
-            return;
-        }
-
-        try {
-            const shipmentRef = await db2.collection('shipments').add({
-                senderName,
-                destinationBranch: currentRequestData.branch,
-                supplierId: '',
-                vehicleNo,
-                expectedDate,
-                driver: '',
-                trackingNo: 'NEV-' + Date.now().toString(36).toUpperCase(),
-                notes: notes,
-                transportCost,
-                items,
-                status: 'Draft',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            await db2.collection('invoiceRequests').doc(currentRequestId).update({
-                status: 'draft',
-                shipmentId: shipmentRef.id,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            await db2.collection('activityLog').add({
-                actionType: 'draft_request',
-                shipmentId: shipmentRef.id,
-                branch: currentRequestData.branch,
-                details: `Drafted invoice request from ${currentRequestData.requestedBy}`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUser.email
-            });
-
-            alert('✅ Draft saved! You can complete it later from the Dispatch page.');
-            closeModal('approveRequestModal');
-            loadPendingRequests();
-        } catch (error) {
-            document.getElementById('approveMessage').innerText = 'Error: ' + error.message;
-        }
-    });
-
-    // ---- Reject ----
-    window.rejectRequest = async function(requestId) {
-        if (!confirm('Reject this request?')) return;
-        const reason = prompt('Reason for rejection (optional):');
-        try {
-            await db2.collection('invoiceRequests').doc(requestId).update({
-                status: 'rejected',
-                rejectionReason: reason || 'No reason provided',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert('Request rejected.');
-            loadPendingRequests();
-        } catch (error) {
-            alert('Error rejecting: ' + error.message);
-        }
-    };
-
-    document.getElementById('rejectRequestBtn').addEventListener('click', async () => {
-        if (!currentRequestId) return;
-        if (!confirm('Reject this request?')) return;
-        const reason = prompt('Reason for rejection:');
-        try {
-            await db2.collection('invoiceRequests').doc(currentRequestId).update({
-                status: 'rejected',
-                rejectionReason: reason || 'No reason provided',
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert('Request rejected.');
-            closeModal('approveRequestModal');
-            loadPendingRequests();
-        } catch (error) {
-            alert('Error rejecting: ' + error.message);
-        }
-    });
-
-    // ==================== Init ====================
-    console.log('NEVAMAK Dashboard loaded with role-based filtering for shipments and invoice requests.');
+    console.log('NEVAMAK Dashboard loaded with users link and role-based header visibility.');
 </script>
 </body>
 </html>
