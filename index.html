@@ -6,6 +6,15 @@
     <!-- ===== FIX: Add referrer policy for CDN ===== -->
     <meta name="referrer" content="no-referrer-when-crossorigin">
     <title>NEVAMAK – Dashboard</title>
+
+    <!-- ===== EARLY DEFINITION FOR EXTENSION COMPATIBILITY ===== -->
+    <script>
+        // Define these globally before any extension scripts run
+        window.ActionableCoachmark = function() { console.log("ActionableCoachmark placeholder"); };
+        window.showOneChild = function() { console.log("showOneChild placeholder"); };
+        console.log("✅ Extension compatibility globals defined.");
+    </script>
+
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -277,13 +286,8 @@
     };
 
     // ============================================================
-    // ===== FIX 2: DEFINE showOneChild for extension compatibility =====
+    // ===== FIX 2: showOneChild is already defined early =====
     // ============================================================
-    window.showOneChild = function() {
-        console.log("👶 showOneChild: Called (placeholder for extension compatibility)");
-        // This function exists solely to prevent extension errors.
-        // Add actual logic if needed, or leave as-is.
-    };
 
     // ============================================================
     // ===== Additional functions for pending requests =====
