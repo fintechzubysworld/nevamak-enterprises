@@ -11,7 +11,36 @@
     :root{--accent:#2b7cff;--danger:#e05353;--muted:#666}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.4;margin:0;padding:24px;background:#f7f9fc;color:#111}
     .container{max-width:980px;margin:0 auto}
-    h1{margin:0 0 12px}
+    /* ---- Header with back button ---- */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .page-header h1 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+    .back-btn {
+      background: #0a3d62;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 40px;
+      text-decoration: none;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    .back-btn:hover {
+      background: #1e4f7a;
+    }
     .card{background:#fff;border:1px solid #e6eef8;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 0 rgba(0,0,0,0.02)}
     form .row{display:flex;gap:12px;margin-bottom:8px}
     label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
@@ -28,12 +57,17 @@
     .message{padding:10px;border-radius:6px;margin-bottom:10px}
     .message.ok{background:#e9f7ff;color:#034a8f}
     .message.err{background:#ffecec;color:#5a1d1d}
+    .badge{background:#e8edf2;padding:2px 10px;border-radius:20px;font-size:0.85rem;}
     @media(max-width:720px){.row{flex-direction:column}}
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>👥 User Management</h1>
+    <!-- Header with back button -->
+    <div class="page-header">
+      <h1>👥 User Management</h1>
+      <a href="index.html" class="back-btn">← Back to Dashboard</a>
+    </div>
 
     <div id="msg" class="message hidden" aria-live="polite"></div>
 
@@ -187,7 +221,7 @@
         tr.innerHTML = `
           <td>${escapeHtml(u.name)}</td>
           <td>${escapeHtml(u.email)}</td>
-          <td><span class="badge" style="background:#e8edf2;padding:2px 10px;border-radius:20px;">${escapeHtml(u.role)}</span></td>
+          <td><span class="badge">${escapeHtml(u.role)}</span></td>
           <td>${u.createdAt ? u.createdAt.toLocaleString() : '—'}</td>
           <td class="actions">
             <button data-id="${u.id}" class="edit" style="background:var(--accent);color:#fff;border:0;padding:4px 12px;border-radius:4px;cursor:pointer;">Edit</button>
