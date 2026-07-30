@@ -33,7 +33,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>User Management</h1>
+    <h1>👥 User Management</h1>
 
     <div id="msg" class="message hidden" aria-live="polite"></div>
 
@@ -59,11 +59,16 @@
               <option value="user">User</option>
               <option value="admin">Admin</option>
               <option value="manager">Manager</option>
+              <option value="lagos_sender">Lagos Sender</option>
+              <option value="abuja_rep">Abuja Rep</option>
+              <option value="ph_rep">PH Rep</option>
+              <option value="vendor">Vendor</option>
             </select>
           </div>
           <div>
             <label for="password">Password (create only)</label>
             <input id="password" name="password" type="password" placeholder="••••••" />
+            <small style="color:var(--muted);display:block;margin-top:4px;">Leave blank when editing</small>
           </div>
         </div>
 
@@ -71,7 +76,6 @@
           <button id="save-btn">Save user</button>
           <button type="button" id="cancel-btn" class="secondary hidden">Cancel edit</button>
         </div>
-        <p class="muted" style="margin-top:12px">This page expects REST endpoints at <code>/api/users</code> (GET/POST) and <code>/api/users/:id</code> (PUT/DELETE). Adjust URLs in the script if needed.</p>
       </form>
     </section>
 
@@ -84,7 +88,7 @@
   </div>
 
   <script>
-    // Firebase auth & role guard
+    // ===== Firebase Config =====
     const firebaseConfig = {
       apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
       authDomain: "nevamak-enterprises.firebaseapp.com",
@@ -98,17 +102,18 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    // ===== Auth Guard (Admin only) =====
     auth.onAuthStateChanged(async (user) => {
       if (!user) { window.location.href = 'login.html'; return; }
       try {
         const userDoc = await db.collection('users').doc(user.uid).get();
         const role = userDoc.data()?.role || '';
         if (role !== 'admin') {
-          alert('Access denied. Admins only.');
+          alert('⛔ Access denied. Admins only.');
           window.location.href = 'index.html';
           return;
         }
-        // allowed: initial load
+        // Load users
         fetchUsers();
       } catch (err) {
         console.error('Auth check failed:', err);
@@ -116,7 +121,7 @@
       }
     });
 
-    const apiBase = '/api/users';
+    // ===== DOM References =====
     const msgEl = document.getElementById('msg');
     const usersWrap = document.getElementById('users-wrap');
     const form = document.getElementById('user-form');
@@ -124,6 +129,7 @@
     const cancelBtn = document.getElementById('cancel-btn');
     const saveBtn = document.getElementById('save-btn');
 
+    // ===== Helpers =====
     function showMessage(text, type='ok'){
       msgEl.textContent = text;
       msgEl.className = `message ${type}`;
@@ -131,18 +137,41 @@
       setTimeout(()=> msgEl.classList.add('hidden'), 4000);
     }
 
+    function escapeHtml(str){
+      if(!str) return '';
+      return String(str).replace(/[&<>"']/g, function(s) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
+      });
+    }
+
+    // ===== Fetch users from Firestore =====
     async function fetchUsers(){
       usersWrap.innerHTML = '<p class="muted">Loading users...</p>';
-      try{
-        const res = await fetch(apiBase);
-        if(!res.ok) throw new Error('Failed to load users');
-        const users = await res.json();
-        renderUsers(users || []);
-      }catch(err){
+      try {
+        const snapshot = await db.collection('users').orderBy('createdAt', 'desc').get();
+        if (snapshot.empty) {
+          usersWrap.innerHTML = '<p class="muted">No users yet.</p>';
+          return;
+        }
+        const users = [];
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          users.push({
+            id: doc.id,
+            name: data.displayName || data.name || '—',
+            email: data.email || '—',
+            role: data.role || 'user',
+            createdAt: data.createdAt ? data.createdAt.toDate() : null
+          });
+        });
+        renderUsers(users);
+      } catch (err) {
+        console.error('Error fetching users:', err);
         usersWrap.innerHTML = `<p class="muted">Unable to fetch users: ${err.message}</p>`;
       }
     }
 
+    // ===== Render users table =====
     function renderUsers(users){
       if(!users.length){
         usersWrap.innerHTML = '<p class="muted">No users yet.</p>';
@@ -156,13 +185,13 @@
       users.forEach(u=>{
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${escapeHtml(u.name||'—')}</td>
-          <td>${escapeHtml(u.email||'—')}</td>
-          <td>${escapeHtml(u.role||'user')}</td>
-          <td>${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</td>
+          <td>${escapeHtml(u.name)}</td>
+          <td>${escapeHtml(u.email)}</td>
+          <td><span class="badge" style="background:#e8edf2;padding:2px 10px;border-radius:20px;">${escapeHtml(u.role)}</span></td>
+          <td>${u.createdAt ? u.createdAt.toLocaleString() : '—'}</td>
           <td class="actions">
-            <button data-id="${u.id}" class="edit">Edit</button>
-            <button data-id="${u.id}" class="delete" style="background:#fff;color:var(--danger);border:1px solid #ffd6d6">Delete</button>
+            <button data-id="${u.id}" class="edit" style="background:var(--accent);color:#fff;border:0;padding:4px 12px;border-radius:4px;cursor:pointer;">Edit</button>
+            <button data-id="${u.id}" class="delete" style="background:var(--danger);color:#fff;border:0;padding:4px 12px;border-radius:4px;cursor:pointer;">Delete</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -183,66 +212,88 @@
       document.querySelectorAll('button.delete').forEach(b=>{
         b.addEventListener('click', async e=>{
           const id = e.currentTarget.dataset.id;
-          if(!confirm('Delete this user? This cannot be undone.')) return;
+          if(!confirm('⚠️ Delete this user permanently?')) return;
           await deleteUser(id);
         });
       });
     }
 
+    // ===== Load user for editing =====
     async function loadUserForEdit(id){
-      try{
-        const res = await fetch(`${apiBase}/${id}`);
-        if(!res.ok) throw new Error('User not found');
-        const u = await res.json();
-        userIdInput.value = u.id;
-        document.getElementById('name').value = u.name || '';
-        document.getElementById('email').value = u.email || '';
-        document.getElementById('role').value = u.role || 'user';
+      try {
+        const doc = await db.collection('users').doc(id).get();
+        if (!doc.exists) throw new Error('User not found');
+        const data = doc.data();
+        userIdInput.value = id;
+        document.getElementById('name').value = data.displayName || data.name || '';
+        document.getElementById('email').value = data.email || '';
+        document.getElementById('role').value = data.role || 'user';
         document.getElementById('password').value = '';
         cancelBtn.classList.remove('hidden');
         saveBtn.textContent = 'Update user';
-      }catch(err){
+      } catch (err) {
         showMessage('Could not load user: '+err.message, 'err');
       }
     }
 
+    // ===== Save (Create or Update) =====
     form.addEventListener('submit', async e=>{
       e.preventDefault();
       const id = userIdInput.value;
-      const payload = {
-        name: document.getElementById('name').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        role: document.getElementById('role').value
-      };
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const role = document.getElementById('role').value;
       const password = document.getElementById('password').value;
-      if(!payload.name || !payload.email){
+
+      if(!name || !email){
         showMessage('Name and email are required', 'err');
         return;
       }
-      try{
-        let res;
-        if(id){
-          // update (omit password if empty)
-          if(password) payload.password = password;
-          res = await fetch(`${apiBase}/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-          if(!res.ok) throw new Error('Update failed');
-          showMessage('User updated');
+
+      try {
+        if (id) {
+          // UPDATE existing user
+          const updateData = {
+            displayName: name,
+            email: email,
+            role: role,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          await db.collection('users').doc(id).update(updateData);
+          showMessage('✅ User updated successfully', 'ok');
         } else {
-          if(password) payload.password = password;
-          res = await fetch(apiBase, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-          if(!res.ok) throw new Error('Create failed');
-          showMessage('User created');
+          // CREATE new user with email/password
+          if (!password || password.length < 6) {
+            showMessage('Password must be at least 6 characters for new users.', 'err');
+            return;
+          }
+          // Create auth user
+          const userCred = await auth.createUserWithEmailAndPassword(email, password);
+          const uid = userCred.user.uid;
+          // Create Firestore document
+          await db.collection('users').doc(uid).set({
+            displayName: name,
+            email: email,
+            role: role,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: auth.currentUser?.uid || 'system'
+          });
+          showMessage('✅ User created successfully', 'ok');
         }
+        // Reset form
         form.reset();
         userIdInput.value = '';
         cancelBtn.classList.add('hidden');
         saveBtn.textContent = 'Save user';
+        // Reload list
         await fetchUsers();
-      }catch(err){
-        showMessage(err.message, 'err');
+      } catch (err) {
+        console.error('Save error:', err);
+        showMessage('❌ Error: ' + err.message, 'err');
       }
     });
 
+    // ===== Cancel edit =====
     cancelBtn.addEventListener('click', ()=>{
       form.reset();
       userIdInput.value = '';
@@ -250,26 +301,18 @@
       saveBtn.textContent = 'Save user';
     });
 
+    // ===== Delete user =====
     async function deleteUser(id){
-      try{
-        const res = await fetch(`${apiBase}/${id}`, {method:'DELETE'});
-        if(!res.ok) throw new Error('Delete failed');
-        showMessage('User deleted');
+      try {
+        // Delete from Firestore
+        await db.collection('users').doc(id).delete();
+        // Optionally delete auth user (requires admin SDK, skip for now)
+        showMessage('🗑️ User deleted from Firestore.', 'ok');
         await fetchUsers();
-      }catch(err){
-        showMessage(err.message, 'err');
+      } catch (err) {
+        showMessage('❌ Delete error: ' + err.message, 'err');
       }
     }
-
-    // small helper to avoid XSS when rendering
-    function escapeHtml(str){
-      if(!str) return '';
-      return String(str).replace(/[&<>"']/g, function(s) {
-        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[s];
-      });
-    }
-
-    // DO NOT call fetchUsers() here — it's invoked after auth check above
   </script>
 </body>
 </html>
