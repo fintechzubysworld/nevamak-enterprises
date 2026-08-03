@@ -145,6 +145,7 @@
         .toast.error { background: #e74c3c; }
         .ack-signature { border: 1px solid #ccc; padding: 12px; border-radius: 16px; background: #f9f9f9; margin: 12px 0; }
         .ack-signature textarea { width: 100%; border-radius: 12px; padding: 8px; border: 1px solid #ccc; }
+        .ack-login-step { border-left: 4px solid #3498db; padding-left: 16px; margin: 12px 0; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } }
     </style>
 </head>
@@ -343,31 +344,45 @@
     </div>
 </div>
 
-<!-- Acknowledgment Modal -->
-<div id="ackModal" class="modal">
+<!-- Acknowledgment Login Modal (two-step) -->
+<div id="ackLoginModal" class="modal">
     <div class="modal-content">
-        <span class="close" onclick="closeModal('ackModal')">&times;</span>
-        <h3>✅ Invoice Acknowledgment</h3>
-        <p><strong>Invoice #:</strong> <span id="ackInvoiceNumber"></span></p>
-        <p><strong>Customer:</strong> <span id="ackCustomer"></span></p>
-        <p><strong>Total:</strong> ₦<span id="ackTotal"></span></p>
-        <p><strong>Branch:</strong> <span id="ackBranch"></span></p>
+        <span class="close" onclick="closeModal('ackLoginModal')">&times;</span>
+        <h3>✅ Invoice Acknowledgment – Login Required</h3>
+        <p><strong>Invoice #:</strong> <span id="ackLoginInvoiceNumber"></span></p>
+        <p><strong>Customer:</strong> <span id="ackLoginCustomer"></span></p>
+        <p><strong>Total:</strong> ₦<span id="ackLoginTotal"></span></p>
         <hr />
-        <div id="ackStatusDisplay" style="margin:12px 0;">
-            <span class="badge" id="ackStatusBadge">Not Acknowledged</span>
-        </div>
-        <div class="ack-signature">
-            <label><strong>✍️ Goods Receiving Officer Signature</strong></label>
-            <textarea id="ackSignature" rows="2" placeholder="Type your full name and title (e.g., 'John Doe, GRO')"></textarea>
-            <div style="margin-top:8px;">
-                <label><input type="checkbox" id="ackConfirmCheck" /> I confirm that goods have been received as per this invoice.</label>
+        <div id="ackLoginStep1">
+            <div class="ack-login-step">
+                <label><strong>Step 1 – Confirm your identity</strong></label>
+                <p style="font-size:0.9rem; color:#555;">Enter your current password to proceed.</p>
+                <input type="password" id="ackCurrentPassword" placeholder="Your current password" style="width:100%;">
             </div>
+            <button id="ackStep1Btn" class="btn-primary" style="width:100%;">Next</button>
+            <div id="ackStep1Message" style="color:red; margin-top:8px;"></div>
         </div>
-        <div style="display:flex; gap:12px; margin-top:12px; flex-wrap:wrap;">
-            <button id="ackSubmitBtn" class="btn-success" style="flex:2;">✅ Confirm & Sign</button>
-            <button onclick="closeModal('ackModal')" class="btn-danger" style="flex:1;">Cancel</button>
+        <div id="ackLoginStep2" style="display:none;">
+            <div class="ack-login-step">
+                <label><strong>Step 2 – Login as the acknowledging officer</strong></label>
+                <p style="font-size:0.9rem; color:#555;">Enter the credentials of the person who will confirm this invoice.</p>
+                <input type="email" id="ackOfficerEmail" placeholder="Officer's email" style="width:100%;">
+                <input type="password" id="ackOfficerPassword" placeholder="Officer's password" style="width:100%;">
+                <div style="margin-top:12px;">
+                    <label><strong>Signature (Name & Title)</strong></label>
+                    <textarea id="ackOfficerSignature" rows="2" placeholder="e.g., 'Jane Smith, GRO'" style="width:100%;"></textarea>
+                </div>
+                <div style="margin-top:8px;">
+                    <label><input type="checkbox" id="ackOfficerConfirmCheck" /> I confirm that goods have been received as per this invoice.</label>
+                </div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;">
+                <button id="ackStep2ConfirmBtn" class="btn-success" style="flex:2;">✅ Confirm & Sign</button>
+                <button onclick="closeModal('ackLoginModal')" class="btn-danger" style="flex:1;">Cancel</button>
+            </div>
+            <div id="ackStep2Message" style="color:red; margin-top:8px;"></div>
         </div>
-        <div id="ackMessage" style="color:red; margin-top:8px;"></div>
+        <div id="ackFinalMessage" style="color:green; margin-top:8px; display:none; font-weight:bold;"></div>
     </div>
 </div>
 
@@ -401,6 +416,10 @@
     let sharedUnsubscribe = null;
     let suppliers = [];
     let itemRowCounter = 0;
+
+    // For acknowledgment login flow
+    let originalUserEmail = '';
+    let originalUserPassword = ''; // we'll store temporarily during flow
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -462,10 +481,19 @@
 
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
-        ['sendMessage','moveMessage','bulkMessage','shareMessageResult','ackMessage'].forEach(e => {
+        ['sendMessage','moveMessage','bulkMessage','shareMessageResult','ackStep1Message','ackStep2Message','ackFinalMessage'].forEach(e => {
             const el = document.getElementById(e);
             if (el) el.textContent = '';
         });
+        // Reset login modal steps
+        document.getElementById('ackLoginStep1').style.display = 'block';
+        document.getElementById('ackLoginStep2').style.display = 'none';
+        document.getElementById('ackCurrentPassword').value = '';
+        document.getElementById('ackOfficerEmail').value = '';
+        document.getElementById('ackOfficerPassword').value = '';
+        document.getElementById('ackOfficerSignature').value = '';
+        document.getElementById('ackOfficerConfirmCheck').checked = false;
+        document.getElementById('ackFinalMessage').style.display = 'none';
     }
     window.closeModal = closeModal;
 
@@ -585,6 +613,7 @@
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
         currentUserEmail = user.email;
+        originalUserEmail = user.email; // store for later
         try {
             const userDoc = await db.collection('users').doc(user.uid).get();
             if (userDoc.exists) {
@@ -1347,7 +1376,7 @@
                                 <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
                                 ${isShareable ? `<button class="btn-sm btn-secondary" onclick="openShareModal('${doc.id}')">📨 Share</button>` : ''}
                                 ${!moved ? `<button class="btn-sm btn-secondary" onclick="openMoveWarehouseModal('${doc.id}')">🏚️ Move</button>` : ''}
-                                ${!d.acknowledged ? `<button class="btn-sm btn-success" onclick="openAckModal('${doc.id}')">✅ Ack</button>` : ''}
+                                ${!d.acknowledged ? `<button class="btn-sm btn-success" onclick="openAckLoginModal('${doc.id}')">✅ Ack</button>` : ''}
                                 <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
                             </td>
                         </tr>`;
@@ -1491,8 +1520,10 @@
         }
     };
 
-    // ==================== Acknowledgment Modal ====================
-    window.openAckModal = async function(id) {
+    // ==================== Acknowledgment Login Flow ====================
+    let ackLoginTargetId = null;
+
+    window.openAckLoginModal = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
@@ -1501,69 +1532,140 @@
                 showToast('Invoice already acknowledged.', 'info');
                 return;
             }
-            ackInvoiceId = id;
-            document.getElementById('ackInvoiceNumber').textContent = d.invoiceNumber;
-            document.getElementById('ackCustomer').textContent = d.customer || 'N/A';
-            document.getElementById('ackTotal').textContent = (d.total || 0).toLocaleString();
-            document.getElementById('ackBranch').textContent = d.branch || 'N/A';
-            document.getElementById('ackStatusBadge').textContent = '⏳ Not Acknowledged';
-            document.getElementById('ackStatusBadge').style.background = '#f39c12';
-            document.getElementById('ackStatusBadge').style.color = 'white';
-            document.getElementById('ackSignature').value = '';
-            document.getElementById('ackConfirmCheck').checked = false;
-            document.getElementById('ackSubmitBtn').disabled = false;
-            document.getElementById('ackSubmitBtn').style.opacity = '1';
-            document.getElementById('ackMessage').textContent = '';
-            document.getElementById('ackModal').style.display = 'flex';
+            ackLoginTargetId = id;
+            document.getElementById('ackLoginInvoiceNumber').textContent = d.invoiceNumber;
+            document.getElementById('ackLoginCustomer').textContent = d.customer || 'N/A';
+            document.getElementById('ackLoginTotal').textContent = (d.total || 0).toLocaleString();
+            // Reset modal
+            document.getElementById('ackLoginStep1').style.display = 'block';
+            document.getElementById('ackLoginStep2').style.display = 'none';
+            document.getElementById('ackCurrentPassword').value = '';
+            document.getElementById('ackOfficerEmail').value = '';
+            document.getElementById('ackOfficerPassword').value = '';
+            document.getElementById('ackOfficerSignature').value = '';
+            document.getElementById('ackOfficerConfirmCheck').checked = false;
+            document.getElementById('ackStep1Message').textContent = '';
+            document.getElementById('ackStep2Message').textContent = '';
+            document.getElementById('ackFinalMessage').style.display = 'none';
+            document.getElementById('ackLoginModal').style.display = 'flex';
         } catch (err) {
             showToast('Error: ' + err.message, 'error');
         }
     };
 
-    document.getElementById('ackSubmitBtn').addEventListener('click', async function() {
-        if (!ackInvoiceId) { document.getElementById('ackMessage').textContent = 'No invoice selected.'; return; }
-        const signature = document.getElementById('ackSignature').value.trim();
-        const checked = document.getElementById('ackConfirmCheck').checked;
-        if (!signature) { document.getElementById('ackMessage').textContent = 'Please enter your signature (name & title).'; return; }
-        if (!checked) { document.getElementById('ackMessage').textContent = 'Please confirm receipt by checking the box.'; return; }
+    document.getElementById('ackStep1Btn').addEventListener('click', async function() {
+        const currentPassword = document.getElementById('ackCurrentPassword').value.trim();
+        if (!currentPassword) {
+            document.getElementById('ackStep1Message').textContent = 'Please enter your current password.';
+            return;
+        }
         const btn = this;
         setButtonLoading(btn, true);
+        document.getElementById('ackStep1Message').textContent = '';
+
         try {
-            const doc = await db.collection('invoices').doc(ackInvoiceId).get();
-            if (!doc.exists) { showToast('Invoice not found.', 'error'); setButtonLoading(btn, false); return; }
-            if (doc.data().acknowledged) {
-                document.getElementById('ackMessage').textContent = 'This invoice is already acknowledged.';
-                setButtonLoading(btn, false); return;
+            // Re-authenticate the current user
+            const credential = firebase.auth.EmailAuthProvider.credential(currentUserEmail, currentPassword);
+            await currentUser.reauthenticateWithCredential(credential);
+            // Store the password for later re-login
+            originalUserPassword = currentPassword;
+            // Move to step 2
+            document.getElementById('ackLoginStep1').style.display = 'none';
+            document.getElementById('ackLoginStep2').style.display = 'block';
+            document.getElementById('ackStep1Message').textContent = '';
+            showToast('Identity confirmed. Please log in as the acknowledging officer.', 'success');
+        } catch (err) {
+            if (err.code === 'auth/wrong-password') {
+                document.getElementById('ackStep1Message').textContent = 'Incorrect password. Please try again.';
+            } else {
+                document.getElementById('ackStep1Message').textContent = 'Error: ' + err.message;
             }
-            await db.collection('invoices').doc(ackInvoiceId).update({
+            showToast('Re-authentication failed: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+
+    document.getElementById('ackStep2ConfirmBtn').addEventListener('click', async function() {
+        const officerEmail = document.getElementById('ackOfficerEmail').value.trim();
+        const officerPassword = document.getElementById('ackOfficerPassword').value.trim();
+        const signature = document.getElementById('ackOfficerSignature').value.trim();
+        const confirmed = document.getElementById('ackOfficerConfirmCheck').checked;
+
+        if (!officerEmail || !officerPassword) {
+            document.getElementById('ackStep2Message').textContent = 'Please enter the officer\'s email and password.';
+            return;
+        }
+        if (!signature) {
+            document.getElementById('ackStep2Message').textContent = 'Please enter the officer\'s signature (name & title).';
+            return;
+        }
+        if (!confirmed) {
+            document.getElementById('ackStep2Message').textContent = 'Please confirm receipt by checking the box.';
+            return;
+        }
+
+        const btn = this;
+        setButtonLoading(btn, true);
+        document.getElementById('ackStep2Message').textContent = '';
+
+        try {
+            // Sign in as the officer
+            await auth.signInWithEmailAndPassword(officerEmail, officerPassword);
+            // Now we are the officer – perform acknowledgment
+            const officerUser = auth.currentUser;
+            if (!officerUser) throw new Error('Failed to sign in as officer.');
+
+            // Perform acknowledgment update
+            const docRef = db.collection('invoices').doc(ackLoginTargetId);
+            const doc = await docRef.get();
+            if (!doc.exists) throw new Error('Invoice not found.');
+            if (doc.data().acknowledged) {
+                throw new Error('Invoice already acknowledged.');
+            }
+            await docRef.update({
                 acknowledged: true,
-                acknowledgedBy: currentUserEmail,
+                acknowledgedBy: officerUser.email,
                 ackSignature: signature,
                 ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             await db.collection('activityLog').add({
                 action: 'invoice_acknowledged',
                 invoiceNumber: doc.data().invoiceNumber,
-                user: currentUserEmail,
+                user: officerUser.email,
                 signature: signature,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-            document.getElementById('ackMessage').textContent = '✅ Invoice acknowledged successfully!';
-            document.getElementById('ackMessage').style.color = 'green';
-            document.getElementById('ackStatusBadge').textContent = '✅ Acknowledged by ' + signature;
-            document.getElementById('ackStatusBadge').style.background = '#27ae60';
-            document.getElementById('ackStatusBadge').style.color = 'white';
-            btn.disabled = true;
-            btn.style.opacity = '0.6';
+
+            // Sign out the officer
+            await auth.signOut();
+
+            // Sign back in as the original user
+            await auth.signInWithEmailAndPassword(originalUserEmail, originalUserPassword);
+
+            // Update UI
+            document.getElementById('ackFinalMessage').style.display = 'block';
+            document.getElementById('ackFinalMessage').textContent = '✅ Invoice acknowledged successfully!';
+            document.getElementById('ackStep2Message').textContent = '';
             showToast('✅ Invoice acknowledged!', 'success');
-            loadInvoices();
-            closeModal('ackModal');
+            closeModal('ackLoginModal');
+            loadInvoices(); // refresh list
         } catch (err) {
-            document.getElementById('ackMessage').textContent = 'Error: ' + err.message;
-            document.getElementById('ackMessage').style.color = 'red';
+            console.error('Acknowledgment error:', err);
+            document.getElementById('ackStep2Message').textContent = 'Error: ' + err.message;
             showToast('Error: ' + err.message, 'error');
+            // Attempt to sign back in as original user if possible
+            try {
+                await auth.signOut();
+                await auth.signInWithEmailAndPassword(originalUserEmail, originalUserPassword);
+            } catch (e) {
+                console.error('Failed to restore original user:', e);
+                showToast('Failed to restore your session. Please refresh and log in again.', 'error');
+                window.location.href = 'login.html';
+            }
+        } finally {
+            setButtonLoading(btn, false);
         }
-        setButtonLoading(btn, false);
     });
 
     // ==================== Send/Share Functions ====================
@@ -2085,7 +2187,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with acknowledgment feature.');
+    console.log('NEVAMAK Invoice Repository loaded with two-step acknowledgment login.');
 </script>
 </body>
 </html>
