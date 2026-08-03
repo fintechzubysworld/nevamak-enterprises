@@ -421,6 +421,9 @@
     let originalUserEmail = '';
     let originalUserPassword = ''; // we'll store temporarily during flow
 
+    // Secondary app for officer authentication
+    let secondaryApp = null;
+
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
     const addItemBtn = document.getElementById('addItemBtn');
@@ -1520,7 +1523,7 @@
         }
     };
 
-    // ==================== Acknowledgment Login Flow ====================
+    // ==================== Acknowledgment Login Flow (Secondary App) ====================
     let ackLoginTargetId = null;
 
     window.openAckLoginModal = async function(id) {
@@ -1567,7 +1570,7 @@
             // Re-authenticate the current user
             const credential = firebase.auth.EmailAuthProvider.credential(currentUserEmail, currentPassword);
             await currentUser.reauthenticateWithCredential(credential);
-            // Store the password for later re-login
+            // Store the password for later re-login (not actually needed with secondary app approach, but kept for security)
             originalUserPassword = currentPassword;
             // Move to step 2
             document.getElementById('ackLoginStep1').style.display = 'none';
@@ -1610,14 +1613,20 @@
         document.getElementById('ackStep2Message').textContent = '';
 
         try {
-            // Sign in as the officer
-            await auth.signInWithEmailAndPassword(officerEmail, officerPassword);
-            // Now we are the officer – perform acknowledgment
-            const officerUser = auth.currentUser;
+            // Step 1: Create or get secondary app
+            if (!secondaryApp) {
+                secondaryApp = firebase.initializeApp(firebaseConfig, 'secondaryApp');
+            }
+            const secondaryAuth = secondaryApp.auth();
+            const secondaryDb = secondaryApp.firestore();
+
+            // Sign in as officer on secondary app
+            await secondaryAuth.signInWithEmailAndPassword(officerEmail, officerPassword);
+            const officerUser = secondaryAuth.currentUser;
             if (!officerUser) throw new Error('Failed to sign in as officer.');
 
-            // Perform acknowledgment update
-            const docRef = db.collection('invoices').doc(ackLoginTargetId);
+            // Perform acknowledgment update using secondary Firestore
+            const docRef = secondaryDb.collection('invoices').doc(ackLoginTargetId);
             const doc = await docRef.get();
             if (!doc.exists) throw new Error('Invoice not found.');
             if (doc.data().acknowledged) {
@@ -1629,7 +1638,7 @@
                 ackSignature: signature,
                 ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-            await db.collection('activityLog').add({
+            await secondaryDb.collection('activityLog').add({
                 action: 'invoice_acknowledged',
                 invoiceNumber: doc.data().invoiceNumber,
                 user: officerUser.email,
@@ -1637,11 +1646,10 @@
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Sign out the officer
-            await auth.signOut();
+            // Sign out the officer from secondary app
+            await secondaryAuth.signOut();
 
-            // Sign back in as the original user
-            await auth.signInWithEmailAndPassword(originalUserEmail, originalUserPassword);
+            // Original user remains logged in (no change)
 
             // Update UI
             document.getElementById('ackFinalMessage').style.display = 'block';
@@ -1654,14 +1662,11 @@
             console.error('Acknowledgment error:', err);
             document.getElementById('ackStep2Message').textContent = 'Error: ' + err.message;
             showToast('Error: ' + err.message, 'error');
-            // Attempt to sign back in as original user if possible
-            try {
-                await auth.signOut();
-                await auth.signInWithEmailAndPassword(originalUserEmail, originalUserPassword);
-            } catch (e) {
-                console.error('Failed to restore original user:', e);
-                showToast('Failed to restore your session. Please refresh and log in again.', 'error');
-                window.location.href = 'login.html';
+            // Ensure secondary app is signed out if any
+            if (secondaryApp) {
+                try {
+                    await secondaryApp.auth().signOut();
+                } catch (e) { /* ignore */ }
             }
         } finally {
             setButtonLoading(btn, false);
@@ -2187,7 +2192,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with two-step acknowledgment login.');
+    console.log('NEVAMAK Invoice Repository loaded with two-step acknowledgment login (secondary app).');
 </script>
 </body>
 </html>
