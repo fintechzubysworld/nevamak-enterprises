@@ -18,7 +18,8 @@
         header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
         header h1 { margin: 0; font-size: 1.4rem; }
         .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
-        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .nav-links a, .logout-btn, .settings-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .settings-btn { background: #5f7d9c; }
         .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
         .tab-btn { background: #ccc; color: #333; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; }
         .tab-btn.active { background: #0a3d62; color: white; }
@@ -146,7 +147,9 @@
         .ack-signature { border: 1px solid #ccc; padding: 12px; border-radius: 16px; background: #f9f9f9; margin: 12px 0; }
         .ack-signature textarea { width: 100%; border-radius: 12px; padding: 8px; border: 1px solid #ccc; }
         .ack-login-step { border-left: 4px solid #3498db; padding-left: 16px; margin: 12px 0; }
-        @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } }
+        .vendor-field { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .vendor-field input, .vendor-field select { flex: 1; }
+        @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } .vendor-field { flex-direction: column; } }
     </style>
 </head>
 <body>
@@ -161,6 +164,7 @@
             <a href="reports.html">📊 Reports</a>
             <a href="warehouse.html">🏚️ Warehouse</a>
             <a href="permissions.html">🔐 Permissions</a>
+            <button class="settings-btn" onclick="openSettingsModal()">⚙️ Settings</button>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -184,6 +188,13 @@
                 <div class="flex-row">
                     <input type="text" id="customerName" placeholder="Customer / Recipient" required>
                     <input type="email" id="customerEmail" placeholder="Customer Email">
+                </div>
+                <div class="flex-row vendor-field">
+                    <label style="font-weight:600; flex:0 0 auto;">Vendor:</label>
+                    <input type="text" id="vendorManual" placeholder="Type vendor name" style="flex:1;">
+                    <select id="vendorSelect" style="flex:1;">
+                        <option value="">-- Select from list --</option>
+                    </select>
                 </div>
                 <div class="flex-row">
                     <select id="invoiceBranch" required>
@@ -247,6 +258,21 @@
             <h2>📨 Invoices Shared with Me</h2>
             <div id="sharedList">Loading...</div>
         </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('settingsModal')">&times;</span>
+        <h3>⚙️ Settings</h3>
+        <div style="margin:16px 0;">
+            <label><strong>Company Name (Invoice Heading)</strong></label>
+            <input type="text" id="companyNameInput" placeholder="e.g., Chizzy Electronics" style="width:100%;">
+            <p style="font-size:0.8rem; color:#888;">This name will appear on all invoices, previews, and PDFs.</p>
+        </div>
+        <button id="saveSettingsBtn" class="btn-primary">💾 Save Settings</button>
+        <div id="settingsMessage" style="color:green; margin-top:8px;"></div>
     </div>
 </div>
 
@@ -406,22 +432,17 @@
     let currentUser = null;
     let currentUserRole = '';
     let currentUserEmail = '';
+    let companyName = 'NEVAMAK Enterprises'; // default
     let sendInvoiceId = null;
     let sendInvoiceData = null;
     let shareInvoiceId = null;
     let importedItems = [];
     let moveInvoiceId = null;
-    let ackInvoiceId = null; // for acknowledgment
+    let ackInvoiceId = null;
     let invoicesUnsubscribe = null;
     let sharedUnsubscribe = null;
     let suppliers = [];
     let itemRowCounter = 0;
-
-    // For acknowledgment login flow
-    let originalUserEmail = '';
-    let originalUserPassword = ''; // we'll store temporarily during flow
-
-    // Secondary app for officer authentication
     let secondaryApp = null;
 
     // ==================== DOM ====================
@@ -441,6 +462,8 @@
     const moveBranchSelect = document.getElementById('moveBranchSelect');
     const transportMultiplier = document.getElementById('transportMultiplier');
     const toast = document.getElementById('toast');
+    const vendorSelect = document.getElementById('vendorSelect');
+    const vendorManual = document.getElementById('vendorManual');
 
     // ==================== Helpers ====================
     function escapeHtml(text) {
@@ -484,19 +507,20 @@
 
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
-        ['sendMessage','moveMessage','bulkMessage','shareMessageResult','ackStep1Message','ackStep2Message','ackFinalMessage'].forEach(e => {
+        ['sendMessage','moveMessage','bulkMessage','shareMessageResult','ackStep1Message','ackStep2Message','ackFinalMessage','settingsMessage'].forEach(e => {
             const el = document.getElementById(e);
             if (el) el.textContent = '';
         });
-        // Reset login modal steps
-        document.getElementById('ackLoginStep1').style.display = 'block';
-        document.getElementById('ackLoginStep2').style.display = 'none';
-        document.getElementById('ackCurrentPassword').value = '';
-        document.getElementById('ackOfficerEmail').value = '';
-        document.getElementById('ackOfficerPassword').value = '';
-        document.getElementById('ackOfficerSignature').value = '';
-        document.getElementById('ackOfficerConfirmCheck').checked = false;
-        document.getElementById('ackFinalMessage').style.display = 'none';
+        if (id === 'ackLoginModal') {
+            document.getElementById('ackLoginStep1').style.display = 'block';
+            document.getElementById('ackLoginStep2').style.display = 'none';
+            document.getElementById('ackCurrentPassword').value = '';
+            document.getElementById('ackOfficerEmail').value = '';
+            document.getElementById('ackOfficerPassword').value = '';
+            document.getElementById('ackOfficerSignature').value = '';
+            document.getElementById('ackOfficerConfirmCheck').checked = false;
+            document.getElementById('ackFinalMessage').style.display = 'none';
+        }
     }
     window.closeModal = closeModal;
 
@@ -616,11 +640,11 @@
         if (!user) { window.location.href = 'login.html'; return; }
         currentUser = user;
         currentUserEmail = user.email;
-        originalUserEmail = user.email; // store for later
         try {
             const userDoc = await db.collection('users').doc(user.uid).get();
             if (userDoc.exists) {
                 currentUserRole = userDoc.data().role || '';
+                companyName = userDoc.data().companyName || 'NEVAMAK Enterprises';
                 if (currentUserRole === 'abuja_rep') {
                     invoiceBranch.value = 'Abuja';
                     invoiceBranch.disabled = true;
@@ -651,15 +675,48 @@
         addItemRow();
         updateCostPreview();
         transportMultiplier.addEventListener('input', updateCostPreview);
-        
-        // Add event listener for Add Product button (moved here to ensure it's available)
         addItemBtn.addEventListener('click', function() {
             addItemRow();
         });
+        // Populate vendor dropdown
+        populateVendorDropdown();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
         auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    // ==================== Vendor Dropdown and Manual Entry Sync ====================
+    async function populateVendorDropdown() {
+        try {
+            const snap = await db.collection('suppliers').orderBy('name').get();
+            vendorSelect.innerHTML = '<option value="">-- Select from list --</option>';
+            snap.forEach(doc => {
+                const s = doc.data();
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name + (s.contact ? ' (' + s.contact + ')' : '');
+                vendorSelect.appendChild(opt);
+            });
+        } catch (err) {
+            console.warn('Could not load suppliers for vendor dropdown:', err);
+        }
+    }
+
+    // Sync vendor manual and select
+    vendorSelect.addEventListener('change', function() {
+        if (this.value) {
+            vendorManual.value = this.value;
+        } else {
+            vendorManual.value = '';
+        }
+    });
+
+    vendorManual.addEventListener('input', function() {
+        // If the user types, clear the select to avoid confusion
+        if (this.value) {
+            vendorSelect.value = '';
+        }
     });
 
     // ==================== Bulk Actions ====================
@@ -893,7 +950,9 @@
     function generateInvoiceHTML(invoiceData = null) {
         // If invoiceData is provided, use it (for viewing saved invoices), else use current form data
         let invNum, date, customer, email, notes, branch, items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier;
+        let vendor = '';
         let ackData = null;
+        let company = companyName; // default
 
         if (invoiceData) {
             // Use saved invoice data
@@ -905,6 +964,7 @@
             notes = d.notes || '';
             branch = d.branch || 'N/A';
             multiplier = d.transportMultiplier || 1.00;
+            vendor = d.vendor || '';
             // Recalculate totals from items
             let sub = 0, tDisc = 0, tVAT = 0, tWHT = 0, grand = 0;
             const itemsArr = [];
@@ -942,7 +1002,6 @@
             totalVAT = tVAT;
             totalWHT = tWHT;
             grandTotal = grand;
-            // Acknowledgment data
             if (d.acknowledged) {
                 ackData = {
                     acknowledged: true,
@@ -959,6 +1018,7 @@
             email = document.getElementById('customerEmail').value.trim() || 'N/A';
             notes = document.getElementById('invoiceNotes').value.trim() || '';
             branch = document.getElementById('invoiceBranch').value;
+            vendor = vendorManual.value.trim() || vendorSelect.value || '';
             const calc = calculateItemTotals();
             items = calc.items;
             subtotal = calc.subtotal;
@@ -967,7 +1027,7 @@
             totalWHT = calc.totalWHT;
             grandTotal = calc.grandTotal;
             multiplier = calc.multiplier;
-            ackData = null; // no acknowledgment for new invoice
+            ackData = null;
         }
 
         if (items.length === 0) return '<p style="color:red;">Add at least one item.</p>';
@@ -995,7 +1055,6 @@
             <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
         `;
 
-        // Acknowledgment footnote
         let ackFootnote = '';
         if (ackData && ackData.acknowledged) {
             const name = ackData.ackSignature || ackData.acknowledgedBy || 'GRO';
@@ -1010,7 +1069,6 @@
             `;
         }
 
-        // Build inline styles for the table to ensure borders appear
         const styleBlock = `
             <style>
                 .invoice-table {
@@ -1085,7 +1143,7 @@
         const html = `
             ${styleBlock}
             <div class="invoice-header">
-                <h2>NEVAMAK Enterprises</h2>
+                <h2>${escapeHtml(company)}</h2>
                 <h3>Invoice</h3>
             </div>
             <div class="invoice-details">
@@ -1093,6 +1151,7 @@
                     <p><span class="label">Invoice #:</span> ${escapeHtml(invNum)}</p>
                     <p><span class="label">Date:</span> ${escapeHtml(date)}</p>
                     <p><span class="label">Branch:</span> ${escapeHtml(branch)}</p>
+                    ${vendor ? `<p><span class="label">Vendor:</span> ${escapeHtml(vendor)}</p>` : ''}
                 </div>
                 <div style="flex:1;">
                     <p><span class="label">Customer:</span> ${escapeHtml(customer)}</p>
@@ -1147,6 +1206,7 @@
             const notes = document.getElementById('invoiceNotes').value.trim();
             const branch = document.getElementById('invoiceBranch').value;
             const multiplier = validateNumber(transportMultiplier.value, 0.01) || 1.00;
+            const vendor = vendorManual.value.trim() || vendorSelect.value || '';
             const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
 
             if (items.length === 0) {
@@ -1196,6 +1256,7 @@
                 customerEmail: email || '',
                 notes: notes,
                 branch: branch,
+                vendor: vendor,
                 items: savedItems,
                 transportMultiplier: multiplier,
                 subtotal: subtotal,
@@ -1204,7 +1265,7 @@
                 totalWHT: totalWHT,
                 total: grandTotal,
                 movedToWarehouse: false,
-                acknowledged: false, // default
+                acknowledged: false,
                 createdBy: currentUserEmail,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1217,6 +1278,8 @@
             itemRowCounter = 0;
             addItemRow();
             transportMultiplier.value = '1.00';
+            vendorManual.value = '';
+            vendorSelect.value = '';
             updateCostPreview();
             document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
             document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
@@ -1249,13 +1312,28 @@
             tempDiv.style.fontFamily = 'sans-serif';
             tempDiv.style.background = 'white';
             document.body.appendChild(tempDiv);
+            // Render to canvas and create multi-page PDF
             const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true });
             const imgData = canvas.toDataURL('image/png');
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF('p', 'mm', 'a4');
             const imgWidth = 190;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            const pageHeight = 277; // A4 height in mm
+            let heightLeft = imgHeight;
+            let position = 10;
+
+            // First page
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight + 10; // move up
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
             pdf.save(`Invoice_${document.getElementById('invoiceNumber').value}.pdf`);
             showToast('✅ PDF generated successfully!', 'success');
         } catch (err) {
@@ -1338,7 +1416,7 @@
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
                 } else {
-                    html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Customer</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+                    html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Customer</th><th>Vendor</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
                     snap.forEach(doc => {
                         const d = doc.data();
                         const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
@@ -1348,6 +1426,7 @@
                         else {
                             if ((d.invoiceNumber || '').toLowerCase().includes(search)) match = true;
                             if (!match && (d.customer || '').toLowerCase().includes(search)) match = true;
+                            if (!match && (d.vendor || '').toLowerCase().includes(search)) match = true;
                             if (!match && d.items && d.items.length > 0) {
                                 for (const item of d.items) {
                                     if (item.itemName && item.itemName.toLowerCase().includes(search)) {
@@ -1365,6 +1444,7 @@
                             <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                             <td>${escapeHtml(d.date || '')}</td>
                             <td>${escapeHtml(d.customer || 'N/A')}</td>
+                            <td>${escapeHtml(d.vendor || '')}</td>
                             <td>${escapeHtml(d.branch || 'N/A')}</td>
                             <td class="items-cell">${escapeHtml(itemsShort)}</td>
                             <td class="cost-cell">₦${total.toLocaleString()}</td>
@@ -1397,13 +1477,12 @@
     refreshBtn.addEventListener('click', loadInvoices);
     searchInvoices.addEventListener('input', loadInvoices);
 
-    // ==================== View Invoice (with inline styles) ====================
+    // ==================== View Invoice ====================
     window.viewInvoice = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             const d = doc.data();
-            // Use generateInvoiceHTML with the data
             const html = generateInvoiceHTML(d);
             const win = window.open('', '_blank', 'width=1000,height=700');
             if (win) {
@@ -1438,7 +1517,20 @@
             const pdf = new jsPDF('p', 'mm', 'a4');
             const imgWidth = 190;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            const pageHeight = 277;
+            let heightLeft = imgHeight;
+            let position = 10;
+
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight + 10;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
             pdf.save(`Invoice_${d.invoiceNumber}.pdf`);
             document.body.removeChild(tempDiv);
             showToast('✅ PDF downloaded!', 'success');
@@ -1488,7 +1580,6 @@
             rows.push(['Total VAT','','','','','','','',totalVAT]);
             rows.push(['Total WHT','','','','','','','',totalWHT]);
             rows.push(['Grand Total','','','','','','','',d.total || grandTotal]);
-            // Acknowledgment info
             const ackStatus = d.acknowledged ? 'Yes' : 'No';
             const ackBy = d.acknowledgedBy || '';
             const ackSig = d.ackSignature || '';
@@ -1523,7 +1614,41 @@
         }
     };
 
-    // ==================== Acknowledgment Login Flow (Secondary App) ====================
+    // ==================== Settings Modal ====================
+    window.openSettingsModal = function() {
+        document.getElementById('companyNameInput').value = companyName;
+        document.getElementById('settingsMessage').textContent = '';
+        document.getElementById('settingsModal').style.display = 'flex';
+    };
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', async function() {
+        const newName = document.getElementById('companyNameInput').value.trim();
+        if (!newName) {
+            document.getElementById('settingsMessage').textContent = 'Company name cannot be empty.';
+            document.getElementById('settingsMessage').style.color = 'red';
+            return;
+        }
+        const btn = this;
+        setButtonLoading(btn, true);
+        try {
+            await db.collection('users').doc(currentUser.uid).update({
+                companyName: newName
+            });
+            companyName = newName;
+            document.getElementById('settingsMessage').textContent = '✅ Settings saved successfully!';
+            document.getElementById('settingsMessage').style.color = 'green';
+            showToast('Company name updated.', 'success');
+            setTimeout(() => closeModal('settingsModal'), 1500);
+        } catch (err) {
+            document.getElementById('settingsMessage').textContent = 'Error: ' + err.message;
+            document.getElementById('settingsMessage').style.color = 'red';
+            showToast('Error saving settings: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+
+    // ==================== Acknowledgment Login Flow ====================
     let ackLoginTargetId = null;
 
     window.openAckLoginModal = async function(id) {
@@ -1539,7 +1664,6 @@
             document.getElementById('ackLoginInvoiceNumber').textContent = d.invoiceNumber;
             document.getElementById('ackLoginCustomer').textContent = d.customer || 'N/A';
             document.getElementById('ackLoginTotal').textContent = (d.total || 0).toLocaleString();
-            // Reset modal
             document.getElementById('ackLoginStep1').style.display = 'block';
             document.getElementById('ackLoginStep2').style.display = 'none';
             document.getElementById('ackCurrentPassword').value = '';
@@ -1567,12 +1691,8 @@
         document.getElementById('ackStep1Message').textContent = '';
 
         try {
-            // Re-authenticate the current user
             const credential = firebase.auth.EmailAuthProvider.credential(currentUserEmail, currentPassword);
             await currentUser.reauthenticateWithCredential(credential);
-            // Store the password for later re-login (not actually needed with secondary app approach, but kept for security)
-            originalUserPassword = currentPassword;
-            // Move to step 2
             document.getElementById('ackLoginStep1').style.display = 'none';
             document.getElementById('ackLoginStep2').style.display = 'block';
             document.getElementById('ackStep1Message').textContent = '';
@@ -1613,19 +1733,16 @@
         document.getElementById('ackStep2Message').textContent = '';
 
         try {
-            // Step 1: Create or get secondary app
             if (!secondaryApp) {
                 secondaryApp = firebase.initializeApp(firebaseConfig, 'secondaryApp');
             }
             const secondaryAuth = secondaryApp.auth();
             const secondaryDb = secondaryApp.firestore();
 
-            // Sign in as officer on secondary app
             await secondaryAuth.signInWithEmailAndPassword(officerEmail, officerPassword);
             const officerUser = secondaryAuth.currentUser;
             if (!officerUser) throw new Error('Failed to sign in as officer.');
 
-            // Perform acknowledgment update using secondary Firestore
             const docRef = secondaryDb.collection('invoices').doc(ackLoginTargetId);
             const doc = await docRef.get();
             if (!doc.exists) throw new Error('Invoice not found.');
@@ -1646,23 +1763,18 @@
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Sign out the officer from secondary app
             await secondaryAuth.signOut();
 
-            // Original user remains logged in (no change)
-
-            // Update UI
             document.getElementById('ackFinalMessage').style.display = 'block';
             document.getElementById('ackFinalMessage').textContent = '✅ Invoice acknowledged successfully!';
             document.getElementById('ackStep2Message').textContent = '';
             showToast('✅ Invoice acknowledged!', 'success');
             closeModal('ackLoginModal');
-            loadInvoices(); // refresh list
+            loadInvoices();
         } catch (err) {
             console.error('Acknowledgment error:', err);
             document.getElementById('ackStep2Message').textContent = 'Error: ' + err.message;
             showToast('Error: ' + err.message, 'error');
-            // Ensure secondary app is signed out if any
             if (secondaryApp) {
                 try {
                     await secondaryApp.auth().signOut();
@@ -1690,7 +1802,6 @@
         }
     };
 
-    // New function to open the dedicated share.html page
     window.openSharePage = function() {
         if (!sendInvoiceId) {
             document.getElementById('sendMessage').textContent = 'No invoice selected.';
@@ -1706,9 +1817,8 @@
             return;
         }
         const recipient = sendInvoiceData.customerEmail || '';
-        const subject = `Invoice ${sendInvoiceData.invoiceNumber} from NEVAMAK Enterprises`;
+        const subject = `Invoice ${sendInvoiceData.invoiceNumber} from ${companyName}`;
         const emailDomain = 'nevamakenterprises.net';
-        
         let emailAddress = recipient;
         if (!emailAddress || emailAddress === '') {
             emailAddress = `info@${emailDomain}`;
@@ -1728,10 +1838,11 @@
             `Invoice Details:\n` +
             `- Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `- Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `- Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
             `${itemsList ? 'Items:\n' + itemsList : ''}\n\n` +
             `Thank you for your business.\n\n` +
             `Best regards,\n` +
-            `NEVAMAK Enterprises\n` +
+            `${companyName}\n` +
             `📧 info@nevamakenterprises.net`;
 
         const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailAddress)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1759,8 +1870,9 @@
             `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
             `📦 Items: ${(sendInvoiceData.items || []).length} item(s)\n\n` +
-            `Please review this invoice. For any questions, contact NEVAMAK Enterprises.\n` +
+            `Please review this invoice. For any questions, contact ${companyName}.\n` +
             `📧 ${chatRecipient}`;
 
         const chatUrl = `https://mail.google.com/chat/?to=${encodeURIComponent(chatRecipient)}&body=${encodeURIComponent(message)}`;
@@ -1774,14 +1886,15 @@
             document.getElementById('sendMessage').textContent = 'No invoice selected.';
             return;
         }
-        const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}* from NEVAMAK Enterprises\n\n` +
+        const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}* from ${companyName}\n\n` +
             `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
             `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
             `📦 Items: ${(sendInvoiceData.items || []).length} item(s)\n\n` +
             `Please review this invoice. Thank you for your business!\n` +
-            `NEVAMAK Enterprises`;
+            `${companyName}`;
 
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         const whatsappUrl = isMobile 
@@ -2192,7 +2305,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with two-step acknowledgment login (secondary app).');
+    console.log('NEVAMAK Invoice Repository loaded with company branding and vendor selection.');
 </script>
 </body>
 </html>
