@@ -575,7 +575,7 @@
     let approveTargetId = null;
     let approveItemRowCounter = 0;
     let reconcileTargetId = null;
-    let reconcileData = null; // store claim data
+    let reconcileData = null;
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -2247,9 +2247,16 @@
                 const priceInput = row.querySelector('.reconcile-unit-price');
                 const itemName = row.cells[0] ? row.cells[0].textContent.trim() : '';
                 const ordered = parseFloat(row.cells[1] ? row.cells[1].textContent : 0) || 0;
-                const received = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
-                const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
-                if (itemName && received > 0) {
+                let received = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+                let price = parseFloat(priceInput ? priceInput.value : 0) || 0;
+                // If price is 0, fallback to the original unit price from the claim data
+                if (price === 0 && claimData.receivedItems) {
+                    const originalItem = claimData.receivedItems.find(it => it.itemName === itemName);
+                    if (originalItem) {
+                        price = originalItem.unitPrice || 0;
+                    }
+                }
+                if (itemName && received > 0 && price > 0) {
                     receivedItems.push({
                         itemName: itemName,
                         orderedQty: ordered,
@@ -2261,7 +2268,7 @@
             });
 
             if (receivedItems.length === 0) {
-                throw new Error('No items with received quantity > 0.');
+                throw new Error('No items with valid received quantity and unit price > 0.');
             }
 
             // Get invoice notes
@@ -2285,6 +2292,9 @@
             }));
 
             const newTotal = newItems.reduce((sum, it) => sum + it.total, 0);
+            if (newTotal === 0) {
+                throw new Error('Invoice total is zero. Please check item quantities and prices.');
+            }
             const newInvNum = claimData.invoiceNumber + '-REC-' + Date.now().toString(36).toUpperCase();
 
             // Get original invoice
