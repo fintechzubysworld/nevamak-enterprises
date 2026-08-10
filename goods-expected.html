@@ -34,6 +34,9 @@
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 800px; width: 95%; max-height: 80vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.5rem; }
+        .error-message { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 8px; border: 1px solid #f5c6cb; margin: 12px 0; }
+        .permission-hint { background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; border: 1px solid #ffc107; margin: 12px 0; }
+        .permission-hint code { background: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -51,6 +54,7 @@
             <input type="text" id="searchReceived" placeholder="🔍 Search by invoice # or customer..." style="flex:1; padding:8px; border-radius:40px; border:1px solid #ccc;">
             <button id="refreshBtn" class="btn-primary">🔄 Refresh</button>
         </div>
+        <div id="statusMessage"></div>
         <div class="scroll" id="receivedList"><div class="loading-spinner"></div> Loading...</div>
     </div>
 </div>
@@ -66,7 +70,11 @@
         measurementId: "G-MZ8NT6KK8N"
     };
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
+
+    let currentUser = null;
+    let receivedUnsubscribe = null;
 
     function escapeHtml(text) {
         if (!text) return '';
@@ -85,9 +93,32 @@
         toast._hideTimer = setTimeout(() => toast.classList.remove('show'), 3000);
     }
 
-    let receivedUnsubscribe = null;
+    function setStatus(message, type = 'info') {
+        const el = document.getElementById('statusMessage');
+        if (type === 'error') {
+            el.innerHTML = `<div class="error-message">${escapeHtml(message)}</div>`;
+        } else if (type === 'warning') {
+            el.innerHTML = `<div class="permission-hint">${escapeHtml(message)}</div>`;
+        } else {
+            el.innerHTML = '';
+        }
+    }
+
+    auth.onAuthStateChanged(user => {
+        if (!user) {
+            // Redirect to login
+            window.location.href = 'login.html';
+            return;
+        }
+        currentUser = user;
+        loadReceived();
+    });
 
     function loadReceived() {
+        if (!currentUser) {
+            document.getElementById('receivedList').innerHTML = '<p>Please log in.</p>';
+            return;
+        }
         const search = document.getElementById('searchReceived').value.toLowerCase().trim();
         if (receivedUnsubscribe) {
             receivedUnsubscribe();
@@ -95,6 +126,8 @@
         }
         const list = document.getElementById('receivedList');
         list.innerHTML = '<div class="loading-spinner"></div> Loading...';
+        setStatus('');
+
         receivedUnsubscribe = db.collection('goodsReceived')
             .orderBy('receivedAt', 'desc')
             .onSnapshot(snap => {
@@ -127,9 +160,15 @@
                     html += '</table>';
                 }
                 list.innerHTML = html;
+                setStatus('');
             }, err => {
                 console.error('Error loading goods received:', err);
-                list.innerHTML = '<p style="color:red;">Error loading data: ' + escapeHtml(err.message) + '</p>';
+                if (err.code === 'permission-denied') {
+                    setStatus('⚠️ You do not have permission to view goods received claims. Please contact your administrator to grant access to the "goodsReceived" collection. Firebase security rules must allow read access for authenticated users.', 'warning');
+                } else {
+                    setStatus('Error loading data: ' + err.message, 'error');
+                }
+                list.innerHTML = '';
                 showToast('Error loading data', 'error');
             });
     }
@@ -183,7 +222,8 @@
 
     document.getElementById('refreshBtn').addEventListener('click', loadReceived);
     document.getElementById('searchReceived').addEventListener('input', loadReceived);
-    loadReceived();
+
+    // Initial load triggered by auth state
 </script>
 </body>
 </html>
