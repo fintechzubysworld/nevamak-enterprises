@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>NEVAMAK – Goods Expected</title>
+    <title>NEVAMAK – Goods Expected (Shortages)</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -20,7 +20,7 @@
         th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.85rem; word-wrap: break-word; }
         th { background: #f8f9fa; }
         .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
-        .received-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
+        .shortage-badge { background: #e74c3c; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; }
         .scroll { overflow-x: auto; }
         .loading-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 8px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -36,20 +36,22 @@
         .close { float: right; cursor: pointer; font-size: 1.5rem; }
         .error-message { background: #f8d7da; color: #721c24; padding: 12px; border-radius: 8px; border: 1px solid #f5c6cb; margin: 12px 0; }
         .permission-hint { background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; border: 1px solid #ffc107; margin: 12px 0; }
-        .permission-hint code { background: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
+        .shortage-highlight { color: #c0392b; font-weight: bold; }
+        .shortage-table th { background: #fde8e8; }
+        .claim-summary { background: #f8f9fa; padding: 8px 12px; border-radius: 8px; margin: 8px 0; }
     </style>
 </head>
 <body>
 <div id="toast" class="toast"></div>
 <div class="container">
     <header>
-        <h1>📦 Goods Expected / Received</h1>
+        <h1>📦 Goods Expected (Shortages)</h1>
         <div class="nav-links">
             <a href="index.html">🏠 Back to Repository</a>
         </div>
     </header>
     <div class="card">
-        <h2>All Goods Received Claims</h2>
+        <h2>All Goods Received Claims – Showing Only Short Items</h2>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
             <input type="text" id="searchReceived" placeholder="🔍 Search by invoice # or customer..." style="flex:1; padding:8px; border-radius:40px; border:1px solid #ccc;">
             <button id="refreshBtn" class="btn-primary">🔄 Refresh</button>
@@ -106,7 +108,6 @@
 
     auth.onAuthStateChanged(user => {
         if (!user) {
-            // Redirect to login
             window.location.href = 'login.html';
             return;
         }
@@ -135,9 +136,31 @@
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No goods received claims.</p>';
                 } else {
-                    html = '<table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Actions</th></tr>';
+                    html = '<table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Short Items</th><th>Total Shortage</th><th>Actions</th></tr>';
                     snap.forEach(doc => {
                         const d = doc.data();
+                        // Filter items with shortage (receivedQty < orderedQty)
+                        let shortItems = [];
+                        let totalShortage = 0;
+                        if (d.receivedItems) {
+                            d.receivedItems.forEach(item => {
+                                const shortage = item.orderedQty - item.receivedQty;
+                                if (shortage > 0) {
+                                    shortItems.push({
+                                        itemName: item.itemName,
+                                        orderedQty: item.orderedQty,
+                                        receivedQty: item.receivedQty,
+                                        shortage: shortage,
+                                        unitPrice: item.unitPrice || 0,
+                                        shortageValue: shortage * (item.unitPrice || 0)
+                                    });
+                                    totalShortage += shortage * (item.unitPrice || 0);
+                                }
+                            });
+                        }
+                        // If no shortages, skip this claim
+                        if (shortItems.length === 0) return;
+
                         let match = false;
                         if (search === '') match = true;
                         else {
@@ -145,7 +168,7 @@
                             if (!match && (d.customer || '').toLowerCase().includes(search)) match = true;
                         }
                         if (!match) return;
-                        const itemsCount = d.receivedItems ? d.receivedItems.filter(i => i.receivedQty > 0).length : 0;
+
                         const date = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
                         html += `<tr>
                             <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
@@ -153,7 +176,8 @@
                             <td>${escapeHtml(d.branch || 'N/A')}</td>
                             <td>${escapeHtml(d.receivingOfficer || '')}</td>
                             <td>${date}</td>
-                            <td>${itemsCount} item(s)</td>
+                            <td><span class="shortage-badge">${shortItems.length} item(s)</span></td>
+                            <td><span class="shortage-highlight">₦${totalShortage.toLocaleString()}</span></td>
                             <td><button class="btn-sm btn-primary" onclick="viewClaim('${doc.id}')">👁️ View</button></td>
                         </tr>`;
                     });
@@ -164,7 +188,7 @@
             }, err => {
                 console.error('Error loading goods received:', err);
                 if (err.code === 'permission-denied') {
-                    setStatus('⚠️ You do not have permission to view goods received claims. Please contact your administrator to grant access to the "goodsReceived" collection. Firebase security rules must allow read access for authenticated users.', 'warning');
+                    setStatus('⚠️ You do not have permission to view goods received claims. Please contact your administrator to grant access to the "goodsReceived" collection.', 'warning');
                 } else {
                     setStatus('Error loading data: ' + err.message, 'error');
                 }
@@ -178,23 +202,52 @@
             const doc = await db.collection('goodsReceived').doc(id).get();
             if (!doc.exists) { showToast('Claim not found.', 'error'); return; }
             const d = doc.data();
-            let itemsHtml = '<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;"><tr><th>Item</th><th>Ordered</th><th>Received</th><th>Unit Price</th><th>Total</th></tr>';
+
+            // Build shortage items table
+            let shortItems = [];
+            let totalShortage = 0;
             if (d.receivedItems) {
-                d.receivedItems.forEach(it => {
+                d.receivedItems.forEach(item => {
+                    const shortage = item.orderedQty - item.receivedQty;
+                    if (shortage > 0) {
+                        shortItems.push({
+                            itemName: item.itemName,
+                            orderedQty: item.orderedQty,
+                            receivedQty: item.receivedQty,
+                            shortage: shortage,
+                            unitPrice: item.unitPrice || 0,
+                            shortageValue: shortage * (item.unitPrice || 0)
+                        });
+                        totalShortage += shortage * (item.unitPrice || 0);
+                    }
+                });
+            }
+
+            let itemsHtml = '';
+            if (shortItems.length === 0) {
+                itemsHtml = '<p>No shortages – all items received in full.</p>';
+            } else {
+                itemsHtml = '<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;"><tr style="background:#fde8e8;"><th>Item</th><th>Ordered</th><th>Received</th><th>Shortage</th><th>Unit Price</th><th>Shortage Value</th></tr>';
+                shortItems.forEach(it => {
                     itemsHtml += `<tr>
                         <td>${escapeHtml(it.itemName)}</td>
                         <td>${it.orderedQty}</td>
                         <td>${it.receivedQty}</td>
+                        <td><span class="shortage-highlight">${it.shortage}</span></td>
                         <td>₦${(it.unitPrice||0).toFixed(2)}</td>
-                        <td>₦${(it.total||0).toFixed(2)}</td>
+                        <td>₦${(it.shortageValue||0).toFixed(2)}</td>
                     </tr>`;
                 });
+                itemsHtml += `<tr style="font-weight:bold; background:#fcf8e8;">
+                    <td colspan="5">Total Shortage Value</td>
+                    <td>₦${totalShortage.toFixed(2)}</td>
+                </tr>`;
+                itemsHtml += '</table>';
             }
-            itemsHtml += '</table>';
-            const totalReceived = d.receivedItems ? d.receivedItems.reduce((sum, i) => sum + (i.total || 0), 0) : 0;
+
             const html = `
                 <div style="padding:20px;">
-                    <h3>Goods Received Claim</h3>
+                    <h3>Goods Received Claim – Shortages</h3>
                     <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
                     <p><strong>Customer:</strong> ${escapeHtml(d.customer)}</p>
                     <p><strong>Branch:</strong> ${escapeHtml(d.branch)}</p>
@@ -203,8 +256,7 @@
                     <p><strong>Signature:</strong> ${escapeHtml(d.officerSignature)}</p>
                     <p><strong>Date:</strong> ${d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : ''}</p>
                     ${d.receivedNotes ? `<p><strong>Notes:</strong> ${escapeHtml(d.receivedNotes)}</p>` : ''}
-                    <p><strong>Total Received Value:</strong> ₦${totalReceived.toLocaleString()}</p>
-                    <h4>Items</h4>
+                    <h4>Short Items (Received < Ordered)</h4>
                     ${itemsHtml}
                 </div>
             `;
@@ -222,8 +274,6 @@
 
     document.getElementById('refreshBtn').addEventListener('click', loadReceived);
     document.getElementById('searchReceived').addEventListener('input', loadReceived);
-
-    // Initial load triggered by auth state
 </script>
 </body>
 </html>
