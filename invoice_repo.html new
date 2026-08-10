@@ -12,14 +12,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
     <style>
-        /* Styles for main page – not used in generated invoice, but keep for consistency */
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
         .container { max-width: 1100px; margin: auto; }
         header { background: #0a3d62; color: white; padding: 12px 16px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
         header h1 { margin: 0; font-size: 1.4rem; }
         .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
-        .nav-links a, .logout-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .nav-links a, .logout-btn, .settings-btn { background: #3c6382; color: white; text-decoration: none; padding: 6px 14px; border-radius: 40px; font-size: 0.85rem; border: none; cursor: pointer; }
+        .settings-btn { background: #5f7d9c; }
         .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
         .tab-btn { background: #ccc; color: #333; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; }
         .tab-btn.active { background: #0a3d62; color: white; }
@@ -48,12 +48,13 @@
         th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.85rem; word-wrap: break-word; }
         th { background: #f8f9fa; }
         .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .ack-badge { background: #2e86de; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .received-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .scroll { overflow-x: auto; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 1000px; width: 95%; max-height: 90vh; overflow-y: auto; }
         .close { float: right; cursor: pointer; font-size: 1.8rem; }
         .invoice-preview { border: 1px solid #ddd; padding: 16px; background: white; border-radius: 16px; margin-top: 12px; }
-        /* Invoice table styles – these are for the preview inside the same page */
         .invoice-table {
             width: 100%;
             border-collapse: collapse !important;
@@ -113,6 +114,13 @@
         .invoice-details .label {
             font-weight: 600;
         }
+        .ack-footnote {
+            font-size: 0.85rem;
+            color: #555;
+            margin-top: 8px;
+            border-top: 1px solid #ddd;
+            padding-top: 8px;
+        }
         @media print {
             .invoice-table th { background-color: #0a3d62 !important; color: white !important; }
             .invoice-table td { border-color: #000 !important; }
@@ -137,7 +145,14 @@
         .toast.show { opacity: 1; }
         .toast.success { background: #27ae60; }
         .toast.error { background: #e74c3c; }
-        @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } }
+        .ack-signature { border: 1px solid #ccc; padding: 12px; border-radius: 16px; background: #f9f9f9; margin: 12px 0; }
+        .ack-signature textarea { width: 100%; border-radius: 12px; padding: 8px; border: 1px solid #ccc; }
+        .ack-login-step { border-left: 4px solid #3498db; padding-left: 16px; margin: 12px 0; }
+        .vendor-field { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .vendor-field input, .vendor-field select { flex: 1; }
+        .received-items-table input { width: 60px; padding: 4px; border-radius: 20px; border: 1px solid #ccc; text-align: center; }
+        .received-items-table td { vertical-align: middle; }
+        @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } .vendor-field { flex-direction: column; } }
     </style>
 </head>
 <body>
@@ -152,6 +167,8 @@
             <a href="reports.html">📊 Reports</a>
             <a href="warehouse.html">🏚️ Warehouse</a>
             <a href="permissions.html">🔐 Permissions</a>
+            <a href="goods-expected.html">📦 Goods Expected</a>
+            <button class="settings-btn" onclick="openSettingsModal()">⚙️ Settings</button>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
     </header>
@@ -161,6 +178,7 @@
         <button class="tab-btn active" data-tab="create">✏️ Create Invoice</button>
         <button class="tab-btn" data-tab="list">📋 Saved Invoices</button>
         <button class="tab-btn" data-tab="shared">📨 Shared with Me</button>
+        <button class="tab-btn" data-tab="goodsreceived">📦 Goods Received</button>
     </div>
 
     <!-- Create Invoice Tab -->
@@ -175,6 +193,13 @@
                 <div class="flex-row">
                     <input type="text" id="customerName" placeholder="Customer / Recipient" required>
                     <input type="email" id="customerEmail" placeholder="Customer Email">
+                </div>
+                <div class="flex-row vendor-field">
+                    <label style="font-weight:600; flex:0 0 auto;">Vendor:</label>
+                    <input type="text" id="vendorManual" placeholder="Type vendor name" style="flex:1;">
+                    <select id="vendorSelect" style="flex:1;">
+                        <option value="">-- Select from list --</option>
+                    </select>
                 </div>
                 <div class="flex-row">
                     <select id="invoiceBranch" required>
@@ -238,6 +263,33 @@
             <h2>📨 Invoices Shared with Me</h2>
             <div id="sharedList">Loading...</div>
         </div>
+    </div>
+
+    <!-- Goods Received Tab -->
+    <div id="tab-goodsreceived" class="tab-content">
+        <div class="card">
+            <h2>📦 Goods Received (Claims)</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <input type="text" id="searchReceived" placeholder="🔍 Search by invoice # or customer..." style="flex:1;">
+                <button id="refreshReceivedBtn" class="btn-primary">🔄 Refresh</button>
+            </div>
+            <div class="scroll" id="receivedList"><div class="loading-spinner"></div> Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('settingsModal')">&times;</span>
+        <h3>⚙️ Settings</h3>
+        <div style="margin:16px 0;">
+            <label><strong>Company Name (Invoice Heading)</strong></label>
+            <input type="text" id="companyNameInput" placeholder="e.g., Chizzy Electronics" style="width:100%;">
+            <p style="font-size:0.8rem; color:#888;">This name will appear on all invoices, previews, and PDFs.</p>
+        </div>
+        <button id="saveSettingsBtn" class="btn-primary">💾 Save Settings</button>
+        <div id="settingsMessage" style="color:green; margin-top:8px;"></div>
     </div>
 </div>
 
@@ -335,6 +387,57 @@
     </div>
 </div>
 
+<!-- Acknowledgment Login Modal (two-step) with Received Items modification -->
+<div id="ackLoginModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('ackLoginModal')">&times;</span>
+        <h3>✅ Invoice Acknowledgment – Login Required</h3>
+        <p><strong>Invoice #:</strong> <span id="ackLoginInvoiceNumber"></span></p>
+        <p><strong>Customer:</strong> <span id="ackLoginCustomer"></span></p>
+        <p><strong>Total:</strong> ₦<span id="ackLoginTotal"></span></p>
+        <hr />
+        <div id="ackLoginStep1">
+            <div class="ack-login-step">
+                <label><strong>Step 1 – Confirm your identity</strong></label>
+                <p style="font-size:0.9rem; color:#555;">Enter your current password to proceed.</p>
+                <input type="password" id="ackCurrentPassword" placeholder="Your current password" style="width:100%;">
+            </div>
+            <button id="ackStep1Btn" class="btn-primary" style="width:100%;">Next</button>
+            <div id="ackStep1Message" style="color:red; margin-top:8px;"></div>
+        </div>
+        <div id="ackLoginStep2" style="display:none;">
+            <div class="ack-login-step">
+                <label><strong>Step 2 – Login as the receiving officer</strong></label>
+                <p style="font-size:0.9rem; color:#555;">Enter the credentials of the person receiving the goods.</p>
+                <input type="email" id="ackOfficerEmail" placeholder="Officer's email" style="width:100%;">
+                <input type="password" id="ackOfficerPassword" placeholder="Officer's password" style="width:100%;">
+                <div style="margin-top:12px;">
+                    <label><strong>Signature (Name & Title)</strong></label>
+                    <textarea id="ackOfficerSignature" rows="2" placeholder="e.g., 'Jane Smith, GRO'" style="width:100%;"></textarea>
+                </div>
+                <div style="margin-top:8px;">
+                    <label><input type="checkbox" id="ackOfficerConfirmCheck" /> I confirm the receipt of goods as per the details below.</label>
+                </div>
+                <div style="margin-top:16px; border-top:1px solid #ddd; padding-top:12px;">
+                    <label><strong>📦 Actual Items Received</strong></label>
+                    <p style="font-size:0.85rem; color:#555;">Adjust the quantities received. Leave 0 for items not received.</p>
+                    <div id="receivedItemsContainer" class="scroll"></div>
+                    <div style="margin-top:8px;">
+                        <label><strong>Receiving Notes</strong></label>
+                        <textarea id="receivedNotes" rows="2" placeholder="Any remarks about the delivery" style="width:100%;"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px;">
+                <button id="ackStep2ConfirmBtn" class="btn-success" style="flex:2;">✅ Confirm Receipt</button>
+                <button onclick="closeModal('ackLoginModal')" class="btn-danger" style="flex:1;">Cancel</button>
+            </div>
+            <div id="ackStep2Message" style="color:red; margin-top:8px;"></div>
+        </div>
+        <div id="ackFinalMessage" style="color:green; margin-top:8px; display:none; font-weight:bold;"></div>
+    </div>
+</div>
+
 <script>
     // ==================== Firebase Config ====================
     const firebaseConfig = {
@@ -355,15 +458,20 @@
     let currentUser = null;
     let currentUserRole = '';
     let currentUserEmail = '';
+    let companyName = 'NEVAMAK Enterprises';
     let sendInvoiceId = null;
     let sendInvoiceData = null;
     let shareInvoiceId = null;
     let importedItems = [];
     let moveInvoiceId = null;
+    let ackLoginTargetId = null;
     let invoicesUnsubscribe = null;
     let sharedUnsubscribe = null;
+    let receivedUnsubscribe = null;
     let suppliers = [];
     let itemRowCounter = 0;
+    let secondaryApp = null;
+    let currentInvoiceData = null; // for received items table
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -375,13 +483,18 @@
     const formMessage = document.getElementById('formMessage');
     const invoicesList = document.getElementById('invoicesList');
     const sharedList = document.getElementById('sharedList');
+    const receivedList = document.getElementById('receivedList');
     const searchInvoices = document.getElementById('searchInvoices');
+    const searchReceived = document.getElementById('searchReceived');
     const refreshBtn = document.getElementById('refreshInvoicesBtn');
+    const refreshReceivedBtn = document.getElementById('refreshReceivedBtn');
     const importPreviewContainer = document.getElementById('importPreviewContainer');
     const invoiceBranch = document.getElementById('invoiceBranch');
     const moveBranchSelect = document.getElementById('moveBranchSelect');
     const transportMultiplier = document.getElementById('transportMultiplier');
     const toast = document.getElementById('toast');
+    const vendorSelect = document.getElementById('vendorSelect');
+    const vendorManual = document.getElementById('vendorManual');
 
     // ==================== Helpers ====================
     function escapeHtml(text) {
@@ -425,10 +538,22 @@
 
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
-        ['sendMessage','moveMessage','bulkMessage','shareMessageResult'].forEach(e => {
+        ['sendMessage','moveMessage','bulkMessage','shareMessageResult','ackStep1Message','ackStep2Message','ackFinalMessage','settingsMessage'].forEach(e => {
             const el = document.getElementById(e);
             if (el) el.textContent = '';
         });
+        if (id === 'ackLoginModal') {
+            document.getElementById('ackLoginStep1').style.display = 'block';
+            document.getElementById('ackLoginStep2').style.display = 'none';
+            document.getElementById('ackCurrentPassword').value = '';
+            document.getElementById('ackOfficerEmail').value = '';
+            document.getElementById('ackOfficerPassword').value = '';
+            document.getElementById('ackOfficerSignature').value = '';
+            document.getElementById('ackOfficerConfirmCheck').checked = false;
+            document.getElementById('ackFinalMessage').style.display = 'none';
+            document.getElementById('receivedItemsContainer').innerHTML = '';
+            document.getElementById('receivedNotes').value = '';
+        }
     }
     window.closeModal = closeModal;
 
@@ -552,6 +677,7 @@
             const userDoc = await db.collection('users').doc(user.uid).get();
             if (userDoc.exists) {
                 currentUserRole = userDoc.data().role || '';
+                companyName = userDoc.data().companyName || 'NEVAMAK Enterprises';
                 if (currentUserRole === 'abuja_rep') {
                     invoiceBranch.value = 'Abuja';
                     invoiceBranch.disabled = true;
@@ -570,6 +696,7 @@
         await loadSuppliers();
         loadInvoices();
         loadSharedInvoices();
+        loadReceivedGoods();
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -577,20 +704,51 @@
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
                 if (btn.dataset.tab === 'shared') loadSharedInvoices();
+                if (btn.dataset.tab === 'goodsreceived') loadReceivedGoods();
             });
         });
         addItemRow();
         updateCostPreview();
         transportMultiplier.addEventListener('input', updateCostPreview);
-        
-        // Add event listener for Add Product button (moved here to ensure it's available)
         addItemBtn.addEventListener('click', function() {
             addItemRow();
         });
+        populateVendorDropdown();
     });
 
     document.getElementById('logoutBtn').addEventListener('click', () => {
         auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    // ==================== Vendor Dropdown ====================
+    async function populateVendorDropdown() {
+        try {
+            const snap = await db.collection('suppliers').orderBy('name').get();
+            vendorSelect.innerHTML = '<option value="">-- Select from list --</option>';
+            snap.forEach(doc => {
+                const s = doc.data();
+                const opt = document.createElement('option');
+                opt.value = s.name;
+                opt.textContent = s.name + (s.contact ? ' (' + s.contact + ')' : '');
+                vendorSelect.appendChild(opt);
+            });
+        } catch (err) {
+            console.warn('Could not load suppliers for vendor dropdown:', err);
+        }
+    }
+
+    vendorSelect.addEventListener('change', function() {
+        if (this.value) {
+            vendorManual.value = this.value;
+        } else {
+            vendorManual.value = '';
+        }
+    });
+
+    vendorManual.addEventListener('input', function() {
+        if (this.value) {
+            vendorSelect.value = '';
+        }
     });
 
     // ==================== Bulk Actions ====================
@@ -821,14 +979,84 @@
         invoicePreviewContainer.style.display = 'block';
     });
 
-    function generateInvoiceHTML() {
-        const invNum = document.getElementById('invoiceNumber').value;
-        const date = document.getElementById('invoiceDate').value;
-        const customer = document.getElementById('customerName').value.trim() || 'N/A';
-        const email = document.getElementById('customerEmail').value.trim() || 'N/A';
-        const notes = document.getElementById('invoiceNotes').value.trim() || '';
-        const branch = document.getElementById('invoiceBranch').value;
-        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
+    function generateInvoiceHTML(invoiceData = null) {
+        let invNum, date, customer, email, notes, branch, items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier;
+        let vendor = '';
+        let ackData = null;
+        let company = companyName;
+
+        if (invoiceData) {
+            const d = invoiceData;
+            invNum = d.invoiceNumber || '';
+            date = d.date || '';
+            customer = d.customer || 'N/A';
+            email = d.customerEmail || 'N/A';
+            notes = d.notes || '';
+            branch = d.branch || 'N/A';
+            multiplier = d.transportMultiplier || 1.00;
+            vendor = d.vendor || '';
+            let sub = 0, tDisc = 0, tVAT = 0, tWHT = 0, grand = 0;
+            const itemsArr = [];
+            if (d.items) {
+                d.items.forEach(it => {
+                    const itemSub = it.subtotal || (it.quantity * (it.updatedPrice || it.unitPrice || 0));
+                    sub += itemSub;
+                    const disc = it.discountTotal || 0;
+                    tDisc += disc;
+                    const vat = it.vat || 0;
+                    tVAT += vat;
+                    const wht = it.wht || 0;
+                    tWHT += wht;
+                    const total = it.total || (itemSub - disc + vat - wht);
+                    grand += total;
+                    itemsArr.push({
+                        name: it.itemName,
+                        qty: it.quantity,
+                        originalPrice: it.originalPrice || it.unitPrice || 0,
+                        updatedPrice: it.updatedPrice || it.unitPrice || 0,
+                        discPct: it.discountPercent || 0,
+                        discAmt: it.discountAmount || 0,
+                        itemDisc: disc,
+                        vatPct: it.vatPercent || 0,
+                        whtPct: it.whtPercent || 0,
+                        itemVAT: vat,
+                        itemWHT: wht,
+                        total: total
+                    });
+                });
+            }
+            items = itemsArr;
+            subtotal = sub;
+            totalDisc = tDisc;
+            totalVAT = tVAT;
+            totalWHT = tWHT;
+            grandTotal = grand;
+            if (d.acknowledged) {
+                ackData = {
+                    acknowledged: true,
+                    acknowledgedBy: d.acknowledgedBy || '',
+                    ackSignature: d.ackSignature || '',
+                    ackTimestamp: d.ackTimestamp ? new Date(d.ackTimestamp.toDate()).toLocaleString() : ''
+                };
+            }
+        } else {
+            invNum = document.getElementById('invoiceNumber').value;
+            date = document.getElementById('invoiceDate').value;
+            customer = document.getElementById('customerName').value.trim() || 'N/A';
+            email = document.getElementById('customerEmail').value.trim() || 'N/A';
+            notes = document.getElementById('invoiceNotes').value.trim() || '';
+            branch = document.getElementById('invoiceBranch').value;
+            vendor = vendorManual.value.trim() || vendorSelect.value || '';
+            const calc = calculateItemTotals();
+            items = calc.items;
+            subtotal = calc.subtotal;
+            totalDisc = calc.totalDisc;
+            totalVAT = calc.totalVAT;
+            totalWHT = calc.totalWHT;
+            grandTotal = calc.grandTotal;
+            multiplier = calc.multiplier;
+            ackData = null;
+        }
 
         if (items.length === 0) return '<p style="color:red;">Add at least one item.</p>';
 
@@ -855,7 +1083,20 @@
             <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
         `;
 
-        // Build inline styles for the table to ensure borders appear
+        let ackFootnote = '';
+        if (ackData && ackData.acknowledged) {
+            const name = ackData.ackSignature || ackData.acknowledgedBy || 'GRO';
+            const email2 = ackData.acknowledgedBy || '';
+            const time = ackData.ackTimestamp || '';
+            ackFootnote = `
+                <div class="ack-footnote">
+                    <strong>✅ Acknowledged by:</strong> ${escapeHtml(name)}
+                    ${email2 ? ` <span style="color:#666; font-size:0.8rem;">(${escapeHtml(email2)})</span>` : ''}
+                    ${time ? ` <span style="color:#666; font-size:0.8rem;">on ${escapeHtml(time)}</span>` : ''}
+                </div>
+            `;
+        }
+
         const styleBlock = `
             <style>
                 .invoice-table {
@@ -917,13 +1158,20 @@
                 .invoice-details .label {
                     font-weight: 600;
                 }
+                .ack-footnote {
+                    font-size: 0.85rem;
+                    color: #555;
+                    margin-top: 8px;
+                    border-top: 1px solid #ddd;
+                    padding-top: 8px;
+                }
             </style>
         `;
 
         const html = `
             ${styleBlock}
             <div class="invoice-header">
-                <h2>NEVAMAK Enterprises</h2>
+                <h2>${escapeHtml(company)}</h2>
                 <h3>Invoice</h3>
             </div>
             <div class="invoice-details">
@@ -931,6 +1179,7 @@
                     <p><span class="label">Invoice #:</span> ${escapeHtml(invNum)}</p>
                     <p><span class="label">Date:</span> ${escapeHtml(date)}</p>
                     <p><span class="label">Branch:</span> ${escapeHtml(branch)}</p>
+                    ${vendor ? `<p><span class="label">Vendor:</span> ${escapeHtml(vendor)}</p>` : ''}
                 </div>
                 <div style="flex:1;">
                     <p><span class="label">Customer:</span> ${escapeHtml(customer)}</p>
@@ -958,6 +1207,7 @@
                 </tbody>
             </table>
             ${notes ? `<p><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ''}
+            ${ackFootnote}
             <p><em>Generated by ${escapeHtml(currentUserEmail)}</em></p>
         `;
         return html;
@@ -984,6 +1234,7 @@
             const notes = document.getElementById('invoiceNotes').value.trim();
             const branch = document.getElementById('invoiceBranch').value;
             const multiplier = validateNumber(transportMultiplier.value, 0.01) || 1.00;
+            const vendor = vendorManual.value.trim() || vendorSelect.value || '';
             const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
 
             if (items.length === 0) {
@@ -998,7 +1249,6 @@
                 return;
             }
 
-            // Check duplicate invoice number
             const existingCheck = await db.collection('invoices')
                 .where('invoiceNumber', '==', invNum)
                 .get();
@@ -1033,6 +1283,7 @@
                 customerEmail: email || '',
                 notes: notes,
                 branch: branch,
+                vendor: vendor,
                 items: savedItems,
                 transportMultiplier: multiplier,
                 subtotal: subtotal,
@@ -1041,6 +1292,7 @@
                 totalWHT: totalWHT,
                 total: grandTotal,
                 movedToWarehouse: false,
+                acknowledged: false,
                 createdBy: currentUserEmail,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1053,6 +1305,8 @@
             itemRowCounter = 0;
             addItemRow();
             transportMultiplier.value = '1.00';
+            vendorManual.value = '';
+            vendorSelect.value = '';
             updateCostPreview();
             document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
             document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
@@ -1091,7 +1345,20 @@
             const pdf = new jsPDF('p', 'mm', 'a4');
             const imgWidth = 190;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            const pageHeight = 277;
+            let heightLeft = imgHeight;
+            let position = 10;
+
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight + 10;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
             pdf.save(`Invoice_${document.getElementById('invoiceNumber').value}.pdf`);
             showToast('✅ PDF generated successfully!', 'success');
         } catch (err) {
@@ -1169,13 +1436,13 @@
 
         invoicesUnsubscribe = db.collection('invoices')
             .orderBy('createdAt', 'desc')
-            .onSnapshot((snap) => {
+            .onSnapshot(async (snap) => {
                 let html = '';
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
                 } else {
-                    html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Customer</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
-                    snap.forEach(doc => {
+                    html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Customer</th><th>Vendor</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+                    for (const doc of snap.docs) {
                         const d = doc.data();
                         const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
                         const total = d.total || 0;
@@ -1184,6 +1451,7 @@
                         else {
                             if ((d.invoiceNumber || '').toLowerCase().includes(search)) match = true;
                             if (!match && (d.customer || '').toLowerCase().includes(search)) match = true;
+                            if (!match && (d.vendor || '').toLowerCase().includes(search)) match = true;
                             if (!match && d.items && d.items.length > 0) {
                                 for (const item of d.items) {
                                     if (item.itemName && item.itemName.toLowerCase().includes(search)) {
@@ -1193,17 +1461,34 @@
                                 }
                             }
                         }
-                        if (!match) return;
+                        if (!match) continue;
                         const moved = d.movedToWarehouse || false;
                         const isShareable = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+                        const ackStatus = d.acknowledged ? `<span class="ack-badge">✅ Acknowledged</span>` : `<span class="badge">⏳ Pending</span>`;
+                        // Check if goods received
+                        let receivedStatus = '<span class="badge">Not Received</span>';
+                        try {
+                            const receivedSnap = await db.collection('goodsReceived')
+                                .where('invoiceId', '==', doc.id)
+                                .limit(1)
+                                .get();
+                            if (!receivedSnap.empty) {
+                                receivedStatus = `<span class="received-badge">✅ Received</span>`;
+                            }
+                        } catch (e) { /* ignore */ }
                         html += `<tr>
                             <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                             <td>${escapeHtml(d.date || '')}</td>
                             <td>${escapeHtml(d.customer || 'N/A')}</td>
+                            <td>${escapeHtml(d.vendor || '')}</td>
                             <td>${escapeHtml(d.branch || 'N/A')}</td>
                             <td class="items-cell">${escapeHtml(itemsShort)}</td>
                             <td class="cost-cell">₦${total.toLocaleString()}</td>
-                            <td>${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}</td>
+                            <td>
+                                ${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}
+                                ${ackStatus}
+                                ${receivedStatus}
+                            </td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="viewInvoice('${doc.id}')">👁️</button>
                                 <button class="btn-sm btn-success" onclick="downloadPDF('${doc.id}')">📄</button>
@@ -1211,10 +1496,11 @@
                                 <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
                                 ${isShareable ? `<button class="btn-sm btn-secondary" onclick="openShareModal('${doc.id}')">📨 Share</button>` : ''}
                                 ${!moved ? `<button class="btn-sm btn-secondary" onclick="openMoveWarehouseModal('${doc.id}')">🏚️ Move</button>` : ''}
+                                ${!d.acknowledged ? `<button class="btn-sm btn-success" onclick="openAckLoginModal('${doc.id}')">✅ Ack</button>` : ''}
                                 <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
                             </td>
                         </tr>`;
-                    });
+                    }
                     html += '</table></div>';
                 }
                 invoicesList.innerHTML = html;
@@ -1228,154 +1514,13 @@
     refreshBtn.addEventListener('click', loadInvoices);
     searchInvoices.addEventListener('input', loadInvoices);
 
-    // ==================== View Invoice (with inline styles) ====================
+    // ==================== View Invoice ====================
     window.viewInvoice = async function(id) {
         try {
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             const d = doc.data();
-            let itemsHtml = '';
-            let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
-            if (d.items) {
-                d.items.forEach(it => {
-                    const itemSub = it.subtotal || (it.quantity * (it.updatedPrice || it.unitPrice || 0));
-                    subtotal += itemSub;
-                    totalDisc += it.discountTotal || 0;
-                    totalVAT += it.vat || 0;
-                    totalWHT += it.wht || 0;
-                    grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
-                    const origPrice = it.originalPrice || it.unitPrice || 0;
-                    const adjPrice = it.updatedPrice || origPrice;
-                    const discPct = it.discountPercent || 0;
-                    const discAmt = it.discountAmount || 0;
-                    const vatPct = it.vatPercent || 0;
-                    const vatAmt = it.vat || 0;
-                    itemsHtml += `<tr>
-                        <td>${escapeHtml(it.itemName)}</td>
-                        <td>${it.quantity}</td>
-                        <td>₦${origPrice.toFixed(2)}</td>
-                        <td>₦${adjPrice.toFixed(2)}</td>
-                        <td>${discPct}%</td>
-                        <td>₦${discAmt.toFixed(2)}</td>
-                        <td>${vatPct}%</td>
-                        <td>₦${vatAmt.toFixed(2)}</td>
-                        <td>₦${(it.total || 0).toFixed(2)}</td>
-                    </tr>`;
-                });
-            }
-            const total = d.total || grandTotal;
-            const multiplier = d.transportMultiplier || 1.00;
-
-            const styleBlock = `
-                <style>
-                    .invoice-table {
-                        width: 100%;
-                        border-collapse: collapse !important;
-                        font-size: 0.9rem;
-                        margin: 12px 0;
-                        border: 1pt solid #000 !important;
-                    }
-                    .invoice-table th,
-                    .invoice-table td {
-                        border: 1pt solid #000 !important;
-                        padding: 8px 10px;
-                        text-align: left;
-                        vertical-align: top;
-                    }
-                    .invoice-table th {
-                        background-color: #0a3d62;
-                        color: white;
-                        font-weight: 600;
-                        text-align: center;
-                    }
-                    .invoice-table td {
-                        background-color: #fff;
-                    }
-                    .invoice-table .totals td {
-                        font-weight: bold;
-                        background-color: #f0f4f8;
-                    }
-                    .invoice-table .grand-total td {
-                        font-weight: bold;
-                        font-size: 1.1rem;
-                        background-color: #d4e2f0;
-                    }
-                    .invoice-header {
-                        text-align: center;
-                        margin-bottom: 20px;
-                    }
-                    .invoice-header h2 {
-                        margin: 0;
-                        color: #0a3d62;
-                        font-size: 1.8rem;
-                    }
-                    .invoice-header h3 {
-                        margin: 0;
-                        color: #2c3e50;
-                        font-size: 1.2rem;
-                    }
-                    .invoice-details {
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 20px;
-                        margin-bottom: 20px;
-                    }
-                    .invoice-details p {
-                        margin: 4px 0;
-                        font-size: 0.95rem;
-                    }
-                    .invoice-details .label {
-                        font-weight: 600;
-                    }
-                </style>
-            `;
-
-            const html = `
-                ${styleBlock}
-                <div style="font-family:'Segoe UI',sans-serif; background:white; padding:16px; max-width:1000px; margin:auto;">
-                    <div class="invoice-header">
-                        <h2>NEVAMAK Enterprises</h2>
-                        <h3>Invoice</h3>
-                    </div>
-                    <div class="invoice-details">
-                        <div style="flex:1;">
-                            <p><span class="label">Invoice #:</span> ${escapeHtml(d.invoiceNumber)}</p>
-                            <p><span class="label">Date:</span> ${escapeHtml(d.date)}</p>
-                            <p><span class="label">Branch:</span> ${escapeHtml(d.branch || 'N/A')}</p>
-                        </div>
-                        <div style="flex:1;">
-                            <p><span class="label">Customer:</span> ${escapeHtml(d.customer)}</p>
-                            ${d.customerEmail ? `<p><span class="label">Email:</span> ${escapeHtml(d.customerEmail)}</p>` : ''}
-                            ${multiplier !== 1.00 ? `<p><span class="label">Transport Multiplier:</span> ${multiplier.toFixed(2)}</p>` : ''}
-                        </div>
-                    </div>
-                    <table class="invoice-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Qty</th>
-                                <th>Original Price</th>
-                                <th>Adjusted Price</th>
-                                <th>Disc %</th>
-                                <th>Disc ₦</th>
-                                <th>VAT %</th>
-                                <th>VAT ₦</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${itemsHtml}
-                            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
-                        </tbody>
-                    </table>
-                    ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
-                    <p><em>Created by ${escapeHtml(d.createdBy)}</em></p>
-                </div>
-            `;
+            const html = generateInvoiceHTML(d);
             const win = window.open('', '_blank', 'width=1000,height=700');
             if (win) {
                 win.document.write(html);
@@ -1396,147 +1541,7 @@
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             const d = doc.data();
-            let itemsHtml = '';
-            let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
-            if (d.items) {
-                d.items.forEach(it => {
-                    const itemSub = it.subtotal || (it.quantity * (it.updatedPrice || it.unitPrice || 0));
-                    subtotal += itemSub;
-                    totalDisc += it.discountTotal || 0;
-                    totalVAT += it.vat || 0;
-                    totalWHT += it.wht || 0;
-                    grandTotal += it.total || (itemSub - (it.discountTotal||0) + (it.vat||0) - (it.wht||0));
-                    const origPrice = it.originalPrice || it.unitPrice || 0;
-                    const adjPrice = it.updatedPrice || origPrice;
-                    const discPct = it.discountPercent || 0;
-                    const discAmt = it.discountAmount || 0;
-                    const vatPct = it.vatPercent || 0;
-                    const vatAmt = it.vat || 0;
-                    itemsHtml += `<tr>
-                        <td>${escapeHtml(it.itemName)}</td>
-                        <td>${it.quantity}</td>
-                        <td>₦${origPrice.toFixed(2)}</td>
-                        <td>₦${adjPrice.toFixed(2)}</td>
-                        <td>${discPct}%</td>
-                        <td>₦${discAmt.toFixed(2)}</td>
-                        <td>${vatPct}%</td>
-                        <td>₦${vatAmt.toFixed(2)}</td>
-                        <td>₦${(it.total || 0).toFixed(2)}</td>
-                    </tr>`;
-                });
-            }
-            const total = d.total || grandTotal;
-            const multiplier = d.transportMultiplier || 1.00;
-
-            const styleBlock = `
-                <style>
-                    .invoice-table {
-                        width: 100%;
-                        border-collapse: collapse !important;
-                        font-size: 0.9rem;
-                        margin: 12px 0;
-                        border: 1pt solid #000 !important;
-                    }
-                    .invoice-table th,
-                    .invoice-table td {
-                        border: 1pt solid #000 !important;
-                        padding: 8px 10px;
-                        text-align: left;
-                        vertical-align: top;
-                    }
-                    .invoice-table th {
-                        background-color: #0a3d62;
-                        color: white;
-                        font-weight: 600;
-                        text-align: center;
-                    }
-                    .invoice-table td {
-                        background-color: #fff;
-                    }
-                    .invoice-table .totals td {
-                        font-weight: bold;
-                        background-color: #f0f4f8;
-                    }
-                    .invoice-table .grand-total td {
-                        font-weight: bold;
-                        font-size: 1.1rem;
-                        background-color: #d4e2f0;
-                    }
-                    .invoice-header {
-                        text-align: center;
-                        margin-bottom: 20px;
-                    }
-                    .invoice-header h2 {
-                        margin: 0;
-                        color: #0a3d62;
-                        font-size: 1.8rem;
-                    }
-                    .invoice-header h3 {
-                        margin: 0;
-                        color: #2c3e50;
-                        font-size: 1.2rem;
-                    }
-                    .invoice-details {
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 20px;
-                        margin-bottom: 20px;
-                    }
-                    .invoice-details p {
-                        margin: 4px 0;
-                        font-size: 0.95rem;
-                    }
-                    .invoice-details .label {
-                        font-weight: 600;
-                    }
-                </style>
-            `;
-            const html = `
-                ${styleBlock}
-                <div id="pdfContent" style="font-family:'Segoe UI',sans-serif; padding:20px; background:white; max-width:1000px; margin:auto;">
-                    <div class="invoice-header">
-                        <h2>NEVAMAK Enterprises</h2>
-                        <h3>Invoice</h3>
-                    </div>
-                    <div class="invoice-details">
-                        <div style="flex:1;">
-                            <p><span class="label">Invoice #:</span> ${escapeHtml(d.invoiceNumber)}</p>
-                            <p><span class="label">Date:</span> ${escapeHtml(d.date)}</p>
-                            <p><span class="label">Branch:</span> ${escapeHtml(d.branch || 'N/A')}</p>
-                        </div>
-                        <div style="flex:1;">
-                            <p><span class="label">Customer:</span> ${escapeHtml(d.customer)}</p>
-                            ${d.customerEmail ? `<p><span class="label">Email:</span> ${escapeHtml(d.customerEmail)}</p>` : ''}
-                            ${multiplier !== 1.00 ? `<p><span class="label">Transport Multiplier:</span> ${multiplier.toFixed(2)}</p>` : ''}
-                        </div>
-                    </div>
-                    <table class="invoice-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>Qty</th>
-                                <th>Original Price</th>
-                                <th>Adjusted Price</th>
-                                <th>Disc %</th>
-                                <th>Disc ₦</th>
-                                <th>VAT %</th>
-                                <th>VAT ₦</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${itemsHtml}
-                            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-                            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-                            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-                            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-                            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${total.toFixed(2)}</strong></td></tr>
-                        </tbody>
-                    </table>
-                    ${d.notes ? `<p><strong>Notes:</strong> ${escapeHtml(d.notes)}</p>` : ''}
-                    <p><em>Created by ${escapeHtml(d.createdBy)}</em></p>
-                </div>
-            `;
+            const html = generateInvoiceHTML(d);
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
             tempDiv.style.position = 'absolute';
@@ -1549,7 +1554,20 @@
             const pdf = new jsPDF('p', 'mm', 'a4');
             const imgWidth = 190;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            const pageHeight = 277;
+            let heightLeft = imgHeight;
+            let position = 10;
+
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight + 10;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
             pdf.save(`Invoice_${d.invoiceNumber}.pdf`);
             document.body.removeChild(tempDiv);
             showToast('✅ PDF downloaded!', 'success');
@@ -1566,7 +1584,10 @@
             const doc = await db.collection('invoices').doc(id).get();
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             const d = doc.data();
-            const rows = [['Item','Qty','Original Price','Adjusted Price','Disc %','Disc ₦','VAT %','VAT ₦','Total']];
+            const rows = [
+                ['Item','Qty','Original Price','Adjusted Price','Disc %','Disc ₦','VAT %','VAT ₦','Total'],
+                ['Acknowledged','Acknowledged By','Signature','Timestamp']
+            ];
             let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
             if (d.items) {
                 d.items.forEach(it => {
@@ -1596,6 +1617,11 @@
             rows.push(['Total VAT','','','','','','','',totalVAT]);
             rows.push(['Total WHT','','','','','','','',totalWHT]);
             rows.push(['Grand Total','','','','','','','',d.total || grandTotal]);
+            const ackStatus = d.acknowledged ? 'Yes' : 'No';
+            const ackBy = d.acknowledgedBy || '';
+            const ackSig = d.ackSignature || '';
+            const ackTime = d.ackTimestamp ? new Date(d.ackTimestamp.toDate()).toLocaleString() : '';
+            rows.push(['Acknowledgment Summary', ackStatus, ackBy, ackSig, ackTime]);
 
             const csvContent = rows.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1625,6 +1651,349 @@
         }
     };
 
+    // ==================== Settings Modal ====================
+    window.openSettingsModal = function() {
+        document.getElementById('companyNameInput').value = companyName;
+        document.getElementById('settingsMessage').textContent = '';
+        document.getElementById('settingsModal').style.display = 'flex';
+    };
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', async function() {
+        const newName = document.getElementById('companyNameInput').value.trim();
+        if (!newName) {
+            document.getElementById('settingsMessage').textContent = 'Company name cannot be empty.';
+            document.getElementById('settingsMessage').style.color = 'red';
+            return;
+        }
+        const btn = this;
+        setButtonLoading(btn, true);
+        try {
+            await db.collection('users').doc(currentUser.uid).update({
+                companyName: newName
+            });
+            companyName = newName;
+            document.getElementById('settingsMessage').textContent = '✅ Settings saved successfully!';
+            document.getElementById('settingsMessage').style.color = 'green';
+            showToast('Company name updated.', 'success');
+            setTimeout(() => closeModal('settingsModal'), 1500);
+        } catch (err) {
+            document.getElementById('settingsMessage').textContent = 'Error: ' + err.message;
+            document.getElementById('settingsMessage').style.color = 'red';
+            showToast('Error saving settings: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+
+    // ==================== Acknowledgment Login Flow with Received Items ====================
+    window.openAckLoginModal = async function(id) {
+        try {
+            const doc = await db.collection('invoices').doc(id).get();
+            if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+            const d = doc.data();
+            if (d.acknowledged) {
+                showToast('Invoice already acknowledged.', 'info');
+                return;
+            }
+            ackLoginTargetId = id;
+            currentInvoiceData = d; // store for received items
+            document.getElementById('ackLoginInvoiceNumber').textContent = d.invoiceNumber;
+            document.getElementById('ackLoginCustomer').textContent = d.customer || 'N/A';
+            document.getElementById('ackLoginTotal').textContent = (d.total || 0).toLocaleString();
+            document.getElementById('ackLoginStep1').style.display = 'block';
+            document.getElementById('ackLoginStep2').style.display = 'none';
+            document.getElementById('ackCurrentPassword').value = '';
+            document.getElementById('ackOfficerEmail').value = '';
+            document.getElementById('ackOfficerPassword').value = '';
+            document.getElementById('ackOfficerSignature').value = '';
+            document.getElementById('ackOfficerConfirmCheck').checked = false;
+            document.getElementById('ackStep1Message').textContent = '';
+            document.getElementById('ackStep2Message').textContent = '';
+            document.getElementById('ackFinalMessage').style.display = 'none';
+            document.getElementById('ackLoginModal').style.display = 'flex';
+            // populate received items container (will be shown in step 2)
+            populateReceivedItems(d);
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
+    function populateReceivedItems(invoiceData) {
+        const container = document.getElementById('receivedItemsContainer');
+        container.innerHTML = '';
+        if (!invoiceData.items || invoiceData.items.length === 0) {
+            container.innerHTML = '<p>No items on this invoice.</p>';
+            return;
+        }
+        let html = `<table class="received-items-table" style="width:100%; border-collapse:collapse; margin-top:8px;">
+            <tr><th style="text-align:left;">Item</th><th style="text-align:center;">Ordered</th><th style="text-align:center;">Received</th></tr>`;
+        invoiceData.items.forEach((item, index) => {
+            html += `<tr>
+                <td>${escapeHtml(item.itemName)}</td>
+                <td style="text-align:center;">${item.quantity}</td>
+                <td style="text-align:center;">
+                    <input type="number" class="received-qty" data-index="${index}" value="${item.quantity}" min="0" max="${item.quantity}" style="width:60px; padding:4px; border-radius:20px; border:1px solid #ccc; text-align:center;">
+                </td>
+            </tr>`;
+        });
+        html += '</table>';
+        container.innerHTML = html;
+    }
+
+    document.getElementById('ackStep1Btn').addEventListener('click', async function() {
+        const currentPassword = document.getElementById('ackCurrentPassword').value.trim();
+        if (!currentPassword) {
+            document.getElementById('ackStep1Message').textContent = 'Please enter your current password.';
+            return;
+        }
+        const btn = this;
+        setButtonLoading(btn, true);
+        document.getElementById('ackStep1Message').textContent = '';
+
+        try {
+            const credential = firebase.auth.EmailAuthProvider.credential(currentUserEmail, currentPassword);
+            await currentUser.reauthenticateWithCredential(credential);
+            document.getElementById('ackLoginStep1').style.display = 'none';
+            document.getElementById('ackLoginStep2').style.display = 'block';
+            document.getElementById('ackStep1Message').textContent = '';
+            showToast('Identity confirmed. Please log in as the receiving officer.', 'success');
+        } catch (err) {
+            if (err.code === 'auth/wrong-password') {
+                document.getElementById('ackStep1Message').textContent = 'Incorrect password. Please try again.';
+            } else {
+                document.getElementById('ackStep1Message').textContent = 'Error: ' + err.message;
+            }
+            showToast('Re-authentication failed: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+
+    document.getElementById('ackStep2ConfirmBtn').addEventListener('click', async function() {
+        const officerEmail = document.getElementById('ackOfficerEmail').value.trim();
+        const officerPassword = document.getElementById('ackOfficerPassword').value.trim();
+        const signature = document.getElementById('ackOfficerSignature').value.trim();
+        const confirmed = document.getElementById('ackOfficerConfirmCheck').checked;
+
+        if (!officerEmail || !officerPassword) {
+            document.getElementById('ackStep2Message').textContent = 'Please enter the officer\'s email and password.';
+            return;
+        }
+        if (!signature) {
+            document.getElementById('ackStep2Message').textContent = 'Please enter the officer\'s signature (name & title).';
+            return;
+        }
+        if (!confirmed) {
+            document.getElementById('ackStep2Message').textContent = 'Please confirm receipt by checking the box.';
+            return;
+        }
+
+        // Collect received quantities
+        const qtyInputs = document.querySelectorAll('.received-qty');
+        let receivedItems = [];
+        let allZero = true;
+        if (currentInvoiceData && currentInvoiceData.items) {
+            currentInvoiceData.items.forEach((item, idx) => {
+                const input = qtyInputs[idx];
+                let receivedQty = 0;
+                if (input) {
+                    receivedQty = parseInt(input.value) || 0;
+                    if (receivedQty < 0) receivedQty = 0;
+                    if (receivedQty > item.quantity) receivedQty = item.quantity;
+                }
+                if (receivedQty > 0) allZero = false;
+                receivedItems.push({
+                    itemName: item.itemName,
+                    orderedQty: item.quantity,
+                    receivedQty: receivedQty,
+                    unitPrice: item.unitPrice || 0,
+                    total: receivedQty * (item.unitPrice || 0)
+                });
+            });
+        }
+
+        if (allZero) {
+            document.getElementById('ackStep2Message').textContent = 'Please enter at least one item with quantity > 0.';
+            return;
+        }
+
+        const notes = document.getElementById('receivedNotes').value.trim();
+
+        const btn = this;
+        setButtonLoading(btn, true);
+        document.getElementById('ackStep2Message').textContent = '';
+
+        try {
+            if (!secondaryApp) {
+                secondaryApp = firebase.initializeApp(firebaseConfig, 'secondaryApp');
+            }
+            const secondaryAuth = secondaryApp.auth();
+            const secondaryDb = secondaryApp.firestore();
+
+            await secondaryAuth.signInWithEmailAndPassword(officerEmail, officerPassword);
+            const officerUser = secondaryAuth.currentUser;
+            if (!officerUser) throw new Error('Failed to sign in as officer.');
+
+            // Update invoice acknowledgment
+            const invDocRef = secondaryDb.collection('invoices').doc(ackLoginTargetId);
+            const invDoc = await invDocRef.get();
+            if (!invDoc.exists) throw new Error('Invoice not found.');
+            if (invDoc.data().acknowledged) {
+                throw new Error('Invoice already acknowledged.');
+            }
+            await invDocRef.update({
+                acknowledged: true,
+                acknowledgedBy: officerUser.email,
+                ackSignature: signature,
+                ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // Create goods received claim
+            await secondaryDb.collection('goodsReceived').add({
+                invoiceId: ackLoginTargetId,
+                invoiceNumber: invDoc.data().invoiceNumber,
+                customer: invDoc.data().customer || '',
+                branch: invDoc.data().branch || '',
+                vendor: invDoc.data().vendor || '',
+                originalItems: invDoc.data().items || [],
+                receivedItems: receivedItems,
+                receivingOfficer: officerUser.email,
+                officerSignature: signature,
+                receivedNotes: notes,
+                receivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await secondaryDb.collection('activityLog').add({
+                action: 'goods_received',
+                invoiceNumber: invDoc.data().invoiceNumber,
+                user: officerUser.email,
+                signature: signature,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await secondaryAuth.signOut();
+
+            document.getElementById('ackFinalMessage').style.display = 'block';
+            document.getElementById('ackFinalMessage').textContent = '✅ Goods received and acknowledged!';
+            document.getElementById('ackStep2Message').textContent = '';
+            showToast('✅ Goods received successfully!', 'success');
+            closeModal('ackLoginModal');
+            loadInvoices();
+            loadReceivedGoods();
+        } catch (err) {
+            console.error('Receiving error:', err);
+            document.getElementById('ackStep2Message').textContent = 'Error: ' + err.message;
+            showToast('Error: ' + err.message, 'error');
+            if (secondaryApp) {
+                try {
+                    await secondaryApp.auth().signOut();
+                } catch (e) { /* ignore */ }
+            }
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
+
+    // ==================== Load Goods Received ====================
+    function loadReceivedGoods() {
+        if (receivedUnsubscribe) {
+            receivedUnsubscribe();
+            receivedUnsubscribe = null;
+        }
+
+        const search = searchReceived.value.toLowerCase().trim();
+        receivedList.innerHTML = '<div class="loading-spinner"></div> Loading...';
+
+        receivedUnsubscribe = db.collection('goodsReceived')
+            .orderBy('receivedAt', 'desc')
+            .onSnapshot((snap) => {
+                let html = '';
+                if (snap.empty) {
+                    html = '<p style="text-align:center; color:#888; padding:20px;">No goods received claims.</p>';
+                } else {
+                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Actions</th></tr>';
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        let match = false;
+                        if (search === '') match = true;
+                        else {
+                            if ((d.invoiceNumber || '').toLowerCase().includes(search)) match = true;
+                            if (!match && (d.customer || '').toLowerCase().includes(search)) match = true;
+                        }
+                        if (!match) return;
+                        const itemsCount = d.receivedItems ? d.receivedItems.filter(i => i.receivedQty > 0).length : 0;
+                        const date = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
+                        html += `<tr>
+                            <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                            <td>${escapeHtml(d.customer || 'N/A')}</td>
+                            <td>${escapeHtml(d.branch || 'N/A')}</td>
+                            <td>${escapeHtml(d.receivingOfficer || '')}</td>
+                            <td>${date}</td>
+                            <td>${itemsCount} item(s)</td>
+                            <td>
+                                <button class="btn-sm btn-primary" onclick="viewReceivedClaim('${doc.id}')">👁️</button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</table></div>';
+                }
+                receivedList.innerHTML = html;
+            }, (err) => {
+                console.error('Goods received load error:', err);
+                receivedList.innerHTML = '<p style="color:red;">Error loading goods received: ' + escapeHtml(err.message) + '</p>';
+                showToast('Error loading goods received: ' + err.message, 'error');
+            });
+    }
+
+    refreshReceivedBtn.addEventListener('click', loadReceivedGoods);
+    searchReceived.addEventListener('input', loadReceivedGoods);
+
+    window.viewReceivedClaim = async function(id) {
+        try {
+            const doc = await db.collection('goodsReceived').doc(id).get();
+            if (!doc.exists) { showToast('Claim not found.', 'error'); return; }
+            const d = doc.data();
+            let itemsHtml = '<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;"><tr><th>Item</th><th>Ordered</th><th>Received</th><th>Unit Price</th><th>Total</th></tr>';
+            if (d.receivedItems) {
+                d.receivedItems.forEach(it => {
+                    itemsHtml += `<tr>
+                        <td>${escapeHtml(it.itemName)}</td>
+                        <td>${it.orderedQty}</td>
+                        <td>${it.receivedQty}</td>
+                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
+                        <td>₦${(it.total||0).toFixed(2)}</td>
+                    </tr>`;
+                });
+            }
+            itemsHtml += '</table>';
+            const totalReceived = d.receivedItems ? d.receivedItems.reduce((sum, i) => sum + (i.total || 0), 0) : 0;
+            const html = `
+                <h4>Goods Received Claim</h4>
+                <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
+                <p><strong>Customer:</strong> ${escapeHtml(d.customer)}</p>
+                <p><strong>Branch:</strong> ${escapeHtml(d.branch)}</p>
+                <p><strong>Vendor:</strong> ${escapeHtml(d.vendor)}</p>
+                <p><strong>Received By:</strong> ${escapeHtml(d.receivingOfficer)}</p>
+                <p><strong>Signature:</strong> ${escapeHtml(d.officerSignature)}</p>
+                <p><strong>Date:</strong> ${d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : ''}</p>
+                ${d.receivedNotes ? `<p><strong>Notes:</strong> ${escapeHtml(d.receivedNotes)}</p>` : ''}
+                <p><strong>Total Received Value:</strong> ₦${totalReceived.toLocaleString()}</p>
+                <h5>Items</h5>
+                ${itemsHtml}
+            `;
+            const win = window.open('', '_blank', 'width=800,height=600');
+            if (win) {
+                win.document.write(`<div style="padding:20px; font-family:sans-serif;">${html}</div>`);
+                win.document.close();
+            } else {
+                showToast('Please allow popups.', 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        }
+    };
+
     // ==================== Send/Share Functions ====================
     window.openSendModal = async function(id) {
         try {
@@ -1642,7 +2011,6 @@
         }
     };
 
-    // New function to open the dedicated share.html page
     window.openSharePage = function() {
         if (!sendInvoiceId) {
             document.getElementById('sendMessage').textContent = 'No invoice selected.';
@@ -1658,9 +2026,8 @@
             return;
         }
         const recipient = sendInvoiceData.customerEmail || '';
-        const subject = `Invoice ${sendInvoiceData.invoiceNumber} from NEVAMAK Enterprises`;
+        const subject = `Invoice ${sendInvoiceData.invoiceNumber} from ${companyName}`;
         const emailDomain = 'nevamakenterprises.net';
-        
         let emailAddress = recipient;
         if (!emailAddress || emailAddress === '') {
             emailAddress = `info@${emailDomain}`;
@@ -1680,10 +2047,11 @@
             `Invoice Details:\n` +
             `- Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `- Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `- Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
             `${itemsList ? 'Items:\n' + itemsList : ''}\n\n` +
             `Thank you for your business.\n\n` +
             `Best regards,\n` +
-            `NEVAMAK Enterprises\n` +
+            `${companyName}\n` +
             `📧 info@nevamakenterprises.net`;
 
         const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(emailAddress)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -1711,8 +2079,9 @@
             `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
             `📦 Items: ${(sendInvoiceData.items || []).length} item(s)\n\n` +
-            `Please review this invoice. For any questions, contact NEVAMAK Enterprises.\n` +
+            `Please review this invoice. For any questions, contact ${companyName}.\n` +
             `📧 ${chatRecipient}`;
 
         const chatUrl = `https://mail.google.com/chat/?to=${encodeURIComponent(chatRecipient)}&body=${encodeURIComponent(message)}`;
@@ -1726,14 +2095,15 @@
             document.getElementById('sendMessage').textContent = 'No invoice selected.';
             return;
         }
-        const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}* from NEVAMAK Enterprises\n\n` +
+        const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}* from ${companyName}\n\n` +
             `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
             `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
+            `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
             `📦 Items: ${(sendInvoiceData.items || []).length} item(s)\n\n` +
             `Please review this invoice. Thank you for your business!\n` +
-            `NEVAMAK Enterprises`;
+            `${companyName}`;
 
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
         const whatsappUrl = isMobile 
@@ -2144,7 +2514,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with fixed Add Product button.');
+    console.log('NEVAMAK Invoice Repository loaded with goods received claims and separate page.');
 </script>
 </body>
 </html>
