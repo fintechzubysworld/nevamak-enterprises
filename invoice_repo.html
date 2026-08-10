@@ -50,6 +50,9 @@
         .badge { background: #e2e3e5; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .ack-badge { background: #2e86de; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .received-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .submitted-badge { background: #f39c12; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .approved-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .resolved-badge { background: #2ecc71; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .scroll { overflow-x: auto; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 1000px; width: 95%; max-height: 90vh; overflow-y: auto; }
@@ -152,6 +155,11 @@
         .vendor-field input, .vendor-field select { flex: 1; }
         .received-items-table input { width: 60px; padding: 4px; border-radius: 20px; border: 1px solid #ccc; text-align: center; }
         .received-items-table td { vertical-align: middle; }
+        .edit-submission-items .item-row { margin-bottom: 6px; }
+        .reconcile-modal-items .item-row { margin-bottom: 6px; }
+        .shortage-highlight { color: #c0392b; font-weight: bold; }
+        .reconcile-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+        .reconcile-actions button { flex: 1; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } .vendor-field { flex-direction: column; } }
     </style>
 </head>
@@ -179,6 +187,7 @@
         <button class="tab-btn" data-tab="list">📋 Saved Invoices</button>
         <button class="tab-btn" data-tab="shared">📨 Shared with Me</button>
         <button class="tab-btn" data-tab="goodsreceived">📦 Goods Received</button>
+        <button class="tab-btn" data-tab="submissions">🔄 Vendor Submissions</button>
     </div>
 
     <!-- Create Invoice Tab -->
@@ -274,6 +283,18 @@
                 <button id="refreshReceivedBtn" class="btn-primary">🔄 Refresh</button>
             </div>
             <div class="scroll" id="receivedList"><div class="loading-spinner"></div> Loading...</div>
+        </div>
+    </div>
+
+    <!-- Vendor Submissions Tab -->
+    <div id="tab-submissions" class="tab-content">
+        <div class="card">
+            <h2>🔄 Vendor Submissions (Pending Approval)</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+                <input type="text" id="searchSubmissions" placeholder="🔍 Search by invoice #, vendor, or customer..." style="flex:1;">
+                <button id="refreshSubmissionsBtn" class="btn-primary">🔄 Refresh</button>
+            </div>
+            <div class="scroll" id="submissionsList"><div class="loading-spinner"></div> Loading...</div>
         </div>
     </div>
 </div>
@@ -387,7 +408,7 @@
     </div>
 </div>
 
-<!-- Acknowledgment Login Modal (two-step) with Received Items modification -->
+<!-- Acknowledgment Login Modal (two-step) -->
 <div id="ackLoginModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('ackLoginModal')">&times;</span>
@@ -438,6 +459,78 @@
     </div>
 </div>
 
+<!-- Edit/Approve Submission Modal -->
+<div id="approveModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('approveModal')">&times;</span>
+        <h3>✏️ Edit & Approve Vendor Submission</h3>
+        <div id="approveContent">
+            <p><strong>Invoice #:</strong> <span id="approveInvoiceNumber"></span></p>
+            <p><strong>Vendor:</strong> <span id="approveVendor"></span></p>
+            <p><strong>Submitted By:</strong> <span id="approveSubmittedBy"></span></p>
+            <p><strong>Date:</strong> <span id="approveDate"></span></p>
+            <p><strong>Destination Branch:</strong> <span id="approveBranch"></span></p>
+            <hr />
+            <div style="margin:12px 0;">
+                <label><strong>Customer / Recipient</strong></label>
+                <input type="text" id="approveCustomer" style="width:100%;">
+            </div>
+            <div style="margin:12px 0;">
+                <label><strong>Customer Email</strong></label>
+                <input type="email" id="approveCustomerEmail" style="width:100%;">
+            </div>
+            <div style="margin:12px 0;">
+                <label><strong>Vendor Name</strong></label>
+                <input type="text" id="approveVendorName" style="width:100%;">
+            </div>
+            <div style="margin:12px 0;">
+                <label><strong>Notes</strong></label>
+                <textarea id="approveNotes" rows="2" style="width:100%;"></textarea>
+            </div>
+            <div style="margin:12px 0;">
+                <label><strong>Items</strong></label>
+                <div id="approveItemsContainer"></div>
+            </div>
+            <div style="margin:12px 0;">
+                <div class="cost-summary" id="approveCostPreview">Total: ₦0</div>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:16px;">
+                <button id="approveConfirmBtn" class="btn-success" style="flex:2;">✅ Approve & Create Invoice</button>
+                <button onclick="closeModal('approveModal')" class="btn-danger" style="flex:1;">Cancel</button>
+            </div>
+            <div id="approveMessage" style="color:red; margin-top:8px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Reconciliation Modal -->
+<div id="reconcileModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal('reconcileModal')">&times;</span>
+        <h3>🔄 Reconciliation – Goods Received Claim</h3>
+        <div id="reconcileContent">
+            <p><strong>Invoice #:</strong> <span id="reconcileInvoiceNumber"></span></p>
+            <p><strong>Customer:</strong> <span id="reconcileCustomer"></span></p>
+            <p><strong>Branch:</strong> <span id="reconcileBranch"></span></p>
+            <p><strong>Received By:</strong> <span id="reconcileReceivedBy"></span></p>
+            <p><strong>Date:</strong> <span id="reconcileDate"></span></p>
+            <hr />
+            <div style="margin:12px 0;">
+                <label><strong>Items Comparison</strong></label>
+                <div id="reconcileItemsContainer" class="scroll"></div>
+            </div>
+            <div style="margin:12px 0;">
+                <div class="cost-summary" id="reconcileSummary">Total Ordered: ₦0 | Total Received: ₦0</div>
+            </div>
+            <div class="reconcile-actions">
+                <button id="reconcileCompleteBtn" class="btn-success" style="flex:2;">✅ Complete Invoice Items</button>
+                <button id="reconcileUpdateBtn" class="btn-warning" style="flex:2;">📝 Update Expected Goods</button>
+            </div>
+            <div id="reconcileMessage" style="color:red; margin-top:8px;"></div>
+        </div>
+    </div>
+</div>
+
 <script>
     // ==================== Firebase Config ====================
     const firebaseConfig = {
@@ -468,10 +561,14 @@
     let invoicesUnsubscribe = null;
     let sharedUnsubscribe = null;
     let receivedUnsubscribe = null;
+    let submissionsUnsubscribe = null;
     let suppliers = [];
     let itemRowCounter = 0;
     let secondaryApp = null;
-    let currentInvoiceData = null; // for received items table
+    let currentInvoiceData = null;
+    let approveTargetId = null;
+    let approveItemRowCounter = 0;
+    let reconcileTargetId = null;
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -484,10 +581,13 @@
     const invoicesList = document.getElementById('invoicesList');
     const sharedList = document.getElementById('sharedList');
     const receivedList = document.getElementById('receivedList');
+    const submissionsList = document.getElementById('submissionsList');
     const searchInvoices = document.getElementById('searchInvoices');
     const searchReceived = document.getElementById('searchReceived');
+    const searchSubmissions = document.getElementById('searchSubmissions');
     const refreshBtn = document.getElementById('refreshInvoicesBtn');
     const refreshReceivedBtn = document.getElementById('refreshReceivedBtn');
+    const refreshSubmissionsBtn = document.getElementById('refreshSubmissionsBtn');
     const importPreviewContainer = document.getElementById('importPreviewContainer');
     const invoiceBranch = document.getElementById('invoiceBranch');
     const moveBranchSelect = document.getElementById('moveBranchSelect');
@@ -538,7 +638,7 @@
 
     function closeModal(id) {
         document.getElementById(id).style.display = 'none';
-        ['sendMessage','moveMessage','bulkMessage','shareMessageResult','ackStep1Message','ackStep2Message','ackFinalMessage','settingsMessage'].forEach(e => {
+        ['sendMessage','moveMessage','bulkMessage','shareMessageResult','ackStep1Message','ackStep2Message','ackFinalMessage','settingsMessage','approveMessage','reconcileMessage'].forEach(e => {
             const el = document.getElementById(e);
             if (el) el.textContent = '';
         });
@@ -554,6 +654,15 @@
             document.getElementById('receivedItemsContainer').innerHTML = '';
             document.getElementById('receivedNotes').value = '';
         }
+        if (id === 'approveModal') {
+            document.getElementById('approveItemsContainer').innerHTML = '';
+            document.getElementById('approveCostPreview').textContent = 'Total: ₦0';
+            approveItemRowCounter = 0;
+        }
+        if (id === 'reconcileModal') {
+            document.getElementById('reconcileItemsContainer').innerHTML = '';
+            document.getElementById('reconcileSummary').textContent = 'Total Ordered: ₦0 | Total Received: ₦0';
+        }
     }
     window.closeModal = closeModal;
 
@@ -563,7 +672,7 @@
         }
     };
 
-    // ==================== Items Management ====================
+    // ==================== Items Management (Main) ====================
     function addItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
         const rowId = ++itemRowCounter;
         const div = document.createElement('div');
@@ -606,13 +715,12 @@
         updateCostPreview();
     }
 
-    // ==================== Calculations ====================
-    function calculateItemTotals() {
+    function calculateItemTotals(containerId = 'invoiceItemsContainer') {
         const multiplier = validateNumber(transportMultiplier.value, 0.01) || 1.00;
         const items = [];
         let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
 
-        document.querySelectorAll('.item-row').forEach(row => {
+        document.querySelectorAll(`#${containerId} .item-row`).forEach(row => {
             const name = row.querySelector('.itemName').value.trim();
             const qty = validateNumber(row.querySelector('.itemQty').value, 0) || 0;
             const price = validateNumber(row.querySelector('.itemPrice').value, 0) || 0;
@@ -656,7 +764,7 @@
     }
 
     function updateCostPreview() {
-        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals();
+        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals('invoiceItemsContainer');
         document.getElementById('invoiceCostPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
         document.getElementById('taxBreakdown').innerHTML = `
             Subtotal: ₦${subtotal.toLocaleString()} | 
@@ -697,6 +805,7 @@
         loadInvoices();
         loadSharedInvoices();
         loadReceivedGoods();
+        loadSubmissions();
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -705,6 +814,7 @@
                 document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
                 if (btn.dataset.tab === 'shared') loadSharedInvoices();
                 if (btn.dataset.tab === 'goodsreceived') loadReceivedGoods();
+                if (btn.dataset.tab === 'submissions') loadSubmissions();
             });
         });
         addItemRow();
@@ -972,7 +1082,7 @@
         formMessage.textContent = '';
     };
 
-    // ==================== Preview Invoice (with inline styles) ====================
+    // ==================== Preview Invoice ====================
     document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
         const preview = generateInvoiceHTML();
         invoicePreviewContainer.innerHTML = preview;
@@ -1047,7 +1157,7 @@
             notes = document.getElementById('invoiceNotes').value.trim() || '';
             branch = document.getElementById('invoiceBranch').value;
             vendor = vendorManual.value.trim() || vendorSelect.value || '';
-            const calc = calculateItemTotals();
+            const calc = calculateItemTotals('invoiceItemsContainer');
             items = calc.items;
             subtotal = calc.subtotal;
             totalDisc = calc.totalDisc;
@@ -1235,7 +1345,7 @@
             const branch = document.getElementById('invoiceBranch').value;
             const multiplier = validateNumber(transportMultiplier.value, 0.01) || 1.00;
             const vendor = vendorManual.value.trim() || vendorSelect.value || '';
-            const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
+            const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals('invoiceItemsContainer');
 
             if (items.length === 0) {
                 formMessage.textContent = 'Add at least one item.';
@@ -1371,7 +1481,7 @@
 
     // ==================== Generate CSV ====================
     document.getElementById('generateCSVBtn').addEventListener('click', () => {
-        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals();
+        const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateItemTotals('invoiceItemsContainer');
         if (items.length === 0) {
             showToast('Add at least one item.', 'error');
             return;
@@ -1465,7 +1575,6 @@
                         const moved = d.movedToWarehouse || false;
                         const isShareable = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
                         const ackStatus = d.acknowledged ? `<span class="ack-badge">✅ Acknowledged</span>` : `<span class="badge">⏳ Pending</span>`;
-                        // Check if goods received
                         let receivedStatus = '<span class="badge">Not Received</span>';
                         try {
                             const receivedSnap = await db.collection('goodsReceived')
@@ -1473,7 +1582,12 @@
                                 .limit(1)
                                 .get();
                             if (!receivedSnap.empty) {
-                                receivedStatus = `<span class="received-badge">✅ Received</span>`;
+                                const recData = receivedSnap.docs[0].data();
+                                if (recData.resolved) {
+                                    receivedStatus = `<span class="resolved-badge">✅ Resolved</span>`;
+                                } else {
+                                    receivedStatus = `<span class="received-badge">✅ Received</span>`;
+                                }
                             }
                         } catch (e) { /* ignore */ }
                         html += `<tr>
@@ -1696,7 +1810,7 @@
                 return;
             }
             ackLoginTargetId = id;
-            currentInvoiceData = d; // store for received items
+            currentInvoiceData = d;
             document.getElementById('ackLoginInvoiceNumber').textContent = d.invoiceNumber;
             document.getElementById('ackLoginCustomer').textContent = d.customer || 'N/A';
             document.getElementById('ackLoginTotal').textContent = (d.total || 0).toLocaleString();
@@ -1711,7 +1825,6 @@
             document.getElementById('ackStep2Message').textContent = '';
             document.getElementById('ackFinalMessage').style.display = 'none';
             document.getElementById('ackLoginModal').style.display = 'flex';
-            // populate received items container (will be shown in step 2)
             populateReceivedItems(d);
         } catch (err) {
             showToast('Error: ' + err.message, 'error');
@@ -1788,7 +1901,6 @@
             return;
         }
 
-        // Collect received quantities
         const qtyInputs = document.querySelectorAll('.received-qty');
         let receivedItems = [];
         let allZero = true;
@@ -1834,7 +1946,6 @@
             const officerUser = secondaryAuth.currentUser;
             if (!officerUser) throw new Error('Failed to sign in as officer.');
 
-            // Update invoice acknowledgment
             const invDocRef = secondaryDb.collection('invoices').doc(ackLoginTargetId);
             const invDoc = await invDocRef.get();
             if (!invDoc.exists) throw new Error('Invoice not found.');
@@ -1848,7 +1959,6 @@
                 ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Create goods received claim
             await secondaryDb.collection('goodsReceived').add({
                 invoiceId: ackLoginTargetId,
                 invoiceNumber: invDoc.data().invoiceNumber,
@@ -1860,6 +1970,7 @@
                 receivingOfficer: officerUser.email,
                 officerSignature: signature,
                 receivedNotes: notes,
+                resolved: false,
                 receivedAt: firebase.firestore.FieldValue.serverTimestamp(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
@@ -1912,7 +2023,7 @@
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No goods received claims.</p>';
                 } else {
-                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Actions</th></tr>';
+                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Status</th><th>Actions</th></tr>';
                     snap.forEach(doc => {
                         const d = doc.data();
                         let match = false;
@@ -1924,6 +2035,7 @@
                         if (!match) return;
                         const itemsCount = d.receivedItems ? d.receivedItems.filter(i => i.receivedQty > 0).length : 0;
                         const date = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
+                        const status = d.resolved ? '<span class="resolved-badge">✅ Resolved</span>' : '<span class="received-badge">Open</span>';
                         html += `<tr>
                             <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                             <td>${escapeHtml(d.customer || 'N/A')}</td>
@@ -1931,8 +2043,10 @@
                             <td>${escapeHtml(d.receivingOfficer || '')}</td>
                             <td>${date}</td>
                             <td>${itemsCount} item(s)</td>
+                            <td>${status}</td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="viewReceivedClaim('${doc.id}')">👁️</button>
+                                ${!d.resolved ? `<button class="btn-sm btn-warning" onclick="openReconcileModal('${doc.id}')">🔄 Reconcile</button>` : ''}
                             </td>
                         </tr>`;
                     });
@@ -1968,6 +2082,7 @@
             }
             itemsHtml += '</table>';
             const totalReceived = d.receivedItems ? d.receivedItems.reduce((sum, i) => sum + (i.total || 0), 0) : 0;
+            const totalOrdered = d.originalItems ? d.originalItems.reduce((sum, i) => sum + (i.quantity * (i.unitPrice || 0)), 0) : 0;
             const html = `
                 <h4>Goods Received Claim</h4>
                 <p><strong>Invoice #:</strong> ${escapeHtml(d.invoiceNumber)}</p>
@@ -1978,6 +2093,7 @@
                 <p><strong>Signature:</strong> ${escapeHtml(d.officerSignature)}</p>
                 <p><strong>Date:</strong> ${d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : ''}</p>
                 ${d.receivedNotes ? `<p><strong>Notes:</strong> ${escapeHtml(d.receivedNotes)}</p>` : ''}
+                <p><strong>Total Ordered Value:</strong> ₦${totalOrdered.toLocaleString()}</p>
                 <p><strong>Total Received Value:</strong> ₦${totalReceived.toLocaleString()}</p>
                 <h5>Items</h5>
                 ${itemsHtml}
@@ -1993,6 +2109,503 @@
             showToast('Error: ' + err.message, 'error');
         }
     };
+
+    // ==================== Reconciliation Modal ====================
+    window.openReconcileModal = async function(claimId) {
+        try {
+            const doc = await db.collection('goodsReceived').doc(claimId).get();
+            if (!doc.exists) { showToast('Claim not found.', 'error'); return; }
+            const d = doc.data();
+            reconcileTargetId = claimId;
+            document.getElementById('reconcileInvoiceNumber').textContent = d.invoiceNumber || 'N/A';
+            document.getElementById('reconcileCustomer').textContent = d.customer || 'N/A';
+            document.getElementById('reconcileBranch').textContent = d.branch || 'N/A';
+            document.getElementById('reconcileReceivedBy').textContent = d.receivingOfficer || '';
+            document.getElementById('reconcileDate').textContent = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
+
+            // Build items comparison table
+            const container = document.getElementById('reconcileItemsContainer');
+            container.innerHTML = '';
+            let totalOrdered = 0, totalReceived = 0;
+            let allFullyReceived = true;
+            if (d.receivedItems && d.receivedItems.length > 0) {
+                let html = `<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                    <tr><th>Item</th><th style="text-align:center;">Ordered</th><th style="text-align:center;">Received</th><th style="text-align:center;">Status</th></tr>`;
+                d.receivedItems.forEach(item => {
+                    const ordered = item.orderedQty || 0;
+                    const received = item.receivedQty || 0;
+                    const shortage = ordered - received;
+                    const status = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
+                    if (shortage > 0) allFullyReceived = false;
+                    totalOrdered += ordered * (item.unitPrice || 0);
+                    totalReceived += received * (item.unitPrice || 0);
+                    html += `<tr>
+                        <td>${escapeHtml(item.itemName)}</td>
+                        <td style="text-align:center;">${ordered}</td>
+                        <td style="text-align:center;">${received}</td>
+                        <td>${status}</td>
+                    </tr>`;
+                });
+                html += '</table>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<p>No items in this claim.</p>';
+            }
+
+            document.getElementById('reconcileSummary').textContent = `Total Ordered: ₦${totalOrdered.toLocaleString()} | Total Received: ₦${totalReceived.toLocaleString()}`;
+
+            // Enable/disable buttons based on full receipt
+            const completeBtn = document.getElementById('reconcileCompleteBtn');
+            const updateBtn = document.getElementById('reconcileUpdateBtn');
+            completeBtn.disabled = !allFullyReceived;
+            completeBtn.style.opacity = allFullyReceived ? '1' : '0.6';
+            updateBtn.disabled = allFullyReceived;
+            updateBtn.style.opacity = allFullyReceived ? '0.6' : '1';
+
+            // Store claim data for use in actions
+            document.getElementById('reconcileModal').dataset.claimId = claimId;
+            document.getElementById('reconcileModal').dataset.allFullyReceived = allFullyReceived;
+            document.getElementById('reconcileMessage').textContent = '';
+            document.getElementById('reconcileModal').style.display = 'flex';
+        } catch (err) {
+            showToast('Error loading claim: ' + err.message, 'error');
+        }
+    };
+
+    // Reconciliation actions
+    document.getElementById('reconcileCompleteBtn').addEventListener('click', async function() {
+        const claimId = document.getElementById('reconcileModal').dataset.claimId;
+        await performReconciliation(claimId, 'complete');
+    });
+
+    document.getElementById('reconcileUpdateBtn').addEventListener('click', async function() {
+        const claimId = document.getElementById('reconcileModal').dataset.claimId;
+        await performReconciliation(claimId, 'update');
+    });
+
+    async function performReconciliation(claimId, action) {
+        const btn = action === 'complete' ? document.getElementById('reconcileCompleteBtn') : document.getElementById('reconcileUpdateBtn');
+        setButtonLoading(btn, true);
+        document.getElementById('reconcileMessage').textContent = '';
+
+        try {
+            const claimDoc = await db.collection('goodsReceived').doc(claimId).get();
+            if (!claimDoc.exists) { throw new Error('Claim not found.'); }
+            const claimData = claimDoc.data();
+
+            // Get the original invoice
+            const invoiceId = claimData.invoiceId;
+            if (!invoiceId) { throw new Error('Original invoice not referenced.'); }
+            const invDoc = await db.collection('invoices').doc(invoiceId).get();
+            if (!invDoc.exists) { throw new Error('Original invoice not found.'); }
+            const invData = invDoc.data();
+
+            // Build new invoice based on received items
+            const receivedItems = claimData.receivedItems || [];
+            const newItems = receivedItems.map(item => ({
+                itemName: item.itemName,
+                quantity: item.receivedQty,
+                originalPrice: item.unitPrice || 0,
+                updatedPrice: item.unitPrice || 0, // no multiplier
+                subtotal: item.receivedQty * (item.unitPrice || 0),
+                discountPercent: 0,
+                discountAmount: 0,
+                discountTotal: 0,
+                vatPercent: 0,
+                whtPercent: 0,
+                vat: 0,
+                wht: 0,
+                total: item.receivedQty * (item.unitPrice || 0)
+            }));
+
+            const newTotal = newItems.reduce((sum, it) => sum + it.total, 0);
+            const newInvNum = invData.invoiceNumber + '-REC-' + Date.now().toString(36).toUpperCase();
+
+            // Create new invoice in repository
+            await db.collection('invoices').add({
+                invoiceNumber: newInvNum,
+                date: new Date().toISOString().slice(0,10),
+                customer: invData.customer || '',
+                customerEmail: invData.customerEmail || '',
+                notes: `Reconciliation from claim ${claimData.invoiceNumber} - ${action === 'complete' ? 'Fully Received' : 'Partial Received'}`,
+                branch: invData.branch || '',
+                vendor: invData.vendor || '',
+                items: newItems,
+                transportMultiplier: 1,
+                subtotal: newTotal,
+                totalDiscount: 0,
+                totalVAT: 0,
+                totalWHT: 0,
+                total: newTotal,
+                movedToWarehouse: false,
+                acknowledged: false,
+                createdBy: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                reconciledFromClaim: claimId,
+                originalInvoice: invoiceId
+            });
+
+            // Update original invoice with reconciliation info
+            await db.collection('invoices').doc(invoiceId).update({
+                reconciled: true,
+                reconciledAt: firebase.firestore.FieldValue.serverTimestamp(),
+                reconciledBy: currentUserEmail,
+                reconciliationAction: action,
+                reconciliationInvoice: newInvNum,
+                notes: (invData.notes || '') + `\nReconciled ${action} on ${new Date().toISOString()} - new invoice ${newInvNum}`
+            });
+
+            if (action === 'complete') {
+                // Mark claim as resolved and delete? We'll mark as resolved.
+                await db.collection('goodsReceived').doc(claimId).update({
+                    resolved: true,
+                    resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    resolvedBy: currentUserEmail,
+                    reconciliationInvoice: newInvNum
+                });
+                showToast('✅ Invoice items completed and new invoice generated.', 'success');
+            } else {
+                // Update: keep claim open, just add a note
+                await db.collection('goodsReceived').doc(claimId).update({
+                    lastReconciledAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastReconciledBy: currentUserEmail,
+                    partialInvoice: newInvNum,
+                    notes: (claimData.notes || '') + `\nPartial reconciliation ${new Date().toISOString()} - new invoice ${newInvNum}`
+                });
+                showToast('📝 Expected goods updated, partial invoice generated.', 'success');
+            }
+
+            await db.collection('activityLog').add({
+                actionType: `reconciliation_${action}`,
+                invoiceNumber: newInvNum,
+                details: `${action} reconciliation from claim ${claimData.invoiceNumber} by ${currentUserEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            document.getElementById('reconcileMessage').textContent = `✅ ${action === 'complete' ? 'Completion' : 'Update'} successful! New invoice: ${newInvNum}`;
+            document.getElementById('reconcileMessage').style.color = 'green';
+            closeModal('reconcileModal');
+            loadReceivedGoods();
+            loadInvoices();
+        } catch (err) {
+            document.getElementById('reconcileMessage').textContent = 'Error: ' + err.message;
+            document.getElementById('reconcileMessage').style.color = 'red';
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    }
+
+    // ==================== Vendor Submissions (Approval) ====================
+    function loadSubmissions() {
+        if (submissionsUnsubscribe) {
+            submissionsUnsubscribe();
+            submissionsUnsubscribe = null;
+        }
+
+        const search = searchSubmissions.value.toLowerCase().trim();
+        submissionsList.innerHTML = '<div class="loading-spinner"></div> Loading...';
+
+        submissionsUnsubscribe = db.collection('shipments')
+            .where('status', 'in', ['Draft', 'Submitted'])
+            .orderBy('createdAt', 'desc')
+            .onSnapshot((snap) => {
+                let html = '';
+                if (snap.empty) {
+                    html = '<p style="text-align:center; color:#888; padding:20px;">No pending vendor submissions.</p>';
+                } else {
+                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Vendor</th><th>Customer</th><th>Branch</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        let match = false;
+                        if (search === '') match = true;
+                        else {
+                            if ((d.invoiceNumber || '').toLowerCase().includes(search)) match = true;
+                            if (!match && (d.vendorName || '').toLowerCase().includes(search)) match = true;
+                            if (!match && (d.destinationBranch || '').toLowerCase().includes(search)) match = true;
+                            if (!match && d.items && d.items.length > 0) {
+                                for (const item of d.items) {
+                                    if (item.itemName && item.itemName.toLowerCase().includes(search)) {
+                                        match = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if (!match) return;
+                        const total = d.total || 0;
+                        const statusClass = d.status === 'Submitted' ? 'submitted-badge' : 'badge';
+                        const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(", ").substring(0,40) : '-';
+                        html += `<tr>
+                            <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                            <td>${escapeHtml(d.vendorName || '')}</td>
+                            <td>${escapeHtml(d.customer || 'N/A')}</td>
+                            <td>${escapeHtml(d.destinationBranch || 'N/A')}</td>
+                            <td>${escapeHtml(d.date || '')}</td>
+                            <td class="cost-cell">₦${total.toLocaleString()}</td>
+                            <td><span class="${statusClass}">${escapeHtml(d.status)}</span></td>
+                            <td>
+                                <button class="btn-sm btn-primary" onclick="openApproveModal('${doc.id}')">👁️ View/Edit</button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</table></div>';
+                }
+                submissionsList.innerHTML = html;
+            }, (err) => {
+                console.error('Submissions load error:', err);
+                submissionsList.innerHTML = '<p style="color:red;">Error loading submissions: ' + escapeHtml(err.message) + '</p>';
+                showToast('Error loading submissions: ' + err.message, 'error');
+            });
+    }
+
+    refreshSubmissionsBtn.addEventListener('click', loadSubmissions);
+    searchSubmissions.addEventListener('input', loadSubmissions);
+
+    // ==================== Approve Modal ====================
+    window.openApproveModal = async function(id) {
+        try {
+            const doc = await db.collection('shipments').doc(id).get();
+            if (!doc.exists) { showToast('Submission not found.', 'error'); return; }
+            const d = doc.data();
+            approveTargetId = id;
+            document.getElementById('approveInvoiceNumber').textContent = d.invoiceNumber || 'N/A';
+            document.getElementById('approveVendor').textContent = d.vendorName || '';
+            document.getElementById('approveSubmittedBy').textContent = d.submittedBy || '';
+            document.getElementById('approveDate').textContent = d.date || '';
+            document.getElementById('approveBranch').textContent = d.destinationBranch || '';
+
+            document.getElementById('approveCustomer').value = d.customer || '';
+            document.getElementById('approveCustomerEmail').value = d.customerEmail || '';
+            document.getElementById('approveVendorName').value = d.vendorName || '';
+            document.getElementById('approveNotes').value = d.notes || '';
+
+            const container = document.getElementById('approveItemsContainer');
+            container.innerHTML = '';
+            approveItemRowCounter = 0;
+            if (d.items && d.items.length > 0) {
+                d.items.forEach(item => {
+                    addApproveItemRow(item.itemName, item.orderedQty, item.unitPrice, item.discountPercent || 0, item.discountAmount || 0, item.vatPercent || 0, item.whtPercent || 0);
+                });
+            } else {
+                addApproveItemRow('', 1, 0, 0, 0, 0, 0);
+            }
+            updateApprovePreview();
+            document.getElementById('approveMessage').textContent = '';
+            document.getElementById('approveModal').style.display = 'flex';
+        } catch (err) {
+            showToast('Error loading submission: ' + err.message, 'error');
+        }
+    };
+
+    function addApproveItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
+        const rowId = ++approveItemRowCounter;
+        const div = document.createElement('div');
+        div.className = 'item-row';
+        div.dataset.rowId = rowId;
+        div.innerHTML = `
+            <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:2;">
+            <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" style="flex:0.8;" min="0" step="1">
+            <input type="number" placeholder="Unit Price" class="itemPrice" value="${Math.max(0, price)}" style="flex:1;" min="0" step="0.01">
+            <div class="item-tax-fields">
+                <input type="number" placeholder="Disc %" class="itemDiscPct" value="${Math.max(0, discPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="Disc ₦" class="itemDiscAmt" value="${Math.max(0, discAmt)}" step="0.01" min="0">
+                <input type="number" placeholder="VAT %" class="itemVAT" value="${Math.max(0, vatPct)}" step="0.01" min="0" max="100">
+                <input type="number" placeholder="WHT %" class="itemWHT" value="${Math.max(0, whtPct)}" step="0.01" min="0" max="100">
+            </div>
+            <button type="button" class="removeItem">✖</button>
+        `;
+        container.appendChild(div);
+        div.querySelector('.removeItem').onclick = () => {
+            if (container.querySelectorAll('.item-row').length <= 1) {
+                showToast('Cannot remove the last item row.', 'error');
+                return;
+            }
+            div.remove();
+            updateApprovePreview();
+        };
+        div.querySelectorAll('input').forEach(inp => {
+            inp.addEventListener('input', updateApprovePreview);
+        });
+        updateApprovePreview();
+    }
+
+    function calculateApproveTotals() {
+        const items = [];
+        let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
+        document.querySelectorAll('#approveItemsContainer .item-row').forEach(row => {
+            const name = row.querySelector('.itemName').value.trim();
+            const qty = validateNumber(row.querySelector('.itemQty').value, 0) || 0;
+            const price = validateNumber(row.querySelector('.itemPrice').value, 0) || 0;
+            const discPct = validateNumber(row.querySelector('.itemDiscPct').value, 0, 100) || 0;
+            const discAmt = validateNumber(row.querySelector('.itemDiscAmt').value, 0) || 0;
+            const vatPct = validateNumber(row.querySelector('.itemVAT').value, 0, 100) || 0;
+            const whtPct = validateNumber(row.querySelector('.itemWHT').value, 0, 100) || 0;
+
+            if (name && qty > 0 && price > 0) {
+                const itemSub = qty * price;
+                subtotal += itemSub;
+                const itemDisc = (itemSub * (discPct / 100)) + discAmt;
+                totalDisc += itemDisc;
+                const afterDisc = itemSub - itemDisc;
+                const itemVAT = afterDisc * (vatPct / 100);
+                const itemWHT = afterDisc * (whtPct / 100);
+                totalVAT += itemVAT;
+                totalWHT += itemWHT;
+                const itemTotal = afterDisc + itemVAT - itemWHT;
+                grandTotal += itemTotal;
+                items.push({
+                    name: name,
+                    qty: qty,
+                    originalPrice: price,
+                    updatedPrice: price,
+                    subtotal: itemSub,
+                    discPct: discPct,
+                    discAmt: discAmt,
+                    itemDisc: itemDisc,
+                    vatPct: vatPct,
+                    whtPct: whtPct,
+                    itemVAT: itemVAT,
+                    itemWHT: itemWHT,
+                    total: itemTotal
+                });
+            }
+        });
+        return { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal };
+    }
+
+    function updateApprovePreview() {
+        const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateApproveTotals();
+        document.getElementById('approveCostPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
+    }
+
+    document.getElementById('approveConfirmBtn').addEventListener('click', async function() {
+        const btn = this;
+        setButtonLoading(btn, true);
+        document.getElementById('approveMessage').textContent = '';
+
+        try {
+            const customer = document.getElementById('approveCustomer').value.trim();
+            const customerEmail = document.getElementById('approveCustomerEmail').value.trim();
+            const vendorName = document.getElementById('approveVendorName').value.trim();
+            const notes = document.getElementById('approveNotes').value.trim();
+            const { items, subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateApproveTotals();
+
+            if (items.length === 0) {
+                document.getElementById('approveMessage').textContent = 'Add at least one item.';
+                setButtonLoading(btn, false);
+                return;
+            }
+            if (!customer) {
+                document.getElementById('approveMessage').textContent = 'Customer name is required.';
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            const submitDoc = await db.collection('shipments').doc(approveTargetId).get();
+            if (!submitDoc.exists) {
+                document.getElementById('approveMessage').textContent = 'Submission not found.';
+                setButtonLoading(btn, false);
+                return;
+            }
+            const submitData = submitDoc.data();
+
+            await db.collection('shipments').doc(approveTargetId).update({
+                status: 'Approved',
+                approvedBy: currentUserEmail,
+                approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                customer: customer,
+                customerEmail: customerEmail,
+                vendorName: vendorName,
+                notes: notes,
+                items: items.map(it => ({
+                    itemName: it.name,
+                    orderedQty: it.qty,
+                    unitPrice: it.originalPrice,
+                    discountPercent: it.discPct,
+                    discountAmount: it.discAmt,
+                    vatPercent: it.vatPct,
+                    whtPercent: it.whtPct,
+                    total: it.total
+                })),
+                subtotal: subtotal,
+                totalDiscount: totalDisc,
+                totalVAT: totalVAT,
+                totalWHT: totalWHT,
+                total: grandTotal
+            });
+
+            const newInvNum = submitData.invoiceNumber || ('INV-' + Date.now().toString(36).toUpperCase());
+            const existingCheck = await db.collection('invoices').where('invoiceNumber', '==', newInvNum).get();
+            let finalInvNum = newInvNum;
+            if (!existingCheck.empty) {
+                finalInvNum = newInvNum + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+            }
+
+            const savedItems = items.map(it => ({
+                itemName: it.name,
+                quantity: it.qty,
+                originalPrice: it.originalPrice,
+                updatedPrice: it.updatedPrice,
+                subtotal: it.subtotal,
+                discountPercent: it.discPct,
+                discountAmount: it.discAmt,
+                discountTotal: it.itemDisc,
+                vatPercent: it.vatPct,
+                whtPercent: it.whtPct,
+                vat: it.itemVAT,
+                wht: it.itemWHT,
+                total: it.total
+            }));
+
+            await db.collection('invoices').add({
+                invoiceNumber: finalInvNum,
+                date: submitData.date || new Date().toISOString().slice(0,10),
+                customer: customer,
+                customerEmail: customerEmail || '',
+                notes: notes,
+                branch: submitData.destinationBranch || 'Lagos',
+                vendor: vendorName || submitData.vendorName || '',
+                items: savedItems,
+                transportMultiplier: 1.00,
+                subtotal: subtotal,
+                totalDiscount: totalDisc,
+                totalVAT: totalVAT,
+                totalWHT: totalWHT,
+                total: grandTotal,
+                movedToWarehouse: false,
+                acknowledged: false,
+                createdBy: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                approvedFromSubmission: approveTargetId,
+                originalSubmitter: submitData.submittedBy || ''
+            });
+
+            await db.collection('activityLog').add({
+                actionType: 'vendor_submission_approved',
+                invoiceNumber: finalInvNum,
+                details: `Approved vendor submission ${submitData.invoiceNumber} by ${currentUserEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            document.getElementById('approveMessage').textContent = '✅ Submission approved and invoice created!';
+            document.getElementById('approveMessage').style.color = 'green';
+            showToast('✅ Submission approved!', 'success');
+            closeModal('approveModal');
+            loadSubmissions();
+            loadInvoices();
+        } catch (err) {
+            document.getElementById('approveMessage').textContent = 'Error: ' + err.message;
+            document.getElementById('approveMessage').style.color = 'red';
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            setButtonLoading(btn, false);
+        }
+    });
 
     // ==================== Send/Share Functions ====================
     window.openSendModal = async function(id) {
@@ -2514,7 +3127,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with goods received claims and separate page.');
+    console.log('NEVAMAK Invoice Repository loaded with reconciliation modal.');
 </script>
 </body>
 </html>
