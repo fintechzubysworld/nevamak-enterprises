@@ -157,6 +157,8 @@
         .received-items-table td { vertical-align: middle; }
         .edit-submission-items .item-row { margin-bottom: 6px; }
         .reconcile-modal-items .item-row { margin-bottom: 6px; }
+        .reconcile-items-table input[type="number"] { width: 80px; padding: 4px; border-radius: 20px; border: 1px solid #ccc; text-align: center; }
+        .reconcile-items-table td { vertical-align: middle; padding: 6px; }
         .shortage-highlight { color: #c0392b; font-weight: bold; }
         .reconcile-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
         .reconcile-actions button { flex: 1; }
@@ -503,11 +505,11 @@
     </div>
 </div>
 
-<!-- Reconciliation Modal -->
+<!-- Reconciliation Modal (Editable) -->
 <div id="reconcileModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeModal('reconcileModal')">&times;</span>
-        <h3>🔄 Reconciliation – Goods Received Claim</h3>
+        <h3>🔄 Reconciliation – Edit Received Items</h3>
         <div id="reconcileContent">
             <p><strong>Invoice #:</strong> <span id="reconcileInvoiceNumber"></span></p>
             <p><strong>Customer:</strong> <span id="reconcileCustomer"></span></p>
@@ -516,11 +518,15 @@
             <p><strong>Date:</strong> <span id="reconcileDate"></span></p>
             <hr />
             <div style="margin:12px 0;">
-                <label><strong>Items Comparison</strong></label>
+                <label><strong>Invoice Notes (for the new invoice)</strong></label>
+                <textarea id="reconcileNotes" rows="2" style="width:100%;" placeholder="Add any notes for the new invoice..."></textarea>
+            </div>
+            <div style="margin:12px 0;">
+                <label><strong>Items – Edit Received Quantities & Unit Prices</strong></label>
                 <div id="reconcileItemsContainer" class="scroll"></div>
             </div>
             <div style="margin:12px 0;">
-                <div class="cost-summary" id="reconcileSummary">Total Ordered: ₦0 | Total Received: ₦0</div>
+                <div class="cost-summary" id="reconcileSummary">Total Ordered: ₦0 | Total Received: ₦0 | Shortage: ₦0</div>
             </div>
             <div class="reconcile-actions">
                 <button id="reconcileCompleteBtn" class="btn-success" style="flex:2;">✅ Complete Invoice Items</button>
@@ -569,6 +575,7 @@
     let approveTargetId = null;
     let approveItemRowCounter = 0;
     let reconcileTargetId = null;
+    let reconcileData = null; // store claim data
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -661,7 +668,8 @@
         }
         if (id === 'reconcileModal') {
             document.getElementById('reconcileItemsContainer').innerHTML = '';
-            document.getElementById('reconcileSummary').textContent = 'Total Ordered: ₦0 | Total Received: ₦0';
+            document.getElementById('reconcileSummary').textContent = 'Total Ordered: ₦0 | Total Received: ₦0 | Shortage: ₦0';
+            reconcileData = null;
         }
     }
     window.closeModal = closeModal;
@@ -2110,76 +2118,114 @@
         }
     };
 
-    // ==================== Reconciliation Modal ====================
+    // ==================== Reconciliation Modal (Editable) ====================
     window.openReconcileModal = async function(claimId) {
         try {
             const doc = await db.collection('goodsReceived').doc(claimId).get();
             if (!doc.exists) { showToast('Claim not found.', 'error'); return; }
             const d = doc.data();
             reconcileTargetId = claimId;
+            reconcileData = d;
             document.getElementById('reconcileInvoiceNumber').textContent = d.invoiceNumber || 'N/A';
             document.getElementById('reconcileCustomer').textContent = d.customer || 'N/A';
             document.getElementById('reconcileBranch').textContent = d.branch || 'N/A';
             document.getElementById('reconcileReceivedBy').textContent = d.receivingOfficer || '';
             document.getElementById('reconcileDate').textContent = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
 
-            // Build items comparison table
+            // Build editable items table
             const container = document.getElementById('reconcileItemsContainer');
             container.innerHTML = '';
-            let totalOrdered = 0, totalReceived = 0;
             let allFullyReceived = true;
             if (d.receivedItems && d.receivedItems.length > 0) {
-                let html = `<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
-                    <tr><th>Item</th><th style="text-align:center;">Ordered</th><th style="text-align:center;">Received</th><th style="text-align:center;">Status</th></tr>`;
-                d.receivedItems.forEach(item => {
+                let html = `<table class="reconcile-items-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                    <tr><th>Item</th><th style="text-align:center;">Ordered</th><th style="text-align:center;">Received (edit)</th><th style="text-align:center;">Unit Price (edit)</th><th style="text-align:center;">Status</th></tr>`;
+                d.receivedItems.forEach((item, idx) => {
                     const ordered = item.orderedQty || 0;
                     const received = item.receivedQty || 0;
+                    const price = item.unitPrice || 0;
                     const shortage = ordered - received;
                     const status = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
                     if (shortage > 0) allFullyReceived = false;
-                    totalOrdered += ordered * (item.unitPrice || 0);
-                    totalReceived += received * (item.unitPrice || 0);
                     html += `<tr>
                         <td>${escapeHtml(item.itemName)}</td>
                         <td style="text-align:center;">${ordered}</td>
-                        <td style="text-align:center;">${received}</td>
+                        <td style="text-align:center;">
+                            <input type="number" class="reconcile-received-qty" data-index="${idx}" value="${received}" min="0" max="${ordered}" style="width:80px; padding:4px; border-radius:20px; border:1px solid #ccc; text-align:center;">
+                        </td>
+                        <td style="text-align:center;">
+                            <input type="number" class="reconcile-unit-price" data-index="${idx}" value="${price}" min="0" step="0.01" style="width:100px; padding:4px; border-radius:20px; border:1px solid #ccc; text-align:center;">
+                        </td>
                         <td>${status}</td>
                     </tr>`;
                 });
                 html += '</table>';
                 container.innerHTML = html;
+
+                // Attach event listeners to update summary and buttons
+                const qtyInputs = container.querySelectorAll('.reconcile-received-qty');
+                const priceInputs = container.querySelectorAll('.reconcile-unit-price');
+                const inputs = [...qtyInputs, ...priceInputs];
+                inputs.forEach(inp => {
+                    inp.addEventListener('input', updateReconcileSummary);
+                });
+                updateReconcileSummary();
             } else {
                 container.innerHTML = '<p>No items in this claim.</p>';
             }
 
-            document.getElementById('reconcileSummary').textContent = `Total Ordered: ₦${totalOrdered.toLocaleString()} | Total Received: ₦${totalReceived.toLocaleString()}`;
-
-            // Enable/disable buttons based on full receipt
-            const completeBtn = document.getElementById('reconcileCompleteBtn');
-            const updateBtn = document.getElementById('reconcileUpdateBtn');
-            completeBtn.disabled = !allFullyReceived;
-            completeBtn.style.opacity = allFullyReceived ? '1' : '0.6';
-            updateBtn.disabled = allFullyReceived;
-            updateBtn.style.opacity = allFullyReceived ? '0.6' : '1';
-
-            // Store claim data for use in actions
-            document.getElementById('reconcileModal').dataset.claimId = claimId;
-            document.getElementById('reconcileModal').dataset.allFullyReceived = allFullyReceived;
-            document.getElementById('reconcileMessage').textContent = '';
             document.getElementById('reconcileModal').style.display = 'flex';
         } catch (err) {
             showToast('Error loading claim: ' + err.message, 'error');
         }
     };
 
+    function updateReconcileSummary() {
+        const container = document.getElementById('reconcileItemsContainer');
+        const rows = container.querySelectorAll('tr');
+        let totalOrdered = 0, totalReceived = 0, totalShortage = 0;
+        let allComplete = true;
+        rows.forEach(row => {
+            const qtyInput = row.querySelector('.reconcile-received-qty');
+            const priceInput = row.querySelector('.reconcile-unit-price');
+            const orderedCell = row.cells[1]; // assumes structure: item, ordered, received, price, status
+            if (qtyInput && orderedCell) {
+                const ordered = parseFloat(orderedCell.textContent) || 0;
+                const received = parseFloat(qtyInput.value) || 0;
+                const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
+                totalOrdered += ordered * price;
+                totalReceived += received * price;
+                const shortage = ordered - received;
+                if (shortage > 0) allComplete = false;
+                totalShortage += shortage * price;
+                // Update status cell
+                const statusCell = row.cells[4];
+                if (statusCell) {
+                    statusCell.innerHTML = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
+                }
+            }
+        });
+        document.getElementById('reconcileSummary').innerHTML = `
+            Total Ordered: ₦${totalOrdered.toLocaleString()} | 
+            Total Received: ₦${totalReceived.toLocaleString()} | 
+            Shortage: ₦${totalShortage.toLocaleString()}
+        `;
+        // Enable/disable buttons
+        const completeBtn = document.getElementById('reconcileCompleteBtn');
+        const updateBtn = document.getElementById('reconcileUpdateBtn');
+        completeBtn.disabled = !allComplete;
+        completeBtn.style.opacity = allComplete ? '1' : '0.6';
+        updateBtn.disabled = allComplete;
+        updateBtn.style.opacity = allComplete ? '0.6' : '1';
+    }
+
     // Reconciliation actions
     document.getElementById('reconcileCompleteBtn').addEventListener('click', async function() {
-        const claimId = document.getElementById('reconcileModal').dataset.claimId;
+        const claimId = reconcileTargetId;
         await performReconciliation(claimId, 'complete');
     });
 
     document.getElementById('reconcileUpdateBtn').addEventListener('click', async function() {
-        const claimId = document.getElementById('reconcileModal').dataset.claimId;
+        const claimId = reconcileTargetId;
         await performReconciliation(claimId, 'update');
     });
 
@@ -2193,21 +2239,41 @@
             if (!claimDoc.exists) { throw new Error('Claim not found.'); }
             const claimData = claimDoc.data();
 
-            // Get the original invoice
-            const invoiceId = claimData.invoiceId;
-            if (!invoiceId) { throw new Error('Original invoice not referenced.'); }
-            const invDoc = await db.collection('invoices').doc(invoiceId).get();
-            if (!invDoc.exists) { throw new Error('Original invoice not found.'); }
-            const invData = invDoc.data();
+            // Get edited received quantities and prices from the table
+            const rows = document.querySelectorAll('#reconcileItemsContainer table tr');
+            let receivedItems = [];
+            rows.forEach(row => {
+                const qtyInput = row.querySelector('.reconcile-received-qty');
+                const priceInput = row.querySelector('.reconcile-unit-price');
+                const itemName = row.cells[0] ? row.cells[0].textContent.trim() : '';
+                const ordered = parseFloat(row.cells[1] ? row.cells[1].textContent : 0) || 0;
+                const received = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+                const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
+                if (itemName && received > 0) {
+                    receivedItems.push({
+                        itemName: itemName,
+                        orderedQty: ordered,
+                        receivedQty: received,
+                        unitPrice: price,
+                        total: received * price
+                    });
+                }
+            });
 
-            // Build new invoice based on received items
-            const receivedItems = claimData.receivedItems || [];
+            if (receivedItems.length === 0) {
+                throw new Error('No items with received quantity > 0.');
+            }
+
+            // Get invoice notes
+            const notes = document.getElementById('reconcileNotes').value.trim();
+
+            // Build new invoice items
             const newItems = receivedItems.map(item => ({
                 itemName: item.itemName,
                 quantity: item.receivedQty,
-                originalPrice: item.unitPrice || 0,
-                updatedPrice: item.unitPrice || 0, // no multiplier
-                subtotal: item.receivedQty * (item.unitPrice || 0),
+                originalPrice: item.unitPrice,
+                updatedPrice: item.unitPrice,
+                subtotal: item.total,
                 discountPercent: 0,
                 discountAmount: 0,
                 discountTotal: 0,
@@ -2215,19 +2281,26 @@
                 whtPercent: 0,
                 vat: 0,
                 wht: 0,
-                total: item.receivedQty * (item.unitPrice || 0)
+                total: item.total
             }));
 
             const newTotal = newItems.reduce((sum, it) => sum + it.total, 0);
-            const newInvNum = invData.invoiceNumber + '-REC-' + Date.now().toString(36).toUpperCase();
+            const newInvNum = claimData.invoiceNumber + '-REC-' + Date.now().toString(36).toUpperCase();
 
-            // Create new invoice in repository
+            // Get original invoice
+            const invoiceId = claimData.invoiceId;
+            if (!invoiceId) { throw new Error('Original invoice not referenced.'); }
+            const invDoc = await db.collection('invoices').doc(invoiceId).get();
+            if (!invDoc.exists) { throw new Error('Original invoice not found.'); }
+            const invData = invDoc.data();
+
+            // Create new invoice
             await db.collection('invoices').add({
                 invoiceNumber: newInvNum,
                 date: new Date().toISOString().slice(0,10),
                 customer: invData.customer || '',
                 customerEmail: invData.customerEmail || '',
-                notes: `Reconciliation from claim ${claimData.invoiceNumber} - ${action === 'complete' ? 'Fully Received' : 'Partial Received'}`,
+                notes: notes || `Reconciliation from claim ${claimData.invoiceNumber} - ${action === 'complete' ? 'Fully Received' : 'Partial Received'}`,
                 branch: invData.branch || '',
                 vendor: invData.vendor || '',
                 items: newItems,
@@ -2246,7 +2319,7 @@
                 originalInvoice: invoiceId
             });
 
-            // Update original invoice with reconciliation info
+            // Update original invoice
             await db.collection('invoices').doc(invoiceId).update({
                 reconciled: true,
                 reconciledAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2257,20 +2330,20 @@
             });
 
             if (action === 'complete') {
-                // Mark claim as resolved and delete? We'll mark as resolved.
                 await db.collection('goodsReceived').doc(claimId).update({
                     resolved: true,
                     resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     resolvedBy: currentUserEmail,
-                    reconciliationInvoice: newInvNum
+                    reconciliationInvoice: newInvNum,
+                    receivedItems: receivedItems // update with edited values
                 });
                 showToast('✅ Invoice items completed and new invoice generated.', 'success');
             } else {
-                // Update: keep claim open, just add a note
                 await db.collection('goodsReceived').doc(claimId).update({
                     lastReconciledAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastReconciledBy: currentUserEmail,
                     partialInvoice: newInvNum,
+                    receivedItems: receivedItems, // update with edited values
                     notes: (claimData.notes || '') + `\nPartial reconciliation ${new Date().toISOString()} - new invoice ${newInvNum}`
                 });
                 showToast('📝 Expected goods updated, partial invoice generated.', 'success');
@@ -3127,7 +3200,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with reconciliation modal.');
+    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal.');
 </script>
 </body>
 </html>
