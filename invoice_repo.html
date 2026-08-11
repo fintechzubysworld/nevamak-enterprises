@@ -162,6 +162,7 @@
         .shortage-highlight { color: #c0392b; font-weight: bold; }
         .reconcile-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
         .reconcile-actions button { flex: 1; }
+        #loadMoreBtn { margin: 16px auto; display: block; width: 200px; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } .vendor-field { flex-direction: column; } }
     </style>
 </head>
@@ -577,6 +578,13 @@
     let reconcileTargetId = null;
     let reconcileData = null;
 
+    // Pagination state for invoices
+    let lastVisible = null;
+    let isLoadingMore = false;
+    let allInvoicesLoaded = false;
+    let currentSearch = '';
+    let invoiceDocsCache = [];
+
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
     const addItemBtn = document.getElementById('addItemBtn');
@@ -810,7 +818,7 @@
         document.getElementById('invoiceNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
         document.getElementById('invoiceDate').value = new Date().toISOString().slice(0,10);
         await loadSuppliers();
-        loadInvoices();
+        loadInvoices(true);
         loadSharedInvoices();
         loadReceivedGoods();
         loadSubmissions();
@@ -1431,7 +1439,7 @@
             document.getElementById('customerName').value = '';
             document.getElementById('customerEmail').value = '';
             document.getElementById('invoiceNotes').value = '';
-            loadInvoices();
+            loadInvoices(true);
         } catch (err) {
             formMessage.style.color = 'red';
             formMessage.textContent = 'Error: ' + err.message;
@@ -1541,100 +1549,160 @@
         }
     }
 
-    // ==================== Load Saved Invoices ====================
-    function loadInvoices() {
+    // ==================== Load Saved Invoices (Pagination) ====================
+    function loadInvoices(reset = true) {
+        if (reset) {
+            lastVisible = null;
+            allInvoicesLoaded = false;
+            invoiceDocsCache = [];
+            invoicesList.innerHTML = '<div class="loading-spinner"></div> Loading...';
+            if (invoicesUnsubscribe) {
+                invoicesUnsubscribe();
+                invoicesUnsubscribe = null;
+            }
+            const loadMore = document.getElementById('loadMoreBtn');
+            if (loadMore) loadMore.remove();
+        }
+
+        if (allInvoicesLoaded) {
+            showToast('All invoices loaded.', 'info');
+            return;
+        }
+
         const search = searchInvoices.value.toLowerCase().trim();
+        currentSearch = search;
+
+        let query = db.collection('invoices')
+            .orderBy('createdAt', 'desc')
+            .limit(50);
+
+        if (lastVisible) {
+            query = query.startAfter(lastVisible);
+        }
 
         if (invoicesUnsubscribe) {
             invoicesUnsubscribe();
             invoicesUnsubscribe = null;
         }
 
-        invoicesList.innerHTML = '<div class="loading-spinner"></div> Loading...';
-
-        invoicesUnsubscribe = db.collection('invoices')
-            .orderBy('createdAt', 'desc')
-            .onSnapshot(async (snap) => {
-                let html = '';
-                if (snap.empty) {
-                    html = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
+        invoicesUnsubscribe = query.onSnapshot((snap) => {
+            if (snap.empty) {
+                if (reset) {
+                    invoicesList.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No saved invoices.</p>';
                 } else {
-                    html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Customer</th><th>Vendor</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
-                    for (const doc of snap.docs) {
-                        const d = doc.data();
-                        const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
-                        const total = d.total || 0;
-                        let match = false;
-                        if (search === '') match = true;
-                        else {
-                            if ((d.invoiceNumber || '').toLowerCase().includes(search)) match = true;
-                            if (!match && (d.customer || '').toLowerCase().includes(search)) match = true;
-                            if (!match && (d.vendor || '').toLowerCase().includes(search)) match = true;
-                            if (!match && d.items && d.items.length > 0) {
-                                for (const item of d.items) {
-                                    if (item.itemName && item.itemName.toLowerCase().includes(search)) {
-                                        match = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if (!match) continue;
-                        const moved = d.movedToWarehouse || false;
-                        const isShareable = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
-                        const ackStatus = d.acknowledged ? `<span class="ack-badge">✅ Acknowledged</span>` : `<span class="badge">⏳ Pending</span>`;
-                        let receivedStatus = '<span class="badge">Not Received</span>';
-                        try {
-                            const receivedSnap = await db.collection('goodsReceived')
-                                .where('invoiceId', '==', doc.id)
-                                .limit(1)
-                                .get();
-                            if (!receivedSnap.empty) {
-                                const recData = receivedSnap.docs[0].data();
-                                if (recData.resolved) {
-                                    receivedStatus = `<span class="resolved-badge">✅ Resolved</span>`;
-                                } else {
-                                    receivedStatus = `<span class="received-badge">✅ Received</span>`;
-                                }
-                            }
-                        } catch (e) { /* ignore */ }
-                        html += `<tr>
-                            <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
-                            <td>${escapeHtml(d.date || '')}</td>
-                            <td>${escapeHtml(d.customer || 'N/A')}</td>
-                            <td>${escapeHtml(d.vendor || '')}</td>
-                            <td>${escapeHtml(d.branch || 'N/A')}</td>
-                            <td class="items-cell">${escapeHtml(itemsShort)}</td>
-                            <td class="cost-cell">₦${total.toLocaleString()}</td>
-                            <td>
-                                ${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}
-                                ${ackStatus}
-                                ${receivedStatus}
-                            </td>
-                            <td>
-                                <button class="btn-sm btn-primary" onclick="viewInvoice('${doc.id}')">👁️</button>
-                                <button class="btn-sm btn-success" onclick="downloadPDF('${doc.id}')">📄</button>
-                                <button class="btn-sm btn-warning" onclick="downloadCSV('${doc.id}')">📊</button>
-                                <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
-                                ${isShareable ? `<button class="btn-sm btn-secondary" onclick="openShareModal('${doc.id}')">📨 Share</button>` : ''}
-                                ${!moved ? `<button class="btn-sm btn-secondary" onclick="openMoveWarehouseModal('${doc.id}')">🏚️ Move</button>` : ''}
-                                ${!d.acknowledged ? `<button class="btn-sm btn-success" onclick="openAckLoginModal('${doc.id}')">✅ Ack</button>` : ''}
-                                <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
-                            </td>
-                        </tr>`;
-                    }
-                    html += '</table></div>';
+                    allInvoicesLoaded = true;
+                    showToast('All invoices loaded.', 'info');
                 }
-                invoicesList.innerHTML = html;
-            }, (err) => {
-                console.error('Invoices load error:', err);
-                invoicesList.innerHTML = '<p style="color:red;">Error loading invoices: ' + escapeHtml(err.message) + '</p>';
-                showToast('Error loading invoices: ' + err.message, 'error');
+                return;
+            }
+
+            lastVisible = snap.docs[snap.docs.length - 1];
+            snap.forEach(doc => {
+                if (!invoiceDocsCache.find(d => d.id === doc.id)) {
+                    invoiceDocsCache.push(doc);
+                }
             });
+
+            renderInvoiceList(invoiceDocsCache, search);
+
+            if (snap.docs.length === 50) {
+                if (!document.getElementById('loadMoreBtn')) {
+                    const btn = document.createElement('button');
+                    btn.id = 'loadMoreBtn';
+                    btn.className = 'btn-primary';
+                    btn.textContent = '📥 Load More';
+                    btn.onclick = () => loadInvoices(false);
+                    invoicesList.appendChild(btn);
+                }
+            } else {
+                allInvoicesLoaded = true;
+                const loadMore = document.getElementById('loadMoreBtn');
+                if (loadMore) loadMore.remove();
+            }
+        }, (err) => {
+            console.error('Invoices load error:', err);
+            invoicesList.innerHTML = '<p style="color:red;">Error loading invoices: ' + escapeHtml(err.message) + '</p>';
+            showToast('Error loading invoices: ' + err.message, 'error');
+        });
     }
 
-    refreshBtn.addEventListener('click', loadInvoices);
-    searchInvoices.addEventListener('input', loadInvoices);
+    function renderInvoiceList(docs, search) {
+        let html = '<div class="scroll"><table><tr><th>#</th><th>Date</th><th>Customer</th><th>Vendor</th><th>Branch</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th></tr>';
+        let hasMatch = false;
+
+        docs.forEach(doc => {
+            const d = doc.data();
+            const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.quantity})`).join(", ").substring(0,40) : '-';
+            const total = d.total || 0;
+
+            let match = false;
+            if (search === '') match = true;
+            else {
+                if ((d.invoiceNumber || '').toLowerCase().includes(search)) match = true;
+                if (!match && (d.customer || '').toLowerCase().includes(search)) match = true;
+                if (!match && (d.vendor || '').toLowerCase().includes(search)) match = true;
+                if (!match && d.items && d.items.length > 0) {
+                    for (const item of d.items) {
+                        if (item.itemName && item.itemName.toLowerCase().includes(search)) {
+                            match = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!match) return;
+            hasMatch = true;
+
+            const moved = d.movedToWarehouse || false;
+            const isShareable = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
+            const ackStatus = d.acknowledged ? `<span class="ack-badge">✅ Acknowledged</span>` : `<span class="badge">⏳ Pending</span>`;
+            let receivedStatus = '<span class="badge">Not Received</span>';
+
+            html += `<tr>
+                <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                <td>${escapeHtml(d.date || '')}</td>
+                <td>${escapeHtml(d.customer || 'N/A')}</td>
+                <td>${escapeHtml(d.vendor || '')}</td>
+                <td>${escapeHtml(d.branch || 'N/A')}</td>
+                <td class="items-cell">${escapeHtml(itemsShort)}</td>
+                <td class="cost-cell">₦${total.toLocaleString()}</td>
+                <td>
+                    ${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}
+                    ${ackStatus}
+                    ${receivedStatus}
+                </td>
+                <td>
+                    <button class="btn-sm btn-primary" onclick="viewInvoice('${doc.id}')">👁️</button>
+                    <button class="btn-sm btn-success" onclick="downloadPDF('${doc.id}')">📄</button>
+                    <button class="btn-sm btn-warning" onclick="downloadCSV('${doc.id}')">📊</button>
+                    <button class="btn-sm btn-info" onclick="openSendModal('${doc.id}')">📤</button>
+                    ${isShareable ? `<button class="btn-sm btn-secondary" onclick="openShareModal('${doc.id}')">📨 Share</button>` : ''}
+                    ${!moved ? `<button class="btn-sm btn-secondary" onclick="openMoveWarehouseModal('${doc.id}')">🏚️ Move</button>` : ''}
+                    ${!d.acknowledged ? `<button class="btn-sm btn-success" onclick="openAckLoginModal('${doc.id}')">✅ Ack</button>` : ''}
+                    <button class="btn-sm btn-danger" onclick="deleteInvoice('${doc.id}')">🗑️</button>
+                </td>
+            </tr>`;
+        });
+
+        html += '</table></div>';
+        if (!hasMatch) {
+            html = '<p style="text-align:center; color:#888; padding:20px;">No matching invoices found.</p>';
+        }
+        invoicesList.innerHTML = html;
+    }
+
+    // Search listener – client-side filtering
+    searchInvoices.addEventListener('input', function() {
+        const search = this.value.toLowerCase().trim();
+        renderInvoiceList(invoiceDocsCache, search);
+    });
+
+    refreshBtn.addEventListener('click', function() {
+        invoiceDocsCache = [];
+        lastVisible = null;
+        allInvoicesLoaded = false;
+        loadInvoices(true);
+    });
 
     // ==================== View Invoice ====================
     window.viewInvoice = async function(id) {
@@ -1767,7 +1835,7 @@
         try {
             await db.collection('invoices').doc(id).delete();
             showToast('✅ Invoice deleted.', 'success');
-            loadInvoices();
+            loadInvoices(true);
         } catch (err) {
             showToast('Error: ' + err.message, 'error');
         }
@@ -1998,7 +2066,7 @@
             document.getElementById('ackStep2Message').textContent = '';
             showToast('✅ Goods received successfully!', 'success');
             closeModal('ackLoginModal');
-            loadInvoices();
+            loadInvoices(true);
             loadReceivedGoods();
         } catch (err) {
             console.error('Receiving error:', err);
@@ -2371,7 +2439,7 @@
             document.getElementById('reconcileMessage').style.color = 'green';
             closeModal('reconcileModal');
             loadReceivedGoods();
-            loadInvoices();
+            loadInvoices(true);
         } catch (err) {
             document.getElementById('reconcileMessage').textContent = 'Error: ' + err.message;
             document.getElementById('reconcileMessage').style.color = 'red';
@@ -2680,7 +2748,7 @@
             showToast('✅ Submission approved!', 'success');
             closeModal('approveModal');
             loadSubmissions();
-            loadInvoices();
+            loadInvoices(true);
         } catch (err) {
             document.getElementById('approveMessage').textContent = 'Error: ' + err.message;
             document.getElementById('approveMessage').style.color = 'red';
@@ -2979,8 +3047,40 @@
         sharedUnsubscribe = db.collection('sharedInvoices')
             .where('recipientId', '==', currentUser.uid)
             .orderBy('timestamp', 'desc')
-            .onSnapshot((snap) => {
-                renderSharedInvoices(snap);
+            .onSnapshot(async (snap) => {
+                if (snap.empty) {
+                    container.innerHTML = '<p style="text-align:center; color:#888; padding:20px;">No invoices shared with you.</p>';
+                    return;
+                }
+                let html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Shared By</th><th>Message</th><th>Date</th><th>Action</th></tr>';
+                for (const doc of snap.docs) {
+                    const d = doc.data();
+                    let invoiceTotal = 'N/A';
+                    let invoiceDate = '';
+                    try {
+                        const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
+                        if (invDoc.exists) {
+                            const invData = invDoc.data();
+                            invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                            invoiceDate = invData.date || '';
+                        }
+                    } catch (e) { /* ignore */ }
+
+                    const date = d.timestamp ? new Date(d.timestamp.toDate()).toLocaleString() : '';
+                    const isRead = d.read ? '' : ' style="font-weight:bold;"';
+                    html += `<tr${isRead}>
+                        <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                        <td>${escapeHtml(d.senderName || 'Unknown')}</td>
+                        <td>${escapeHtml(d.message || '')}</td>
+                        <td>${date}</td>
+                        <td>
+                            <button class="btn-sm btn-primary" onclick="viewSharedInvoice('${d.invoiceId}')">👁️ View</button>
+                            <button class="btn-sm btn-success" onclick="markSharedRead('${doc.id}')">✅ Mark Read</button>
+                        </td>
+                    </tr>`;
+                }
+                html += '</table></div>';
+                container.innerHTML = html;
             }, (err) => {
                 console.error('Shared invoices load error:', err);
                 if (err.message && err.message.includes('requires an index')) {
@@ -3153,7 +3253,7 @@
             if (d.movedToWarehouse) {
                 showToast('Already moved.', 'error');
                 closeModal('moveWarehouseModal');
-                loadInvoices();
+                loadInvoices(true);
                 return;
             }
             const items = d.items || [];
@@ -3199,7 +3299,7 @@
             showToast(`✅ Moved ${items.length} items to warehouse.`, 'success');
             setTimeout(() => {
                 closeModal('moveWarehouseModal');
-                loadInvoices();
+                loadInvoices(true);
             }, 1000);
         } catch (err) {
             document.getElementById('moveMessage').textContent = 'Error: ' + err.message;
@@ -3210,7 +3310,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal.');
+    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal and pagination.');
 </script>
 </body>
 </html>
