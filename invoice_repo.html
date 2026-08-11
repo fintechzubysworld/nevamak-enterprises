@@ -2216,13 +2216,23 @@
             const container = document.getElementById('reconcileItemsContainer');
             container.innerHTML = '';
             let allFullyReceived = true;
+
+            // Create a map of original item prices from originalItems (if available)
+            const originalPrices = {};
+            if (d.originalItems && Array.isArray(d.originalItems)) {
+                d.originalItems.forEach(orig => {
+                    originalPrices[orig.itemName] = orig.unitPrice || 0;
+                });
+            }
+
             if (d.receivedItems && d.receivedItems.length > 0) {
                 let html = `<table class="reconcile-items-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                     <tr><th>Item</th><th style="text-align:center;">Ordered</th><th style="text-align:center;">Received (edit)</th><th style="text-align:center;">Unit Price (edit)</th><th style="text-align:center;">Status</th></tr>`;
                 d.receivedItems.forEach((item, idx) => {
                     const ordered = item.orderedQty || 0;
-                    const received = item.receivedQty || 0;
-                    const price = item.unitPrice || 0;
+                    let received = item.receivedQty || 0;
+                    // Use original price if available, fallback to item.unitPrice, then 0
+                    let price = originalPrices[item.itemName] !== undefined ? originalPrices[item.itemName] : (item.unitPrice || 0);
                     const shortage = ordered - received;
                     const status = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
                     if (shortage > 0) allFullyReceived = false;
@@ -3322,7 +3332,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal and original invoice total capture.');
+    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal and original invoice price fallback.');
 </script>
 </body>
 </html>
