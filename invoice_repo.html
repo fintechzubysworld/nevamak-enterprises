@@ -517,6 +517,7 @@
             <p><strong>Branch:</strong> <span id="reconcileBranch"></span></p>
             <p><strong>Received By:</strong> <span id="reconcileReceivedBy"></span></p>
             <p><strong>Date:</strong> <span id="reconcileDate"></span></p>
+            <p><strong>Original Invoice Total:</strong> ₦<span id="reconcileOriginalTotal"></span></p>
             <hr />
             <div style="margin:12px 0;">
                 <label><strong>Invoice Notes (for the new invoice)</strong></label>
@@ -2035,6 +2036,9 @@
                 ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
+            // Store original total
+            const originalTotal = invDoc.data().total || 0;
+
             await secondaryDb.collection('goodsReceived').add({
                 invoiceId: ackLoginTargetId,
                 invoiceNumber: invDoc.data().invoiceNumber,
@@ -2042,6 +2046,7 @@
                 branch: invDoc.data().branch || '',
                 vendor: invDoc.data().vendor || '',
                 originalItems: invDoc.data().items || [],
+                originalTotal: originalTotal, // capture original invoice total
                 receivedItems: receivedItems,
                 receivingOfficer: officerUser.email,
                 officerSignature: signature,
@@ -2099,7 +2104,7 @@
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No goods received claims.</p>';
                 } else {
-                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Status</th><th>Actions</th></tr>';
+                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Original Total</th><th>Received Total</th><th>Status</th><th>Actions</th></tr>';
                     snap.forEach(doc => {
                         const d = doc.data();
                         let match = false;
@@ -2112,6 +2117,8 @@
                         const itemsCount = d.receivedItems ? d.receivedItems.filter(i => i.receivedQty > 0).length : 0;
                         const date = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
                         const status = d.resolved ? '<span class="resolved-badge">✅ Resolved</span>' : '<span class="received-badge">Open</span>';
+                        const originalTotal = d.originalTotal || 0;
+                        const receivedTotal = d.receivedItems ? d.receivedItems.reduce((sum, i) => sum + (i.total || 0), 0) : 0;
                         html += `<tr>
                             <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                             <td>${escapeHtml(d.customer || 'N/A')}</td>
@@ -2119,6 +2126,8 @@
                             <td>${escapeHtml(d.receivingOfficer || '')}</td>
                             <td>${date}</td>
                             <td>${itemsCount} item(s)</td>
+                            <td>₦${originalTotal.toLocaleString()}</td>
+                            <td>₦${receivedTotal.toLocaleString()}</td>
                             <td>${status}</td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="viewReceivedClaim('${doc.id}')">👁️</button>
@@ -2158,6 +2167,7 @@
             }
             itemsHtml += '</table>';
             const totalReceived = d.receivedItems ? d.receivedItems.reduce((sum, i) => sum + (i.total || 0), 0) : 0;
+            const originalTotal = d.originalTotal || 0;
             const totalOrdered = d.originalItems ? d.originalItems.reduce((sum, i) => sum + (i.quantity * (i.unitPrice || 0)), 0) : 0;
             const html = `
                 <h4>Goods Received Claim</h4>
@@ -2169,6 +2179,7 @@
                 <p><strong>Signature:</strong> ${escapeHtml(d.officerSignature)}</p>
                 <p><strong>Date:</strong> ${d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : ''}</p>
                 ${d.receivedNotes ? `<p><strong>Notes:</strong> ${escapeHtml(d.receivedNotes)}</p>` : ''}
+                <p><strong>Original Invoice Total:</strong> ₦${originalTotal.toLocaleString()}</p>
                 <p><strong>Total Ordered Value:</strong> ₦${totalOrdered.toLocaleString()}</p>
                 <p><strong>Total Received Value:</strong> ₦${totalReceived.toLocaleString()}</p>
                 <h5>Items</h5>
@@ -2199,6 +2210,7 @@
             document.getElementById('reconcileBranch').textContent = d.branch || 'N/A';
             document.getElementById('reconcileReceivedBy').textContent = d.receivingOfficer || '';
             document.getElementById('reconcileDate').textContent = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
+            document.getElementById('reconcileOriginalTotal').textContent = (d.originalTotal || 0).toLocaleString();
 
             // Build editable items table
             const container = document.getElementById('reconcileItemsContainer');
@@ -3310,7 +3322,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal and pagination.');
+    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal and original invoice total capture.');
 </script>
 </body>
 </html>
