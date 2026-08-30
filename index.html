@@ -53,7 +53,7 @@
 
         /* ── Sidebar ── */
         .sidebar {
-            width: 240px;
+            width: 260px;
             background: #0a1e2f;
             color: #eaeef3;
             display: flex;
@@ -71,7 +71,7 @@
         .sidebar-brand {
             padding: 0 22px 20px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
         .sidebar-brand h1 {
             font-size: 1.4rem;
@@ -134,6 +134,11 @@
             padding: 2px 8px;
             border-radius: 20px;
             font-weight: 600;
+        }
+        .sidebar-nav .nav-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.06);
+            margin: 8px 14px;
         }
         .sidebar-footer {
             padding: 16px 22px 0;
@@ -704,7 +709,7 @@
                 left: 0;
                 height: 100%;
                 transform: translateX(-100%);
-                width: 260px;
+                width: 280px;
                 z-index: 200;
                 border-radius: 0 20px 20px 0;
             }
@@ -894,6 +899,43 @@
                 <span class="icon">⏳</span> Pending Requests
                 <span class="badge-dot" id="pendingBadge">0</span>
             </button>
+
+            <div class="nav-divider"></div>
+
+            <!-- Full module navigation -->
+            <a class="nav-item" href="reports.html" target="_blank">
+                <span class="icon">📊</span> Reports
+            </a>
+            <a class="nav-item" href="warehouse.html" target="_blank">
+                <span class="icon">🏚️</span> Warehouse
+            </a>
+            <a class="nav-item" href="request_invoice.html" target="_blank">
+                <span class="icon">📄</span> Request Invoice
+            </a>
+            <a class="nav-item" href="invoice_repo.html" target="_blank">
+                <span class="icon">🧾</span> Invoice Repo
+            </a>
+            <a class="nav-item" href="goods-expected.html" target="_blank">
+                <span class="icon">📦</span> Goods Expected
+            </a>
+            <a class="nav-item" href="shop_floor.html" target="_blank">
+                <span class="icon">🏪</span> Shop Floor
+            </a>
+            <a class="nav-item" href="user.html" target="_blank">
+                <span class="icon">👥</span> Users
+            </a>
+            <a class="nav-item" href="permissions.html" target="_blank">
+                <span class="icon">🔐</span> Permissions
+            </a>
+            <a class="nav-item" href="admin_create_user.html" target="_blank">
+                <span class="icon">👑</span> Admin
+            </a>
+            <a class="nav-item" href="superadmin_zone.html" target="_blank">
+                <span class="icon">🛡️</span> Super Admin
+            </a>
+            <a class="nav-item" href="update.html" target="_blank">
+                <span class="icon">🔄</span> Update
+            </a>
         </nav>
         <div class="sidebar-footer">
             <div class="user-badge">
@@ -1196,7 +1238,7 @@
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         //   SIDEBAR / NAV
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        const navItems = document.querySelectorAll('.nav-item');
+        const navItems = document.querySelectorAll('.nav-item[data-tab]');
         const tabPanes = {
             dashboard: document.getElementById('tab-dashboard'),
             shipments: document.getElementById('tab-shipments'),
@@ -1543,6 +1585,7 @@
                         <td><span class="badge ${moved === '✅ Moved' ? 'badge-success' : 'badge-warning'}">${moved}</span></td>
                         <td>
                             <button class="btn-icon" onclick="viewInvoice('${doc.id}')" title="View">👁️</button>
+                            <button class="btn-icon" onclick="openShareInvoice('${doc.id}')" title="Share">📤</button>
                             <button class="btn-icon" onclick="openMoveWarehouseModal('${doc.id}')" title="Move to WH">🏚️</button>
                             <button class="btn-icon danger" onclick="deleteInvoice('${doc.id}')" title="Delete">🗑️</button>
                         </td>
@@ -1561,6 +1604,16 @@
             loadInvoices();
             showToast('Invoices refreshed', 'info', 1000);
         });
+
+        // ── Share Invoice (opens share.html with invoice ID) ──
+        window.openShareInvoice = function(invoiceId) {
+            if (!invoiceId) {
+                showToast('No invoice selected.', 'error');
+                return;
+            }
+            // Open share.html with the invoice ID as a query parameter
+            window.open(`share.html?id=${invoiceId}`, '_blank');
+        };
 
         // ── New Invoice ──
         document.getElementById('newInvoiceBtn').addEventListener('click', () => {
