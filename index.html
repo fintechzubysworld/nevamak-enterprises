@@ -446,6 +446,10 @@
             background: #fff3cd;
             color: #8a6d00;
         }
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
 
         .cost-cell {
             font-family: 'JetBrains Mono', monospace;
@@ -469,6 +473,10 @@
         .btn-icon.danger:hover {
             background: #fde8e8;
             color: #c0392b;
+        }
+        .btn-icon.success:hover {
+            background: #d4edda;
+            color: #1e7e34;
         }
 
         .empty-state {
@@ -902,7 +910,7 @@
 
             <div class="nav-divider"></div>
 
-            <!-- Full module navigation -->
+            <!-- Full module navigation (opens in new tab) -->
             <a class="nav-item" href="reports.html" target="_blank">
                 <span class="icon">📊</span> Reports
             </a>
@@ -1177,6 +1185,33 @@
 
     <script>
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   GLOBAL ERROR HANDLING (suppress benign extension errors)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        window.addEventListener('error', function(e) {
+            const msg = e.message || '';
+            if (msg.includes('message channel closed') ||
+                msg.includes('Extension') ||
+                msg.includes('chrome-extension://') ||
+                msg.includes('moz-extension://')) {
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+            }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+            const reason = e.reason || {};
+            const msg = reason.message || String(reason);
+            if (msg.includes('message channel closed') ||
+                msg.includes('Extension') ||
+                msg.includes('chrome-extension://') ||
+                msg.includes('moz-extension://')) {
+                e.preventDefault();
+                return true;
+            }
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         //   FIREBASE CONFIG
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         const FIREBASE_CONFIG = {
@@ -1253,13 +1288,10 @@
         const backdrop = document.getElementById('sidebarBackdrop');
 
         function switchTab(tabId) {
-            // Update nav
             navItems.forEach(el => el.classList.toggle('active', el.dataset.tab === tabId));
-            // Update panes
             Object.keys(tabPanes).forEach(key => {
                 tabPanes[key].classList.toggle('active', key === tabId);
             });
-            // Title
             const titles = {
                 dashboard: 'Dashboard',
                 shipments: 'Shipments',
@@ -1270,10 +1302,8 @@
                 pending: 'Pending Requests'
             };
             pageTitle.innerHTML = titles[tabId] || 'Dashboard';
-            // Close sidebar on mobile
             closeSidebar();
 
-            // Refresh data on tab switch
             if (tabId === 'shipments') refreshShipments();
             if (tabId === 'invoices') loadInvoices();
             if (tabId === 'inventory') loadInventory();
@@ -1287,7 +1317,6 @@
             btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
 
-        // Mobile menu toggle
         document.getElementById('menuToggle').addEventListener('click', () => {
             sidebar.classList.toggle('open');
             backdrop.classList.toggle('open');
@@ -1321,7 +1350,6 @@
                     document.getElementById('userAvatar').textContent = (user.email || 'U').charAt(0).toUpperCase();
                 }
 
-                // Show pending tab for admin / lagos_sender
                 const pendingTab = document.getElementById('pendingTabBtn');
                 if (currentRole === 'admin' || currentRole === 'lagos_sender') {
                     pendingTab.style.display = 'flex';
@@ -1329,7 +1357,6 @@
                     pendingTab.style.display = 'none';
                 }
 
-                // Today's date
                 document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-NG', {
                     weekday: 'short',
                     day: 'numeric',
@@ -1337,15 +1364,12 @@
                     year: 'numeric'
                 });
 
-                // Start real-time listeners
                 startDashboardListeners();
                 loadInvoices();
                 loadInventory();
                 loadReturns();
                 loadAudit();
                 if (currentRole === 'admin' || currentRole === 'lagos_sender') loadPendingRequests();
-
-                // Init charts
                 initCharts();
 
             } catch (err) {
@@ -1368,7 +1392,6 @@
         //   DASHBOARD LISTENERS (Shipments + Returns)
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function startDashboardListeners() {
-            // ── Shipments ──
             let q = db.collection('shipments').orderBy('createdAt', 'desc');
             if (currentRole === 'abuja_rep') {
                 q = db.collection('shipments').where('destinationBranch', '==', 'Abuja').orderBy('createdAt', 'desc');
@@ -1423,7 +1446,6 @@
                     </tr>`);
                 });
 
-                // Stats
                 document.getElementById('statTotal').textContent = total;
                 document.getElementById('statAbuja').textContent = abuja;
                 document.getElementById('statPH').textContent = ph;
@@ -1431,23 +1453,20 @@
                 document.getElementById('statGoods').textContent = `₦${goods.toLocaleString()}`;
                 document.getElementById('statTransport').textContent = `₦${transport.toLocaleString()}`;
                 document.getElementById('shipmentBadge').textContent = total;
-
-                // Table
                 document.getElementById('shipmentsBody').innerHTML = rows.length ? rows.join('') :
                     '<tr><td colspan="9" class="text-center text-muted">No shipments found</td></tr>';
 
-                // Charts
                 const sorted = Object.keys(chartMap).sort().slice(-30);
                 const data = sorted.map(k => ({ date: k, count: chartMap[k].count, value: chartMap[k].value }));
                 updateCharts(data);
 
             }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
                 console.error('Shipments listener error:', err);
                 document.getElementById('shipmentsBody').innerHTML =
                     `<tr><td colspan="9" class="text-center text-muted">⚠️ Error loading shipments</td></tr>`;
             });
 
-            // ── Returns ──
             if (returnsUnsub) returnsUnsub();
             returnsUnsub = db.collection('returns').orderBy('date', 'desc').onSnapshot((snap) => {
                 let totalReturned = 0;
@@ -1467,15 +1486,20 @@
                 document.getElementById('statReturned').textContent = totalReturned;
                 document.getElementById('returnsBody').innerHTML = rows ||
                     '<tr><td colspan="6" class="text-center text-muted">No returns recorded</td></tr>';
-            }, (err) => console.error('Returns listener error:', err));
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Returns listener error:', err);
+            });
 
-            // ── Inventory stock count ──
             if (inventoryUnsub) inventoryUnsub();
             inventoryUnsub = db.collection('inventory').onSnapshot((snap) => {
                 let stock = 0;
                 snap.forEach(d => { stock += d.data().stock || 0; });
                 document.getElementById('statStock').textContent = stock;
-            }, (err) => console.error('Inventory count error:', err));
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Inventory count error:', err);
+            });
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1577,15 +1601,20 @@
                     count++;
                     const total = d.total || 0;
                     const moved = d.movedToWarehouse ? '✅ Moved' : 'Pending';
+                    const dispatched = d.dispatched ? '📦 Dispatched' : '';
+                    const statusBadge = dispatched ? `<span class="badge badge-info">${dispatched}</span>` :
+                        `<span class="badge ${moved === '✅ Moved' ? 'badge-success' : 'badge-warning'}">${moved}</span>`;
                     rows += `<tr>
                         <td><strong>${d.invoiceNumber || doc.id.slice(0,6)}</strong></td>
                         <td>${d.customer || '—'}</td>
                         <td><span class="badge">${d.branch || '—'}</span></td>
                         <td class="cost-cell">₦${total.toLocaleString()}</td>
-                        <td><span class="badge ${moved === '✅ Moved' ? 'badge-success' : 'badge-warning'}">${moved}</span></td>
+                        <td>${statusBadge}</td>
                         <td>
+                            <button class="btn-icon" onclick="editInvoice('${doc.id}')" title="Edit">✏️</button>
                             <button class="btn-icon" onclick="viewInvoice('${doc.id}')" title="View">👁️</button>
                             <button class="btn-icon" onclick="openShareInvoice('${doc.id}')" title="Share">📤</button>
+                            ${!d.dispatched ? `<button class="btn-icon success" onclick="dispatchInvoice('${doc.id}')" title="Dispatch">📦</button>` : ''}
                             <button class="btn-icon" onclick="openMoveWarehouseModal('${doc.id}')" title="Move to WH">🏚️</button>
                             <button class="btn-icon danger" onclick="deleteInvoice('${doc.id}')" title="Delete">🗑️</button>
                         </td>
@@ -1594,6 +1623,7 @@
                 tbody.innerHTML = rows;
                 document.getElementById('invoiceBadge').textContent = count;
             }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
                 console.error('Invoices error:', err);
                 tbody.innerHTML =
                 `<tr><td colspan="6" class="text-center text-muted">⚠️ Error loading invoices</td></tr>`;
@@ -1605,13 +1635,103 @@
             showToast('Invoices refreshed', 'info', 1000);
         });
 
-        // ── Share Invoice (opens share.html with invoice ID) ──
-        window.openShareInvoice = function(invoiceId) {
-            if (!invoiceId) {
-                showToast('No invoice selected.', 'error');
-                return;
+        // ── Edit Invoice ──
+        window.editInvoice = async function(id) {
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+                const d = doc.data();
+                editingInvoiceId = id;
+                document.getElementById('invoiceModalTitle').textContent = '✏️ Edit Invoice';
+                document.getElementById('invNumber').value = d.invoiceNumber || '';
+                document.getElementById('invDate').value = d.date || new Date().toISOString().slice(0, 10);
+                document.getElementById('invCustomer').value = d.customer || '';
+                document.getElementById('invEmail').value = d.customerEmail || '';
+                document.getElementById('invVendor').value = d.vendor || '';
+                document.getElementById('invBranch').value = d.branch || 'Lagos';
+                document.getElementById('invNotes').value = d.notes || '';
+                document.getElementById('invMultiplier').value = d.transportMultiplier || 1.00;
+                document.getElementById('bulkDiscPct').value = '0';
+                document.getElementById('bulkVAT').value = '0';
+                document.getElementById('invoiceFormMessage').textContent = '';
+                document.getElementById('invoicePreviewArea').style.display = 'none';
+
+                const container = document.getElementById('invoiceItemsContainer');
+                container.innerHTML = '';
+                itemCounter = 0;
+                if (d.items && d.items.length) {
+                    d.items.forEach(it => {
+                        addInvoiceItemRow(it.itemName, it.quantity, it.unitPrice,
+                            it.discountPercent || 0, it.discountAmount || 0, it.vatPercent || 0);
+                    });
+                } else {
+                    addInvoiceItemRow();
+                }
+                updateInvoicePreview();
+                openModal('invoiceModal');
+            } catch (err) {
+                showToast('Error loading invoice: ' + err.message, 'error');
             }
-            // Open share.html with the invoice ID as a query parameter
+        };
+
+        // ── Dispatch Invoice (create shipment) ──
+        window.dispatchInvoice = async function(id) {
+            if (!confirm('Dispatch this invoice? A shipment will be created.')) return;
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+                const d = doc.data();
+                if (d.dispatched) { showToast('Already dispatched.', 'info'); return; }
+
+                // Build shipment items from invoice items
+                const shipmentItems = (d.items || []).map(it => ({
+                    itemName: it.itemName || '',
+                    orderedQty: it.quantity || 0,
+                    unitPrice: it.unitPrice || 0,
+                    totalItemCost: (it.quantity || 0) * (it.unitPrice || 0)
+                }));
+
+                // Create shipment
+                await db.collection('shipments').add({
+                    senderName: d.customer || 'Unknown',
+                    destinationBranch: d.branch || 'Lagos',
+                    items: shipmentItems,
+                    transportCost: 0, // default
+                    status: 'Dispatched',
+                    vehicleNo: '',
+                    driver: '',
+                    notes: `Dispatched from invoice ${d.invoiceNumber}`,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: currentEmail,
+                    invoiceId: id // link back to invoice
+                });
+
+                // Mark invoice as dispatched
+                await db.collection('invoices').doc(id).update({
+                    dispatched: true,
+                    dispatchedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    dispatchedBy: currentEmail
+                });
+
+                await db.collection('activityLog').add({
+                    actionType: 'invoice_dispatched',
+                    invoiceNumber: d.invoiceNumber,
+                    details: `Invoice ${d.invoiceNumber} dispatched by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+
+                showToast('✅ Invoice dispatched and shipment created!', 'success');
+                loadInvoices();
+                refreshShipments();
+            } catch (err) {
+                showToast('Error dispatching: ' + err.message, 'error');
+            }
+        };
+
+        // ── Share Invoice ──
+        window.openShareInvoice = function(invoiceId) {
+            if (!invoiceId) { showToast('No invoice selected.', 'error'); return; }
             window.open(`share.html?id=${invoiceId}`, '_blank');
         };
 
@@ -1811,7 +1931,7 @@
             showToast('Preview ready', 'info', 1200);
         });
 
-        // ── Save Invoice ──
+        // ── Save Invoice (Create or Update) ──
         document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('saveInvoiceBtn');
@@ -1889,6 +2009,7 @@
                         totalWHT: 0,
                         total: grandTotal,
                         movedToWarehouse: false,
+                        dispatched: false,
                         acknowledged: false,
                         createdBy: currentEmail,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1921,14 +2042,14 @@
                     });
                 }
                 itemsHtml += '</table>';
-                const moved = d.movedToWarehouse ? '✅ Moved to Warehouse' : 'Pending';
+                const status = d.dispatched ? '📦 Dispatched' : (d.movedToWarehouse ? '✅ Moved' : 'Pending');
                 document.getElementById('viewInvoiceContent').innerHTML = `
                     <p><strong>#:</strong> ${d.invoiceNumber}</p>
                     <p><strong>Date:</strong> ${d.date || 'N/A'}</p>
                     <p><strong>Customer:</strong> ${d.customer || 'N/A'}</p>
                     <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     <p><strong>Vendor:</strong> ${d.vendor || 'N/A'}</p>
-                    <p><strong>Status:</strong> ${moved}</p>
+                    <p><strong>Status:</strong> ${status}</p>
                     <p><strong>Total:</strong> ₦${(d.total||0).toLocaleString()}</p>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
                     <h4>Items</h4>${itemsHtml}
@@ -2002,7 +2123,6 @@
                 if (d.movedToWarehouse) { throw new Error('Already moved.'); }
                 const branch = document.getElementById('moveBranchSel').value;
 
-                // Update inventory
                 for (const item of d.items || []) {
                     const qty = item.quantity || 0;
                     const price = item.unitPrice || 0;
@@ -2083,12 +2203,12 @@
                 });
                 tbody.innerHTML = rows;
             }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
                 console.error('Inventory error:', err);
                 tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">⚠️ Error loading inventory</td></tr>';
             });
         }
 
-        // Inventory search (client-side)
         document.getElementById('invSearch').addEventListener('input', function() {
             const q = this.value.toLowerCase().trim();
             const rows = document.querySelectorAll('#inventoryBody tr');
@@ -2124,6 +2244,7 @@
                 });
                 tbody.innerHTML = rows;
             }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
                 console.error('Returns error:', err);
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">⚠️ Error loading returns</td></tr>';
             });
@@ -2150,6 +2271,7 @@
                 });
                 el.innerHTML = html;
             }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
                 console.error('Audit error:', err);
                 el.innerHTML = '<div class="text-center text-muted" style="padding:20px;">⚠️ Error loading audit log</div>';
             });
@@ -2195,6 +2317,7 @@
                     html += '</table>';
                     el.innerHTML = html;
                 }, (err) => {
+                    if (err.message && err.message.includes('message channel closed')) return;
                     console.error('Pending requests error:', err);
                     el.innerHTML =
                         `<div class="text-center text-muted" style="padding:20px;">⚠️ Error loading: ${escapeHtml(err.message)}</div>`;
@@ -2245,14 +2368,12 @@
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         console.log('🚀 NEVAMAK Unified Dashboard loaded.');
 
-        // Close modals on backdrop click
         document.querySelectorAll('.modal-overlay').forEach(el => {
             el.addEventListener('click', function(e) {
                 if (e.target === this) this.classList.remove('open');
             });
         });
 
-        // Close sidebar on Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeSidebar();
         });
