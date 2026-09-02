@@ -478,6 +478,10 @@
             background: #d4edda;
             color: #1e7e34;
         }
+        .btn-icon.warning:hover {
+            background: #fff3cd;
+            color: #8a6d00;
+        }
 
         .empty-state {
             text-align: center;
@@ -1014,7 +1018,7 @@
                 </div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+                        <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
                         <tbody id="shipmentsBody"><tr><td colspan="9" class="text-center text-muted">Loading…</td></tr></tbody>
                     </table>
                 </div>
@@ -1102,12 +1106,61 @@
     <!-- ─── TOAST ─── -->
     <div class="toast-container"><div class="toast" id="toast"></div></div>
 
-    <!-- ─── MODAL: View Shipment ─── -->
+    <!-- ─── MODAL: View Shipment (read-only) ─── -->
     <div class="modal-overlay" id="viewShipmentModal">
         <div class="modal-box">
             <span class="modal-close" onclick="closeModal('viewShipmentModal')">&times;</span>
             <h2>📄 Shipment Details</h2>
             <div id="viewShipmentContent"></div>
+        </div>
+    </div>
+
+    <!-- ─── MODAL: Edit Shipment ─── -->
+    <div class="modal-overlay" id="editShipmentModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('editShipmentModal')">&times;</span>
+            <h2>✏️ Edit Shipment</h2>
+            <form id="editShipmentForm">
+                <input type="hidden" id="editShipmentId">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Sender</label><input type="text" id="editSender" required></div>
+                    <div class="form-group"><label>Destination</label>
+                        <select id="editDestination"><option value="Lagos">Lagos</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Vehicle #</label><input type="text" id="editVehicle" placeholder="e.g., ABC-123"></div>
+                    <div class="form-group"><label>Driver</label><input type="text" id="editDriver" placeholder="Driver name"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Transport Cost (₦)</label><input type="number" id="editTransport" step="0.01" min="0"></div>
+                    <div class="form-group"><label>Status</label>
+                        <select id="editStatus">
+                            <option value="Dispatched">Dispatched</option>
+                            <option value="In Transit">In Transit</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                            <option value="Partial">Partial</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group"><label>Notes</label><textarea id="editNotes" rows="2" placeholder="Optional notes"></textarea></div>
+
+                <div class="form-group">
+                    <label>Items</label>
+                    <div id="editShipmentItemsContainer"></div>
+                    <button type="button" class="btn-sm primary" id="addEditShipmentItemBtn">＋ Add Item</button>
+                </div>
+
+                <div class="cost-summary" id="editShipmentTotalPreview">Total Goods: ₦0</div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-success" id="updateShipmentBtn">💾 Update Shipment</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('editShipmentModal')">Cancel</button>
+                </div>
+                <div id="editShipmentMessage" style="color:#c0392b; margin-top:8px;"></div>
+            </form>
         </div>
     </div>
 
@@ -1235,6 +1288,7 @@
         let currentEmail = '';
         let itemCounter = 0;
         let editingInvoiceId = null;
+        let editShipmentItemCounter = 0;
 
         // Chart instances
         let shipmentChart = null;
@@ -1442,7 +1496,13 @@
                         <td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td>
                         <td><span class="${statusClass}">${d.status || 'Dispatched'}</span></td>
                         <td>${lastUpdate}</td>
-                        <td><button class="btn-icon" onclick="viewShipment('${doc.id}')" title="View">👁️</button></td>
+                        <td>
+                            <button class="btn-icon" onclick="viewShipment('${doc.id}')" title="View">👁️</button>
+                            <button class="btn-icon" onclick="editShipment('${doc.id}')" title="Edit">✏️</button>
+                            ${d.status !== 'Dispatched' ? `<button class="btn-icon warning" onclick="dispatchShipment('${doc.id}')" title="Dispatch">📦</button>` : ''}
+                            ${d.status !== 'Delivered' ? `<button class="btn-icon success" onclick="deliverShipment('${doc.id}')" title="Deliver">✅</button>` : ''}
+                            <button class="btn-icon danger" onclick="deleteShipment('${doc.id}')" title="Delete">🗑️</button>
+                        </td>
                     </tr>`);
                 });
 
@@ -1535,8 +1595,10 @@
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   VIEW SHIPMENT
+        //   SHIPMENT ACTIONS (View, Edit, Update, Dispatch, Deliver, Delete)
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // ── View Shipment (read-only) ──
         window.viewShipment = async function(id) {
             try {
                 const doc = await db.collection('shipments').doc(id).get();
@@ -1568,9 +1630,193 @@
             }
         };
 
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   REFRESH SHIPMENTS (manual)
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // ── Edit Shipment ──
+        window.editShipment = async function(id) {
+            try {
+                const doc = await db.collection('shipments').doc(id).get();
+                if (!doc.exists) { showToast('Shipment not found.', 'error'); return; }
+                const d = doc.data();
+                document.getElementById('editShipmentId').value = id;
+                document.getElementById('editSender').value = d.senderName || '';
+                document.getElementById('editDestination').value = d.destinationBranch || 'Lagos';
+                document.getElementById('editVehicle').value = d.vehicleNo || '';
+                document.getElementById('editDriver').value = d.driver || '';
+                document.getElementById('editTransport').value = d.transportCost || 0;
+                document.getElementById('editStatus').value = d.status || 'Dispatched';
+                document.getElementById('editNotes').value = d.notes || '';
+
+                // Items
+                const container = document.getElementById('editShipmentItemsContainer');
+                container.innerHTML = '';
+                editShipmentItemCounter = 0;
+                if (d.items && d.items.length) {
+                    d.items.forEach(it => {
+                        addEditShipmentItemRow(it.itemName, it.orderedQty, it.unitPrice);
+                    });
+                } else {
+                    addEditShipmentItemRow();
+                }
+                updateEditShipmentTotal();
+
+                document.getElementById('editShipmentMessage').textContent = '';
+                openModal('editShipmentModal');
+            } catch (err) {
+                showToast('Error loading shipment: ' + err.message, 'error');
+            }
+        };
+
+        // ── Add item row in edit shipment modal ──
+        function addEditShipmentItemRow(name = '', qty = 1, price = 0) {
+            const id = ++editShipmentItemCounter;
+            const container = document.getElementById('editShipmentItemsContainer');
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.dataset.rowId = id;
+            div.innerHTML = `
+                <input type="text" placeholder="Item name" class="edit-shipment-item-name" value="${escapeHtml(name)}" style="flex:2;" required>
+                <input type="number" placeholder="Qty" class="edit-shipment-item-qty" value="${Math.max(0,qty)}" min="0" step="1" style="flex:0.8;">
+                <input type="number" placeholder="Unit Price" class="edit-shipment-item-price" value="${Math.max(0,price)}" min="0" step="0.01" style="flex:1;">
+                <button type="button" class="remove-btn" onclick="removeEditShipmentItem(this)">✖</button>
+            `;
+            container.appendChild(div);
+            div.querySelectorAll('input').forEach(inp => inp.addEventListener('input', updateEditShipmentTotal));
+            updateEditShipmentTotal();
+        }
+
+        window.removeEditShipmentItem = function(btn) {
+            const container = document.getElementById('editShipmentItemsContainer');
+            if (container.children.length <= 1) { showToast('Cannot remove last item.', 'error'); return; }
+            btn.closest('.item-row').remove();
+            updateEditShipmentTotal();
+        };
+
+        function updateEditShipmentTotal() {
+            const rows = document.querySelectorAll('#editShipmentItemsContainer .item-row');
+            let total = 0;
+            rows.forEach(row => {
+                const qty = parseFloat(row.querySelector('.edit-shipment-item-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.edit-shipment-item-price').value) || 0;
+                total += qty * price;
+            });
+            document.getElementById('editShipmentTotalPreview').textContent = `Total Goods: ₦${total.toLocaleString()}`;
+        }
+
+        // ── Update Shipment (submit edit form) ──
+        document.getElementById('editShipmentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editShipmentId').value;
+            const btn = document.getElementById('updateShipmentBtn');
+            btn.disabled = true;
+            btn.textContent = 'Updating…';
+            document.getElementById('editShipmentMessage').textContent = '';
+
+            try {
+                const sender = document.getElementById('editSender').value.trim();
+                if (!sender) throw new Error('Sender is required.');
+                const destination = document.getElementById('editDestination').value;
+                const vehicle = document.getElementById('editVehicle').value.trim();
+                const driver = document.getElementById('editDriver').value.trim();
+                const transport = parseFloat(document.getElementById('editTransport').value) || 0;
+                const status = document.getElementById('editStatus').value;
+                const notes = document.getElementById('editNotes').value.trim();
+
+                // Collect items
+                const rows = document.querySelectorAll('#editShipmentItemsContainer .item-row');
+                const items = [];
+                rows.forEach(row => {
+                    const name = row.querySelector('.edit-shipment-item-name').value.trim();
+                    const qty = parseFloat(row.querySelector('.edit-shipment-item-qty').value) || 0;
+                    const price = parseFloat(row.querySelector('.edit-shipment-item-price').value) || 0;
+                    if (name && qty > 0 && price > 0) {
+                        items.push({ itemName: name, orderedQty: qty, unitPrice: price, totalItemCost: qty * price });
+                    }
+                });
+                if (items.length === 0) throw new Error('Add at least one item.');
+
+                await db.collection('shipments').doc(id).update({
+                    senderName: sender,
+                    destinationBranch: destination,
+                    vehicleNo: vehicle,
+                    driver: driver,
+                    transportCost: transport,
+                    status: status,
+                    notes: notes,
+                    items: items,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await db.collection('activityLog').add({
+                    actionType: 'shipment_updated',
+                    shipmentId: id,
+                    details: `Shipment ${id.slice(0,6)} updated by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+
+                showToast('✅ Shipment updated!', 'success');
+                closeModal('editShipmentModal');
+                refreshShipments();
+            } catch (err) {
+                document.getElementById('editShipmentMessage').textContent = '❌ ' + err.message;
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Update Shipment';
+            }
+        });
+
+        // ── Dispatch Shipment (set status to Dispatched) ──
+        window.dispatchShipment = async function(id) {
+            if (!confirm('Mark this shipment as Dispatched?')) return;
+            try {
+                await db.collection('shipments').doc(id).update({
+                    status: 'Dispatched',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await db.collection('activityLog').add({
+                    actionType: 'shipment_dispatched',
+                    shipmentId: id,
+                    details: `Shipment ${id.slice(0,6)} dispatched by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+                showToast('✅ Shipment marked as Dispatched.', 'success');
+                refreshShipments();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        // ── Deliver Shipment (set status to Delivered) ──
+        window.deliverShipment = async function(id) {
+            if (!confirm('Mark this shipment as Delivered?')) return;
+            try {
+                await db.collection('shipments').doc(id).update({
+                    status: 'Delivered',
+                    receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await db.collection('activityLog').add({
+                    actionType: 'shipment_delivered',
+                    shipmentId: id,
+                    details: `Shipment ${id.slice(0,6)} delivered by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+                showToast('✅ Shipment marked as Delivered.', 'success');
+                refreshShipments();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        // ── Delete Shipment ──
+        window.deleteShipment = async function(id) {
+            if (!confirm('Delete this shipment permanently?')) return;
+            try {
+                await db.collection('shipments').doc(id).delete();
+                showToast('✅ Shipment deleted.', 'success');
+                refreshShipments();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        // ── Refresh Shipments (manual) ──
         function refreshShipments() {
             if (shipmentsUnsub) {
                 shipmentsUnsub();
@@ -1581,7 +1827,7 @@
         window.refreshShipments = refreshShipments;
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   INVOICES
+        //   INVOICES (same as before, with edit, dispatch, etc.)
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function loadInvoices() {
             if (invoicesUnsub) invoicesUnsub();
@@ -1683,7 +1929,6 @@
                 const d = doc.data();
                 if (d.dispatched) { showToast('Already dispatched.', 'info'); return; }
 
-                // Build shipment items from invoice items
                 const shipmentItems = (d.items || []).map(it => ({
                     itemName: it.itemName || '',
                     orderedQty: it.quantity || 0,
@@ -1691,22 +1936,20 @@
                     totalItemCost: (it.quantity || 0) * (it.unitPrice || 0)
                 }));
 
-                // Create shipment
                 await db.collection('shipments').add({
                     senderName: d.customer || 'Unknown',
                     destinationBranch: d.branch || 'Lagos',
                     items: shipmentItems,
-                    transportCost: 0, // default
+                    transportCost: 0,
                     status: 'Dispatched',
                     vehicleNo: '',
                     driver: '',
                     notes: `Dispatched from invoice ${d.invoiceNumber}`,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     createdBy: currentEmail,
-                    invoiceId: id // link back to invoice
+                    invoiceId: id
                 });
 
-                // Mark invoice as dispatched
                 await db.collection('invoices').doc(id).update({
                     dispatched: true,
                     dispatchedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1757,7 +2000,7 @@
             openModal('invoiceModal');
         });
 
-        // ── Add Item Row ──
+        // ── Add Item Row (Invoice) ──
         document.getElementById('addItemBtn').addEventListener('click', () => addInvoiceItemRow());
 
         function addInvoiceItemRow(name = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0) {
@@ -1847,7 +2090,7 @@
             this.value = '';
         });
 
-        // ── Calculate totals ──
+        // ── Calculate totals (Invoice) ──
         function calcInvoiceTotals() {
             const rows = document.querySelectorAll('#invoiceItemsContainer .item-row');
             const items = [];
@@ -1931,7 +2174,7 @@
             showToast('Preview ready', 'info', 1200);
         });
 
-        // ── Save Invoice (Create or Update) ──
+        // ── Save Invoice ──
         document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('saveInvoiceBtn');
@@ -2366,7 +2609,7 @@
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         //   INIT
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        console.log('🚀 NEVAMAK Unified Dashboard loaded.');
+        console.log('🚀 NEVAMAK Unified Dashboard loaded with shipment edit & dispatch.');
 
         document.querySelectorAll('.modal-overlay').forEach(el => {
             el.addEventListener('click', function(e) {
@@ -2377,6 +2620,9 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeSidebar();
         });
+
+        // Add item button for edit shipment modal
+        document.getElementById('addEditShipmentItemBtn').addEventListener('click', () => addEditShipmentItemRow());
     </script>
 
 </body>
