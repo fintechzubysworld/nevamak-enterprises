@@ -1,0 +1,2744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes" />
+    <meta name="referrer" content="no-referrer-when-crossorigin" />
+
+    <title>NEVAMAK · Unified Dashboard</title>
+
+    <!-- Firebase & Libs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js">
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" crossorigin="anonymous">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+    </script>
+
+    <style>
+        /* ── Reset & Base ── */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f4f6fa;
+            color: #1a2634;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e9ecf0;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #b0b8c4;
+            border-radius: 8px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #8e99a8;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 260px;
+            background: #0a1e2f;
+            color: #eaeef3;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            padding: 18px 0 20px;
+            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+            transition: transform 0.25s ease;
+        }
+        .sidebar-brand {
+            padding: 0 22px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 8px;
+        }
+        .sidebar-brand h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #fff;
+        }
+        .sidebar-brand h1 span {
+            color: #6fc3ff;
+        }
+        .sidebar-brand small {
+            display: block;
+            font-size: 0.7rem;
+            opacity: 0.6;
+            margin-top: 2px;
+            font-weight: 400;
+        }
+        .sidebar-nav {
+            flex: 1;
+            padding: 0 12px;
+        }
+        .sidebar-nav .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: #b8c9dd;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: 2px;
+            border: none;
+            background: transparent;
+            width: 100%;
+            text-align: left;
+        }
+        .sidebar-nav .nav-item:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: #fff;
+        }
+        .sidebar-nav .nav-item.active {
+            background: #1d3b56;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(0, 60, 130, 0.3);
+        }
+        .sidebar-nav .nav-item .icon {
+            font-size: 1.2rem;
+            width: 28px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .sidebar-nav .nav-item .badge-dot {
+            margin-left: auto;
+            background: #e74c3c;
+            color: #fff;
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        .sidebar-nav .nav-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.06);
+            margin: 8px 14px;
+        }
+        .sidebar-footer {
+            padding: 16px 22px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            margin-top: 8px;
+        }
+        .sidebar-footer .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: #b0c4db;
+        }
+        .sidebar-footer .user-badge .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #2d4b66;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .sidebar-footer .logout-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: none;
+            color: #d0dcec;
+            padding: 8px 14px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            width: 100%;
+            margin-top: 10px;
+            transition: background 0.15s;
+        }
+        .sidebar-footer .logout-btn:hover {
+            background: rgba(255, 70, 70, 0.2);
+            color: #ffb3b3;
+        }
+
+        /* ── Main ── */
+        .main {
+            flex: 1;
+            padding: 20px 24px 40px;
+            max-width: 1440px;
+            margin: 0 auto;
+            width: 100%;
+            min-width: 0;
+        }
+
+        /* ── Top Bar ── */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .topbar h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #0a1e2f;
+        }
+        .topbar h2 small {
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: #6b7a8d;
+            margin-left: 8px;
+        }
+        .topbar-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .topbar-actions .date-badge {
+            background: #fff;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            color: #3a4a5e;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+        }
+        .topbar-actions .btn {
+            padding: 8px 18px;
+            border-radius: 40px;
+            border: none;
+            font-weight: 500;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            background: #fff;
+            color: #1a2634;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+        }
+        .topbar-actions .btn-primary {
+            background: #0a3d62;
+            color: #fff;
+        }
+        .topbar-actions .btn-primary:hover {
+            background: #0e4d7a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(10, 61, 98, 0.25);
+        }
+        .topbar-actions .btn-outline {
+            background: transparent;
+            border: 1px solid #d0d8e2;
+        }
+        .topbar-actions .btn-outline:hover {
+            background: #eef2f7;
+        }
+
+        /* ── Tab Content ── */
+        .tab-pane {
+            display: none;
+            animation: fadeUp 0.25s ease;
+        }
+        .tab-pane.active {
+            display: block;
+        }
+        @keyframes fadeUp {
+            0% {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ── Stats Grid ── */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 18px;
+            padding: 16px 18px;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+            border-left: 4px solid #0a3d62;
+            transition: transform 0.1s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+        }
+        .stat-card .label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: #6b7f96;
+        }
+        .stat-card .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #0a1e2f;
+            margin-top: 2px;
+            word-break: break-word;
+        }
+        .stat-card .value small {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: #6b7f96;
+            margin-left: 4px;
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: #fff;
+            border-radius: 20px;
+            padding: 18px 20px 22px;
+            box-shadow: 0 1px 8px rgba(0, 0, 0, 0.04);
+            margin-bottom: 22px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .card-header h3 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #0a1e2f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-header .card-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .card-header .card-actions .btn-sm {
+            padding: 4px 14px;
+            border-radius: 40px;
+            border: none;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            background: #eef2f7;
+            color: #1a2634;
+            transition: 0.1s;
+        }
+        .card-header .card-actions .btn-sm:hover {
+            background: #dce3ec;
+        }
+        .card-header .card-actions .btn-sm.primary {
+            background: #0a3d62;
+            color: #fff;
+        }
+        .card-header .card-actions .btn-sm.primary:hover {
+            background: #0e4d7a;
+        }
+
+        /* ── Tables ── */
+        .table-wrap {
+            overflow-x: auto;
+            margin-top: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84rem;
+            min-width: 520px;
+        }
+        th,
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #eef1f5;
+            text-align: left;
+            vertical-align: middle;
+        }
+        th {
+            font-weight: 600;
+            color: #3a4e66;
+            background: #f8faff;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        tr:hover td {
+            background: #fafcff;
+        }
+
+        .status {
+            padding: 3px 12px;
+            border-radius: 40px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            display: inline-block;
+            white-space: nowrap;
+        }
+        .status-dispatched {
+            background: #fff3cd;
+            color: #8a6d00;
+        }
+        .status-delivered {
+            background: #d4edda;
+            color: #0e5a2b;
+        }
+        .status-partial {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-cancelled {
+            background: #f5c6cb;
+            color: #721c24;
+        }
+        .status-pending {
+            background: #e2e8f0;
+            color: #2d3a4a;
+        }
+        .status-approved {
+            background: #d4edda;
+            color: #0e5a2b;
+        }
+        .badge {
+            background: #e9ecf0;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #0e5a2b;
+        }
+        .badge-warning {
+            background: #fff3cd;
+            color: #8a6d00;
+        }
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .cost-cell {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .btn-icon {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 4px 6px;
+            border-radius: 8px;
+            transition: background 0.1s;
+            color: #3a5a7a;
+        }
+        .btn-icon:hover {
+            background: #e9edf4;
+        }
+        .btn-icon.danger:hover {
+            background: #fde8e8;
+            color: #c0392b;
+        }
+        .btn-icon.success:hover {
+            background: #d4edda;
+            color: #1e7e34;
+        }
+        .btn-icon.warning:hover {
+            background: #fff3cd;
+            color: #8a6d00;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 32px 16px;
+            color: #7a8a9e;
+        }
+        .empty-state .icon {
+            font-size: 2.4rem;
+            opacity: 0.5;
+        }
+
+        /* ── Charts ── */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+        }
+        @media (max-width: 700px) {
+            .charts-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        .chart-box {
+            background: #fff;
+            border-radius: 18px;
+            padding: 14px 16px 10px;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+        }
+        .chart-box h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #2a4058;
+            margin-bottom: 6px;
+        }
+
+        /* ── Invoice items rows ── */
+        .item-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+            align-items: center;
+            background: #f8faff;
+            padding: 8px 12px;
+            border-radius: 14px;
+            border-left: 3px solid #0a3d62;
+        }
+        .item-row input,
+        .item-row select {
+            padding: 6px 10px;
+            border-radius: 30px;
+            border: 1px solid #d8e0ea;
+            font-size: 0.82rem;
+            background: #fff;
+            flex: 1;
+            min-width: 60px;
+        }
+        .item-row .remove-btn {
+            background: #e74c3c;
+            color: #fff;
+            border: none;
+            border-radius: 40px;
+            padding: 4px 14px;
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+        .item-row .remove-btn:hover {
+            background: #c0392b;
+        }
+        .item-row .item-check {
+            width: auto;
+            flex: 0 0 24px;
+        }
+
+        .cost-summary {
+            background: #eaf1fa;
+            padding: 10px 16px;
+            border-radius: 40px;
+            font-weight: 600;
+            text-align: center;
+            margin: 12px 0;
+        }
+
+        /* ── Modals ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(2px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            padding: 16px;
+        }
+        .modal-overlay.open {
+            display: flex;
+        }
+        .modal-box {
+            background: #fff;
+            border-radius: 28px;
+            padding: 28px 30px 30px;
+            max-width: 820px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+            animation: fadeUp 0.2s ease;
+        }
+        .modal-box .modal-close {
+            float: right;
+            font-size: 1.6rem;
+            cursor: pointer;
+            line-height: 1;
+            color: #6b7f96;
+            transition: 0.1s;
+        }
+        .modal-box .modal-close:hover {
+            color: #1a2634;
+        }
+        .modal-box h2 {
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+            color: #0a1e2f;
+        }
+        .modal-box .form-group {
+            margin-bottom: 14px;
+        }
+        .modal-box .form-group label {
+            display: block;
+            font-weight: 500;
+            font-size: 0.85rem;
+            margin-bottom: 3px;
+            color: #2a4058;
+        }
+        .modal-box .form-group input,
+        .modal-box .form-group select,
+        .modal-box .form-group textarea {
+            width: 100%;
+            padding: 8px 14px;
+            border-radius: 30px;
+            border: 1px solid #d8e0ea;
+            font-size: 0.9rem;
+            background: #fff;
+        }
+        .modal-box .form-group textarea {
+            border-radius: 16px;
+            min-height: 60px;
+            resize: vertical;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+        .modal-actions .btn {
+            padding: 10px 28px;
+            border-radius: 40px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.88rem;
+            transition: 0.15s;
+        }
+        .modal-actions .btn-primary {
+            background: #0a3d62;
+            color: #fff;
+        }
+        .modal-actions .btn-primary:hover {
+            background: #0e4d7a;
+        }
+        .modal-actions .btn-success {
+            background: #27ae60;
+            color: #fff;
+        }
+        .modal-actions .btn-success:hover {
+            background: #1e8e4e;
+        }
+        .modal-actions .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .modal-actions .btn-danger:hover {
+            background: #c0392b;
+        }
+        .modal-actions .btn-outline {
+            background: transparent;
+            border: 1px solid #d0d8e2;
+        }
+        .modal-actions .btn-outline:hover {
+            background: #eef2f7;
+        }
+
+        /* ── Toast ── */
+        .toast-container {
+            position: fixed;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            pointer-events: none;
+        }
+        .toast {
+            background: #1a2634;
+            color: #fff;
+            padding: 12px 28px;
+            border-radius: 60px;
+            font-size: 0.9rem;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+            opacity: 0;
+            transform: translateY(12px) scale(0.96);
+            transition: all 0.25s ease;
+            pointer-events: auto;
+            text-align: center;
+            max-width: 92vw;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .toast.success {
+            background: #1e7e34;
+        }
+        .toast.error {
+            background: #b13e30;
+        }
+        .toast.info {
+            background: #1a4a6a;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 820px) {
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100%;
+                transform: translateX(-100%);
+                width: 280px;
+                z-index: 200;
+                border-radius: 0 20px 20px 0;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .sidebar-backdrop {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.35);
+                z-index: 150;
+            }
+            .sidebar-backdrop.open {
+                display: block;
+            }
+            .main {
+                padding: 14px 14px 32px;
+            }
+            .topbar h2 {
+                font-size: 1.2rem;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .stat-card .value {
+                font-size: 1.3rem;
+            }
+            .modal-box {
+                padding: 20px 18px;
+                border-radius: 20px;
+            }
+            .item-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .item-row input,
+            .item-row select {
+                flex: 1 1 auto;
+            }
+            .item-row .remove-btn {
+                align-self: flex-end;
+            }
+        }
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            .stat-card {
+                padding: 12px 14px;
+            }
+            .stat-card .value {
+                font-size: 1.1rem;
+            }
+            .topbar-actions .date-badge {
+                display: none;
+            }
+        }
+
+        /* ── Utilities ── */
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .gap-8 {
+            gap: 8px;
+        }
+        .mt-8 {
+            margin-top: 8px;
+        }
+        .mt-12 {
+            margin-top: 12px;
+        }
+        .mb-8 {
+            margin-bottom: 8px;
+        }
+        .text-muted {
+            color: #6b7f96;
+            font-size: 0.82rem;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .fw-600 {
+            font-weight: 600;
+        }
+
+        /* Invoice preview inside modal */
+        .invoice-preview {
+            background: #fafcff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 16px 18px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+        }
+        .invoice-preview table {
+            font-size: 0.8rem;
+            min-width: 100%;
+        }
+        .invoice-preview table th {
+            background: #0a3d62;
+            color: #fff;
+        }
+        .invoice-preview table td,
+        .invoice-preview table th {
+            border: 1px solid #d0d8e2;
+            padding: 6px 10px;
+        }
+        .invoice-preview .grand-total {
+            font-weight: 700;
+            background: #eaf1fa;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 3px solid #e9ecf0;
+            border-top: 3px solid #0a3d62;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .inline-flex {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* notification dot */
+        .notif-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #e74c3c;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ─── SIDEBAR ─── -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <h1>NEVAMAK<span>.</span></h1>
+            <small>Enterprise Suite</small>
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav">
+            <button class="nav-item active" data-tab="dashboard">
+                <span class="icon">📊</span> Dashboard
+            </button>
+            <button class="nav-item" data-tab="shipments">
+                <span class="icon">🚛</span> Shipments
+                <span class="badge-dot" id="shipmentBadge">0</span>
+            </button>
+            <button class="nav-item" data-tab="invoices">
+                <span class="icon">🧾</span> Invoices
+                <span class="badge-dot" id="invoiceBadge">0</span>
+            </button>
+            <button class="nav-item" data-tab="inventory">
+                <span class="icon">📦</span> Inventory
+            </button>
+            <button class="nav-item" data-tab="returns">
+                <span class="icon">🔄</span> Returns
+            </button>
+            <button class="nav-item" data-tab="audit">
+                <span class="icon">📜</span> Activity
+            </button>
+            <button class="nav-item" data-tab="reports">
+                <span class="icon">📊</span> Reports
+            </button>
+            <button class="nav-item" data-tab="pending" id="pendingTabBtn" style="display:none;">
+                <span class="icon">⏳</span> Pending Requests
+                <span class="badge-dot" id="pendingBadge">0</span>
+            </button>
+
+            <div class="nav-divider"></div>
+
+            <!-- External module links (open in new tab) -->
+            <a class="nav-item" href="warehouse.html" target="_blank">
+                <span class="icon">🏚️</span> Warehouse
+            </a>
+            <a class="nav-item" href="request_invoice.html" target="_blank">
+                <span class="icon">📄</span> Request Invoice
+            </a>
+            <a class="nav-item" href="invoice_repo.html" target="_blank">
+                <span class="icon">🧾</span> Invoice Repo
+            </a>
+            <a class="nav-item" href="goods-expected.html" target="_blank">
+                <span class="icon">📦</span> Goods Expected
+            </a>
+            <a class="nav-item" href="shop_floor.html" target="_blank">
+                <span class="icon">🏪</span> Shop Floor
+            </a>
+            <a class="nav-item" href="user.html" target="_blank">
+                <span class="icon">👥</span> Users
+            </a>
+            <a class="nav-item" href="permissions.html" target="_blank">
+                <span class="icon">🔐</span> Permissions
+            </a>
+            <a class="nav-item" href="admin_create_user.html" target="_blank">
+                <span class="icon">👑</span> Admin
+            </a>
+            <a class="nav-item" href="superadmin_zone.html" target="_blank">
+                <span class="icon">🛡️</span> Super Admin
+            </a>
+            <a class="nav-item" href="update.html" target="_blank">
+                <span class="icon">🔄</span> Update
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-badge">
+                <div class="avatar" id="userAvatar">U</div>
+                <div>
+                    <div id="userName" style="font-weight:500; color:#fff;">User</div>
+                    <div id="userRole" style="font-size:0.7rem; opacity:0.6;">role</div>
+                </div>
+            </div>
+            <button class="logout-btn" id="logoutBtn">🚪 Sign Out</button>
+        </div>
+    </aside>
+
+    <!-- Sidebar backdrop (mobile) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- ─── MAIN ─── -->
+    <main class="main">
+
+        <!-- Top Bar -->
+        <div class="topbar">
+            <h2 id="pageTitle">Dashboard <small>overview</small></h2>
+            <div class="topbar-actions">
+                <span class="date-badge" id="todayDate"></span>
+                <button class="btn btn-outline" id="menuToggle" aria-label="Toggle menu">☰</button>
+                <button class="btn btn-primary" id="refreshBtn">🔄 Refresh</button>
+            </div>
+        </div>
+
+        <!-- ─── TAB: DASHBOARD ─── -->
+        <div class="tab-pane active" id="tab-dashboard">
+
+            <!-- Stats -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card"><div class="label">Total Shipments</div><div class="value" id="statTotal">—</div></div>
+                <div class="stat-card"><div class="label">To Abuja</div><div class="value" id="statAbuja">—</div></div>
+                <div class="stat-card"><div class="label">To PH</div><div class="value" id="statPH">—</div></div>
+                <div class="stat-card"><div class="label">Delivered ✅</div><div class="value" id="statDelivered">—</div></div>
+                <div class="stat-card"><div class="label">Goods Value (₦)</div><div class="value" id="statGoods">—</div></div>
+                <div class="stat-card"><div class="label">Transport (₦)</div><div class="value" id="statTransport">—</div></div>
+                <div class="stat-card"><div class="label">Returned</div><div class="value" id="statReturned">—</div></div>
+                <div class="stat-card"><div class="label">In Stock</div><div class="value" id="statStock">—</div></div>
+            </div>
+
+            <!-- Charts -->
+            <div class="charts-row">
+                <div class="chart-box"><h4>📈 Shipment Trend</h4><canvas id="shipmentChart" height="140"></canvas></div>
+                <div class="chart-box"><h4>💰 Cost Trend</h4><canvas id="costChart" height="140"></canvas></div>
+            </div>
+
+            <!-- Quick actions -->
+            <div style="display:flex; gap:12px; flex-wrap:wrap; margin:18px 0 8px;">
+                <button class="btn btn-primary" onclick="switchTab('shipments')">🚛 View Shipments</button>
+                <button class="btn btn-primary" onclick="switchTab('invoices')">🧾 Manage Invoices</button>
+                <button class="btn btn-primary" onclick="switchTab('inventory')">📦 Check Inventory</button>
+            </div>
+        </div>
+
+        <!-- ─── TAB: SHIPMENTS ─── -->
+        <div class="tab-pane" id="tab-shipments">
+            <div class="card">
+                <div class="card-header">
+                    <h3>🚛 Shipments</h3>
+                    <div class="card-actions">
+                        <input type="text" id="shipmentSearch" placeholder="🔍 Search..." style="padding:6px 16px; border-radius:40px; border:1px solid #d8e0ea; font-size:0.82rem;">
+                        <button class="btn-sm primary" onclick="refreshShipments()">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+                        <tbody id="shipmentsBody"><tr><td colspan="9" class="text-center text-muted">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── TAB: INVOICES ─── -->
+        <div class="tab-pane" id="tab-invoices">
+            <div class="card">
+                <div class="card-header">
+                    <h3>🧾 Invoices</h3>
+                    <div class="card-actions">
+                        <button class="btn-sm primary" id="newInvoiceBtn">＋ New Invoice</button>
+                        <button class="btn-sm" id="refreshInvoicesBtn">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>#</th><th>Customer</th><th>Branch</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+                        <tbody id="invoicesBody"><tr><td colspan="6" class="text-center text-muted">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── TAB: INVENTORY ─── -->
+        <div class="tab-pane" id="tab-inventory">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📦 Inventory Summary</h3>
+                    <div class="card-actions">
+                        <input type="text" id="invSearch" placeholder="🔍 Search item..." style="padding:6px 16px; border-radius:40px; border:1px solid #d8e0ea; font-size:0.82rem;">
+                        <button class="btn-sm primary" onclick="loadInventory()">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Item</th><th>Branch</th><th>Stock (units)</th><th>Unit Price</th></tr></thead>
+                        <tbody id="inventoryBody"><tr><td colspan="4" class="text-center text-muted">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── TAB: RETURNS ─── -->
+        <div class="tab-pane" id="tab-returns">
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔄 Returns Log</h3>
+                    <div class="card-actions"><button class="btn-sm primary" onclick="loadReturns()">🔄 Refresh</button></div>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Date</th><th>Branch</th><th>Shipment</th><th>Item</th><th>Qty</th><th>Reason</th></tr></thead>
+                        <tbody id="returnsBody"><tr><td colspan="6" class="text-center text-muted">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── TAB: AUDIT ─── -->
+        <div class="tab-pane" id="tab-audit">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📜 Activity Audit</h3>
+                    <div class="card-actions"><button class="btn-sm primary" onclick="loadAudit()">🔄 Refresh</button></div>
+                </div>
+                <div id="auditLog" style="max-height:400px; overflow-y:auto; font-size:0.85rem;">Loading…</div>
+            </div>
+        </div>
+
+        <!-- ─── TAB: REPORTS ─── -->
+        <div class="tab-pane" id="tab-reports">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📊 Reports & Invoice Generation</h3>
+                    <div class="card-actions">
+                        <button class="btn-sm primary" onclick="loadReceivedGoodsForReports()">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div id="reportsContent">
+                    <p class="text-muted" style="margin-bottom:12px;">Generate invoices from received goods. Select a record below and click "Create Invoice".</p>
+                    <div id="receivedGoodsList" style="max-height:500px; overflow-y:auto;">Loading received goods…</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── TAB: PENDING REQUESTS ─── -->
+        <div class="tab-pane" id="tab-pending">
+            <div class="card">
+                <div class="card-header">
+                    <h3>⏳ Pending Invoice Requests</h3>
+                    <div class="card-actions"><button class="btn-sm primary" onclick="loadPendingRequests()">🔄 Refresh</button></div>
+                </div>
+                <div id="pendingList">Loading…</div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ─── TOAST ─── -->
+    <div class="toast-container"><div class="toast" id="toast"></div></div>
+
+    <!-- ─── MODAL: View Shipment (read-only) ─── -->
+    <div class="modal-overlay" id="viewShipmentModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('viewShipmentModal')">&times;</span>
+            <h2>📄 Shipment Details</h2>
+            <div id="viewShipmentContent"></div>
+        </div>
+    </div>
+
+    <!-- ─── MODAL: Edit Shipment ─── -->
+    <div class="modal-overlay" id="editShipmentModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('editShipmentModal')">&times;</span>
+            <h2>✏️ Edit Shipment</h2>
+            <form id="editShipmentForm">
+                <input type="hidden" id="editShipmentId">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Sender</label><input type="text" id="editSender" required></div>
+                    <div class="form-group"><label>Destination</label>
+                        <select id="editDestination"><option value="Lagos">Lagos</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
+                    </div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Vehicle #</label><input type="text" id="editVehicle" placeholder="e.g., ABC-123"></div>
+                    <div class="form-group"><label>Driver</label><input type="text" id="editDriver" placeholder="Driver name"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Transport Cost (₦)</label><input type="number" id="editTransport" step="0.01" min="0"></div>
+                    <div class="form-group"><label>Status</label>
+                        <select id="editStatus">
+                            <option value="Dispatched">Dispatched</option>
+                            <option value="In Transit">In Transit</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                            <option value="Partial">Partial</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group"><label>Notes</label><textarea id="editNotes" rows="2" placeholder="Optional notes"></textarea></div>
+
+                <div class="form-group">
+                    <label>Items</label>
+                    <div id="editShipmentItemsContainer"></div>
+                    <button type="button" class="btn-sm primary" id="addEditShipmentItemBtn">＋ Add Item</button>
+                </div>
+
+                <div class="cost-summary" id="editShipmentTotalPreview">Total Goods: ₦0</div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-success" id="updateShipmentBtn">💾 Update Shipment</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('editShipmentModal')">Cancel</button>
+                </div>
+                <div id="editShipmentMessage" style="color:#c0392b; margin-top:8px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ─── MODAL: New / Edit Invoice ─── -->
+    <div class="modal-overlay" id="invoiceModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('invoiceModal')">&times;</span>
+            <h2 id="invoiceModalTitle">🧾 New Invoice</h2>
+            <form id="invoiceForm" novalidate>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Invoice #</label><input type="text" id="invNumber" readonly></div>
+                    <div class="form-group"><label>Date</label><input type="date" id="invDate"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Customer</label><input type="text" id="invCustomer" placeholder="Customer name" required></div>
+                    <div class="form-group"><label>Customer Email</label><input type="email" id="invEmail" placeholder="email@example.com"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Vendor</label><input type="text" id="invVendor" placeholder="Vendor name"></div>
+                    <div class="form-group"><label>Branch</label>
+                        <select id="invBranch"><option value="Lagos">Lagos</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
+                    </div>
+                </div>
+                <div class="form-group"><label>Notes</label><textarea id="invNotes" rows="2" placeholder="Optional notes"></textarea></div>
+
+                <div class="flex-between"><label style="font-weight:600;">Items</label>
+                    <button type="button" class="btn-sm primary" id="addItemBtn">＋ Add Item</button>
+                    <button type="button" class="btn-sm" id="importExcelBtn">📂 Import Excel</button>
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                </div>
+                <div id="invoiceItemsContainer"></div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin:10px 0;">
+                    <div class="form-group"><label>Transport Multiplier</label><input type="number" id="invMultiplier" value="1.00" step="0.01" min="0.01"></div>
+                    <div class="form-group"><label>Discount % (bulk)</label><input type="number" id="bulkDiscPct" value="0" step="0.5" min="0" max="100"></div>
+                    <div class="form-group"><label>VAT % (bulk)</label><input type="number" id="bulkVAT" value="0" step="0.5" min="0" max="100"></div>
+                </div>
+
+                <div class="cost-summary" id="invoiceTotalPreview">Total: ₦0</div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-success" id="saveInvoiceBtn">💾 Save Invoice</button>
+                    <button type="button" class="btn btn-primary" id="previewInvoiceBtn">👁️ Preview</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('invoiceModal')">Cancel</button>
+                </div>
+                <div id="invoiceFormMessage" style="color:#c0392b; margin-top:8px;"></div>
+                <div id="invoicePreviewArea" class="invoice-preview" style="display:none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ─── MODAL: View Invoice ─── -->
+    <div class="modal-overlay" id="viewInvoiceModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('viewInvoiceModal')">&times;</span>
+            <h2>🧾 Invoice</h2>
+            <div id="viewInvoiceContent"></div>
+            <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal('viewInvoiceModal')">Close</button></div>
+        </div>
+    </div>
+
+    <!-- ─── MODAL: Move to Warehouse ─── -->
+    <div class="modal-overlay" id="moveWarehouseModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('moveWarehouseModal')">&times;</span>
+            <h2>🏚️ Move to Warehouse</h2>
+            <div id="moveWarehouseContent"></div>
+            <div class="modal-actions">
+                <button class="btn btn-success" id="confirmMoveBtn">✅ Move All</button>
+                <button class="btn btn-outline" onclick="closeModal('moveWarehouseModal')">Cancel</button>
+            </div>
+            <div id="moveMessage" style="color:#c0392b; margin-top:8px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   GLOBAL ERROR HANDLING (suppress benign extension errors)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        window.addEventListener('error', function(e) {
+            const msg = e.message || '';
+            if (msg.includes('message channel closed') ||
+                msg.includes('Extension') ||
+                msg.includes('chrome-extension://') ||
+                msg.includes('moz-extension://')) {
+                e.preventDefault();
+                e.stopPropagation();
+                return true;
+            }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+            const reason = e.reason || {};
+            const msg = reason.message || String(reason);
+            if (msg.includes('message channel closed') ||
+                msg.includes('Extension') ||
+                msg.includes('chrome-extension://') ||
+                msg.includes('moz-extension://')) {
+                e.preventDefault();
+                return true;
+            }
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   FIREBASE CONFIG
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+            authDomain: "nevamak-enterprises.firebaseapp.com",
+            projectId: "nevamak-enterprises",
+            storageBucket: "nevamak-enterprises.firebasestorage.app",
+            messagingSenderId: "144324172534",
+            appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+            measurementId: "G-MZ8NT6KK8N"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   STATE
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        let currentUser = null;
+        let currentRole = '';
+        let currentEmail = '';
+        let itemCounter = 0;
+        let editingInvoiceId = null;
+        let editShipmentItemCounter = 0;
+
+        // Chart instances
+        let shipmentChart = null;
+        let costChart = null;
+
+        // Unsubscribers
+        let shipmentsUnsub = null;
+        let invoicesUnsub = null;
+        let inventoryUnsub = null;
+        let returnsUnsub = null;
+        let auditUnsub = null;
+        let pendingUnsub = null;
+        let receivedReportsUnsub = null;
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   TOAST
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function showToast(msg, type = 'info', duration = 3000) {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = 'toast ' + type;
+            void el.offsetWidth;
+            el.classList.add('show');
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => el.classList.remove('show'), duration);
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   MODAL HELPERS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function openModal(id) { document.getElementById(id).classList.add('open'); }
+
+        function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+        window.closeModal = closeModal;
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   SIDEBAR / NAV
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const navItems = document.querySelectorAll('.nav-item[data-tab]');
+        const tabPanes = {
+            dashboard: document.getElementById('tab-dashboard'),
+            shipments: document.getElementById('tab-shipments'),
+            invoices: document.getElementById('tab-invoices'),
+            inventory: document.getElementById('tab-inventory'),
+            returns: document.getElementById('tab-returns'),
+            audit: document.getElementById('tab-audit'),
+            reports: document.getElementById('tab-reports'),
+            pending: document.getElementById('tab-pending'),
+        };
+        const pageTitle = document.getElementById('pageTitle');
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebarBackdrop');
+
+        function switchTab(tabId) {
+            navItems.forEach(el => el.classList.toggle('active', el.dataset.tab === tabId));
+            Object.keys(tabPanes).forEach(key => {
+                tabPanes[key].classList.toggle('active', key === tabId);
+            });
+            const titles = {
+                dashboard: 'Dashboard',
+                shipments: 'Shipments',
+                invoices: 'Invoices',
+                inventory: 'Inventory',
+                returns: 'Returns',
+                audit: 'Activity Audit',
+                reports: 'Reports',
+                pending: 'Pending Requests'
+            };
+            pageTitle.innerHTML = titles[tabId] || 'Dashboard';
+            closeSidebar();
+
+            if (tabId === 'shipments') refreshShipments();
+            if (tabId === 'invoices') loadInvoices();
+            if (tabId === 'inventory') loadInventory();
+            if (tabId === 'returns') loadReturns();
+            if (tabId === 'audit') loadAudit();
+            if (tabId === 'reports') loadReceivedGoodsForReports();
+            if (tabId === 'pending') loadPendingRequests();
+        }
+        window.switchTab = switchTab;
+
+        navItems.forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+
+        document.getElementById('menuToggle').addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            backdrop.classList.toggle('open');
+        });
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            backdrop.classList.remove('open');
+        }
+        backdrop.addEventListener('click', closeSidebar);
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   AUTH
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) { window.location.href = 'login.html'; return; }
+            currentUser = user;
+            currentEmail = user.email;
+
+            try {
+                const doc = await db.collection('users').doc(user.uid).get();
+                if (doc.exists) {
+                    currentRole = doc.data().role || '';
+                    const displayName = doc.data().displayName || user.email || 'User';
+                    document.getElementById('userName').textContent = displayName;
+                    document.getElementById('userRole').textContent = currentRole || 'member';
+                    document.getElementById('userAvatar').textContent = displayName.charAt(0).toUpperCase();
+                } else {
+                    document.getElementById('userName').textContent = user.email || 'User';
+                    document.getElementById('userRole').textContent = 'member';
+                    document.getElementById('userAvatar').textContent = (user.email || 'U').charAt(0).toUpperCase();
+                }
+
+                const pendingTab = document.getElementById('pendingTabBtn');
+                if (currentRole === 'admin' || currentRole === 'lagos_sender') {
+                    pendingTab.style.display = 'flex';
+                } else {
+                    pendingTab.style.display = 'none';
+                }
+
+                document.getElementById('todayDate').textContent = new Date().toLocaleDateString('en-NG', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                });
+
+                startDashboardListeners();
+                loadInvoices();
+                loadInventory();
+                loadReturns();
+                loadAudit();
+                if (currentRole === 'admin' || currentRole === 'lagos_sender') loadPendingRequests();
+                initCharts();
+
+            } catch (err) {
+                console.warn('User load error:', err);
+                showToast('Error loading profile: ' + err.message, 'error');
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            auth.signOut().then(() => window.location.href = 'login.html');
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            showToast('Refreshing…', 'info', 1200);
+            const active = document.querySelector('.nav-item.active');
+            if (active) switchTab(active.dataset.tab);
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   DASHBOARD LISTENERS (Shipments + Returns)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function startDashboardListeners() {
+            let q = db.collection('shipments').orderBy('createdAt', 'desc');
+            if (currentRole === 'abuja_rep') {
+                q = db.collection('shipments').where('destinationBranch', '==', 'Abuja').orderBy('createdAt', 'desc');
+            } else if (currentRole === 'ph_rep') {
+                q = db.collection('shipments').where('destinationBranch', '==', 'Portharcourt').orderBy('createdAt', 'desc');
+            }
+
+            if (shipmentsUnsub) shipmentsUnsub();
+            shipmentsUnsub = q.onSnapshot((snap) => {
+                let total = 0,
+                    abuja = 0,
+                    ph = 0,
+                    delivered = 0,
+                    goods = 0,
+                    transport = 0;
+                const chartMap = {};
+                let rows = [];
+
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    total++;
+                    if (d.destinationBranch === 'Abuja') abuja++;
+                    if (d.destinationBranch === 'Portharcourt') ph++;
+                    if (d.status === 'Delivered') delivered++;
+
+                    let g = 0;
+                    if (d.items) d.items.forEach(i => g += i.totalItemCost || 0);
+                    goods += g;
+                    transport += d.transportCost || 0;
+
+                    const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : 'unknown';
+                    if (!chartMap[date]) chartMap[date] = { count: 0, value: 0 };
+                    chartMap[date].count++;
+                    chartMap[date].value += g;
+
+                    const statusClass = `status status-${(d.status || 'dispatched').toLowerCase().replace(/\s/g, '')}`;
+                    const itemsShort = d.items ? d.items.map(i => `${i.itemName}(${i.orderedQty})`).join(', ').substring(0,
+                    40) : '-';
+                    const lastUpdate = d.receivedDate ? new Date(d.receivedDate.toDate()).toLocaleDateString() :
+                        (d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : 'N/A');
+
+                    rows.push(`<tr>
+                        <td><strong>${doc.id.slice(0,6)}</strong></td>
+                        <td>${d.senderName || '—'}</td>
+                        <td><span class="badge">${d.destinationBranch || '—'}</span></td>
+                        <td>${itemsShort}</td>
+                        <td class="cost-cell">₦${g.toLocaleString()}</td>
+                        <td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td>
+                        <td><span class="${statusClass}">${d.status || 'Dispatched'}</span></td>
+                        <td>${lastUpdate}</td>
+                        <td>
+                            <button class="btn-icon" onclick="viewShipment('${doc.id}')" title="View">👁️</button>
+                            <button class="btn-icon" onclick="editShipment('${doc.id}')" title="Edit">✏️</button>
+                            ${d.status !== 'Dispatched' ? `<button class="btn-icon warning" onclick="dispatchShipment('${doc.id}')" title="Dispatch">📦</button>` : ''}
+                            ${d.status !== 'Delivered' ? `<button class="btn-icon success" onclick="deliverShipment('${doc.id}')" title="Deliver">✅</button>` : ''}
+                            <button class="btn-icon danger" onclick="deleteShipment('${doc.id}')" title="Delete">🗑️</button>
+                        </td>
+                    </tr>`);
+                });
+
+                document.getElementById('statTotal').textContent = total;
+                document.getElementById('statAbuja').textContent = abuja;
+                document.getElementById('statPH').textContent = ph;
+                document.getElementById('statDelivered').textContent = delivered;
+                document.getElementById('statGoods').textContent = `₦${goods.toLocaleString()}`;
+                document.getElementById('statTransport').textContent = `₦${transport.toLocaleString()}`;
+                document.getElementById('shipmentBadge').textContent = total;
+                document.getElementById('shipmentsBody').innerHTML = rows.length ? rows.join('') :
+                    '<tr><td colspan="9" class="text-center text-muted">No shipments found</td></tr>';
+
+                const sorted = Object.keys(chartMap).sort().slice(-30);
+                const data = sorted.map(k => ({ date: k, count: chartMap[k].count, value: chartMap[k].value }));
+                updateCharts(data);
+
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Shipments listener error:', err);
+                document.getElementById('shipmentsBody').innerHTML =
+                    `<tr><td colspan="9" class="text-center text-muted">⚠️ Error loading shipments</td></tr>`;
+            });
+
+            if (returnsUnsub) returnsUnsub();
+            returnsUnsub = db.collection('returns').orderBy('date', 'desc').onSnapshot((snap) => {
+                let totalReturned = 0;
+                let rows = '';
+                snap.forEach(doc => {
+                    const r = doc.data();
+                    totalReturned += r.returnedQty || 0;
+                    rows += `<tr>
+                        <td>${r.date ? new Date(r.date.toDate()).toLocaleDateString() : ''}</td>
+                        <td>${r.branch || ''}</td>
+                        <td>${(r.shipmentId || '').slice(0,6)}</td>
+                        <td>${r.itemName || ''}</td>
+                        <td>${r.returnedQty || 0}</td>
+                        <td>${r.reason || ''}</td>
+                    </tr>`;
+                });
+                document.getElementById('statReturned').textContent = totalReturned;
+                document.getElementById('returnsBody').innerHTML = rows ||
+                    '<tr><td colspan="6" class="text-center text-muted">No returns recorded</td></tr>';
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Returns listener error:', err);
+            });
+
+            if (inventoryUnsub) inventoryUnsub();
+            inventoryUnsub = db.collection('inventory').onSnapshot((snap) => {
+                let stock = 0;
+                snap.forEach(d => { stock += d.data().stock || 0; });
+                document.getElementById('statStock').textContent = stock;
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Inventory count error:', err);
+            });
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   CHARTS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function initCharts() {
+            const ctx1 = document.getElementById('shipmentChart').getContext('2d');
+            const ctx2 = document.getElementById('costChart').getContext('2d');
+            shipmentChart = new Chart(ctx1, {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Shipments', data: [], borderColor: '#0a3d62',
+                        backgroundColor: 'rgba(10,61,98,0.06)', fill: true, tension: 0.2 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } }
+            });
+            costChart = new Chart(ctx2, {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Goods Value (₦)', data: [], backgroundColor: '#3c6382',
+                        borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function updateCharts(data) {
+            if (!shipmentChart || !costChart) return;
+            const labels = data.map(d => d.date);
+            shipmentChart.data.labels = labels;
+            shipmentChart.data.datasets[0].data = data.map(d => d.count);
+            shipmentChart.update();
+
+            costChart.data.labels = labels;
+            costChart.data.datasets[0].data = data.map(d => d.value);
+            costChart.update();
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   SHIPMENT ACTIONS (View, Edit, Update, Dispatch, Deliver, Delete)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        // ── View Shipment (read-only) ──
+        window.viewShipment = async function(id) {
+            try {
+                const doc = await db.collection('shipments').doc(id).get();
+                if (!doc.exists) { showToast('Shipment not found.', 'error'); return; }
+                const d = doc.data();
+                let itemsHtml = '<table style="margin-top:8px;"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
+                if (d.items && d.items.length) {
+                    d.items.forEach(it => {
+                        itemsHtml +=
+                            `<tr><td>${it.itemName}</td><td>${it.orderedQty}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${(it.totalItemCost||0).toFixed(2)}</td></tr>`;
+                    });
+                } else { itemsHtml += '<tr><td colspan="4">No items</td></tr>'; }
+                itemsHtml += '</table>';
+                const statusClass = `status status-${(d.status||'dispatched').toLowerCase().replace(/\s/g,'')}`;
+                document.getElementById('viewShipmentContent').innerHTML = `
+                    <p><strong>ID:</strong> ${id.slice(0,8)}</p>
+                    <p><strong>Sender:</strong> ${d.senderName || '—'}</p>
+                    <p><strong>Destination:</strong> ${d.destinationBranch || '—'}</p>
+                    <p><strong>Vehicle:</strong> ${d.vehicleNo || 'N/A'}</p>
+                    <p><strong>Driver:</strong> ${d.driver || 'N/A'}</p>
+                    <p><strong>Status:</strong> <span class="${statusClass}">${d.status || 'Dispatched'}</span></p>
+                    <p><strong>Transport:</strong> ₦${(d.transportCost||0).toLocaleString()}</p>
+                    ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                    <h4 style="margin:10px 0 4px;">Items</h4>${itemsHtml}
+                `;
+                openModal('viewShipmentModal');
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        };
+
+        // ── Edit Shipment ──
+        window.editShipment = async function(id) {
+            try {
+                const doc = await db.collection('shipments').doc(id).get();
+                if (!doc.exists) { showToast('Shipment not found.', 'error'); return; }
+                const d = doc.data();
+                document.getElementById('editShipmentId').value = id;
+                document.getElementById('editSender').value = d.senderName || '';
+                document.getElementById('editDestination').value = d.destinationBranch || 'Lagos';
+                document.getElementById('editVehicle').value = d.vehicleNo || '';
+                document.getElementById('editDriver').value = d.driver || '';
+                document.getElementById('editTransport').value = d.transportCost || 0;
+                document.getElementById('editStatus').value = d.status || 'Dispatched';
+                document.getElementById('editNotes').value = d.notes || '';
+
+                // Items
+                const container = document.getElementById('editShipmentItemsContainer');
+                container.innerHTML = '';
+                editShipmentItemCounter = 0;
+                if (d.items && d.items.length) {
+                    d.items.forEach(it => {
+                        addEditShipmentItemRow(it.itemName, it.orderedQty, it.unitPrice);
+                    });
+                } else {
+                    addEditShipmentItemRow();
+                }
+                updateEditShipmentTotal();
+
+                document.getElementById('editShipmentMessage').textContent = '';
+                openModal('editShipmentModal');
+            } catch (err) {
+                showToast('Error loading shipment: ' + err.message, 'error');
+            }
+        };
+
+        // ── Add item row in edit shipment modal ──
+        function addEditShipmentItemRow(name = '', qty = 1, price = 0) {
+            const id = ++editShipmentItemCounter;
+            const container = document.getElementById('editShipmentItemsContainer');
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.dataset.rowId = id;
+            div.innerHTML = `
+                <input type="text" placeholder="Item name" class="edit-shipment-item-name" value="${escapeHtml(name)}" style="flex:2;" required>
+                <input type="number" placeholder="Qty" class="edit-shipment-item-qty" value="${Math.max(0,qty)}" min="0" step="1" style="flex:0.8;">
+                <input type="number" placeholder="Unit Price" class="edit-shipment-item-price" value="${Math.max(0,price)}" min="0" step="0.01" style="flex:1;">
+                <button type="button" class="remove-btn" onclick="removeEditShipmentItem(this)">✖</button>
+            `;
+            container.appendChild(div);
+            div.querySelectorAll('input').forEach(inp => inp.addEventListener('input', updateEditShipmentTotal));
+            updateEditShipmentTotal();
+        }
+
+        window.removeEditShipmentItem = function(btn) {
+            const container = document.getElementById('editShipmentItemsContainer');
+            if (container.children.length <= 1) { showToast('Cannot remove last item.', 'error'); return; }
+            btn.closest('.item-row').remove();
+            updateEditShipmentTotal();
+        };
+
+        function updateEditShipmentTotal() {
+            const rows = document.querySelectorAll('#editShipmentItemsContainer .item-row');
+            let total = 0;
+            rows.forEach(row => {
+                const qty = parseFloat(row.querySelector('.edit-shipment-item-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.edit-shipment-item-price').value) || 0;
+                total += qty * price;
+            });
+            document.getElementById('editShipmentTotalPreview').textContent = `Total Goods: ₦${total.toLocaleString()}`;
+        }
+
+        // ── Update Shipment (submit edit form) ──
+        document.getElementById('editShipmentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editShipmentId').value;
+            const btn = document.getElementById('updateShipmentBtn');
+            btn.disabled = true;
+            btn.textContent = 'Updating…';
+            document.getElementById('editShipmentMessage').textContent = '';
+
+            try {
+                const sender = document.getElementById('editSender').value.trim();
+                if (!sender) throw new Error('Sender is required.');
+                const destination = document.getElementById('editDestination').value;
+                const vehicle = document.getElementById('editVehicle').value.trim();
+                const driver = document.getElementById('editDriver').value.trim();
+                const transport = parseFloat(document.getElementById('editTransport').value) || 0;
+                const status = document.getElementById('editStatus').value;
+                const notes = document.getElementById('editNotes').value.trim();
+
+                // Collect items
+                const rows = document.querySelectorAll('#editShipmentItemsContainer .item-row');
+                const items = [];
+                rows.forEach(row => {
+                    const name = row.querySelector('.edit-shipment-item-name').value.trim();
+                    const qty = parseFloat(row.querySelector('.edit-shipment-item-qty').value) || 0;
+                    const price = parseFloat(row.querySelector('.edit-shipment-item-price').value) || 0;
+                    if (name && qty > 0 && price > 0) {
+                        items.push({ itemName: name, orderedQty: qty, unitPrice: price, totalItemCost: qty * price });
+                    }
+                });
+                if (items.length === 0) throw new Error('Add at least one item.');
+
+                await db.collection('shipments').doc(id).update({
+                    senderName: sender,
+                    destinationBranch: destination,
+                    vehicleNo: vehicle,
+                    driver: driver,
+                    transportCost: transport,
+                    status: status,
+                    notes: notes,
+                    items: items,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await db.collection('activityLog').add({
+                    actionType: 'shipment_updated',
+                    shipmentId: id,
+                    details: `Shipment ${id.slice(0,6)} updated by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+
+                showToast('✅ Shipment updated!', 'success');
+                closeModal('editShipmentModal');
+                refreshShipments();
+            } catch (err) {
+                document.getElementById('editShipmentMessage').textContent = '❌ ' + err.message;
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Update Shipment';
+            }
+        });
+
+        // ── Dispatch Shipment (set status to Dispatched) ──
+        window.dispatchShipment = async function(id) {
+            if (!confirm('Mark this shipment as Dispatched?')) return;
+            try {
+                await db.collection('shipments').doc(id).update({
+                    status: 'Dispatched',
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await db.collection('activityLog').add({
+                    actionType: 'shipment_dispatched',
+                    shipmentId: id,
+                    details: `Shipment ${id.slice(0,6)} dispatched by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+                showToast('✅ Shipment marked as Dispatched.', 'success');
+                refreshShipments();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        // ── Deliver Shipment (set status to Delivered) ──
+        window.deliverShipment = async function(id) {
+            if (!confirm('Mark this shipment as Delivered?')) return;
+            try {
+                await db.collection('shipments').doc(id).update({
+                    status: 'Delivered',
+                    receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                await db.collection('activityLog').add({
+                    actionType: 'shipment_delivered',
+                    shipmentId: id,
+                    details: `Shipment ${id.slice(0,6)} delivered by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+                showToast('✅ Shipment marked as Delivered.', 'success');
+                refreshShipments();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        // ── Delete Shipment ──
+        window.deleteShipment = async function(id) {
+            if (!confirm('Delete this shipment permanently?')) return;
+            try {
+                await db.collection('shipments').doc(id).delete();
+                showToast('✅ Shipment deleted.', 'success');
+                refreshShipments();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        // ── Refresh Shipments (manual) ──
+        function refreshShipments() {
+            if (shipmentsUnsub) {
+                shipmentsUnsub();
+                startDashboardListeners();
+                showToast('Shipments refreshed', 'info', 1200);
+            }
+        }
+        window.refreshShipments = refreshShipments;
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   INVOICES (same as before, with edit, dispatch, etc.)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function loadInvoices() {
+            if (invoicesUnsub) invoicesUnsub();
+            const tbody = document.getElementById('invoicesBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Loading…</td></tr>';
+
+            invoicesUnsub = db.collection('invoices').orderBy('createdAt', 'desc').limit(100).onSnapshot((snap) => {
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No invoices yet</td></tr>';
+                    document.getElementById('invoiceBadge').textContent = '0';
+                    return;
+                }
+                let rows = '';
+                let count = 0;
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    count++;
+                    const total = d.total || 0;
+                    const moved = d.movedToWarehouse ? '✅ Moved' : 'Pending';
+                    const dispatched = d.dispatched ? '📦 Dispatched' : '';
+                    const statusBadge = dispatched ? `<span class="badge badge-info">${dispatched}</span>` :
+                        `<span class="badge ${moved === '✅ Moved' ? 'badge-success' : 'badge-warning'}">${moved}</span>`;
+                    rows += `<tr>
+                        <td><strong>${d.invoiceNumber || doc.id.slice(0,6)}</strong></td>
+                        <td>${d.customer || '—'}</td>
+                        <td><span class="badge">${d.branch || '—'}</span></td>
+                        <td class="cost-cell">₦${total.toLocaleString()}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <button class="btn-icon" onclick="editInvoice('${doc.id}')" title="Edit">✏️</button>
+                            <button class="btn-icon" onclick="viewInvoice('${doc.id}')" title="View">👁️</button>
+                            <button class="btn-icon" onclick="openShareInvoice('${doc.id}')" title="Share">📤</button>
+                            ${!d.dispatched ? `<button class="btn-icon success" onclick="dispatchInvoice('${doc.id}')" title="Dispatch">📦</button>` : ''}
+                            <button class="btn-icon" onclick="openMoveWarehouseModal('${doc.id}')" title="Move to WH">🏚️</button>
+                            <button class="btn-icon danger" onclick="deleteInvoice('${doc.id}')" title="Delete">🗑️</button>
+                        </td>
+                    </tr>`;
+                });
+                tbody.innerHTML = rows;
+                document.getElementById('invoiceBadge').textContent = count;
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Invoices error:', err);
+                tbody.innerHTML =
+                `<tr><td colspan="6" class="text-center text-muted">⚠️ Error loading invoices</td></tr>`;
+            });
+        }
+
+        document.getElementById('refreshInvoicesBtn').addEventListener('click', () => {
+            loadInvoices();
+            showToast('Invoices refreshed', 'info', 1000);
+        });
+
+        // ── Edit Invoice ──
+        window.editInvoice = async function(id) {
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+                const d = doc.data();
+                editingInvoiceId = id;
+                document.getElementById('invoiceModalTitle').textContent = '✏️ Edit Invoice';
+                document.getElementById('invNumber').value = d.invoiceNumber || '';
+                document.getElementById('invDate').value = d.date || new Date().toISOString().slice(0, 10);
+                document.getElementById('invCustomer').value = d.customer || '';
+                document.getElementById('invEmail').value = d.customerEmail || '';
+                document.getElementById('invVendor').value = d.vendor || '';
+                document.getElementById('invBranch').value = d.branch || 'Lagos';
+                document.getElementById('invNotes').value = d.notes || '';
+                document.getElementById('invMultiplier').value = d.transportMultiplier || 1.00;
+                document.getElementById('bulkDiscPct').value = '0';
+                document.getElementById('bulkVAT').value = '0';
+                document.getElementById('invoiceFormMessage').textContent = '';
+                document.getElementById('invoicePreviewArea').style.display = 'none';
+
+                const container = document.getElementById('invoiceItemsContainer');
+                container.innerHTML = '';
+                itemCounter = 0;
+                if (d.items && d.items.length) {
+                    d.items.forEach(it => {
+                        addInvoiceItemRow(it.itemName, it.quantity, it.unitPrice,
+                            it.discountPercent || 0, it.discountAmount || 0, it.vatPercent || 0);
+                    });
+                } else {
+                    addInvoiceItemRow();
+                }
+                updateInvoicePreview();
+                openModal('invoiceModal');
+            } catch (err) {
+                showToast('Error loading invoice: ' + err.message, 'error');
+            }
+        };
+
+        // ── Dispatch Invoice (create shipment) ──
+        window.dispatchInvoice = async function(id) {
+            if (!confirm('Dispatch this invoice? A shipment will be created.')) return;
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+                const d = doc.data();
+                if (d.dispatched) { showToast('Already dispatched.', 'info'); return; }
+
+                const shipmentItems = (d.items || []).map(it => ({
+                    itemName: it.itemName || '',
+                    orderedQty: it.quantity || 0,
+                    unitPrice: it.unitPrice || 0,
+                    totalItemCost: (it.quantity || 0) * (it.unitPrice || 0)
+                }));
+
+                await db.collection('shipments').add({
+                    senderName: d.customer || 'Unknown',
+                    destinationBranch: d.branch || 'Lagos',
+                    items: shipmentItems,
+                    transportCost: 0,
+                    status: 'Dispatched',
+                    vehicleNo: '',
+                    driver: '',
+                    notes: `Dispatched from invoice ${d.invoiceNumber}`,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    createdBy: currentEmail,
+                    invoiceId: id
+                });
+
+                await db.collection('invoices').doc(id).update({
+                    dispatched: true,
+                    dispatchedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    dispatchedBy: currentEmail
+                });
+
+                await db.collection('activityLog').add({
+                    actionType: 'invoice_dispatched',
+                    invoiceNumber: d.invoiceNumber,
+                    details: `Invoice ${d.invoiceNumber} dispatched by ${currentEmail}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+
+                showToast('✅ Invoice dispatched and shipment created!', 'success');
+                loadInvoices();
+                refreshShipments();
+            } catch (err) {
+                showToast('Error dispatching: ' + err.message, 'error');
+            }
+        };
+
+        // ── Share Invoice ──
+        window.openShareInvoice = function(invoiceId) {
+            if (!invoiceId) { showToast('No invoice selected.', 'error'); return; }
+            window.open(`share.html?id=${invoiceId}`, '_blank');
+        };
+
+        // ── New Invoice ──
+        document.getElementById('newInvoiceBtn').addEventListener('click', () => {
+            editingInvoiceId = null;
+            document.getElementById('invoiceModalTitle').textContent = '🧾 New Invoice';
+            document.getElementById('invNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+            document.getElementById('invDate').value = new Date().toISOString().slice(0, 10);
+            document.getElementById('invCustomer').value = '';
+            document.getElementById('invEmail').value = '';
+            document.getElementById('invVendor').value = '';
+            document.getElementById('invNotes').value = '';
+            document.getElementById('invMultiplier').value = '1.00';
+            document.getElementById('bulkDiscPct').value = '0';
+            document.getElementById('bulkVAT').value = '0';
+            document.getElementById('invoiceFormMessage').textContent = '';
+            document.getElementById('invoicePreviewArea').style.display = 'none';
+            document.getElementById('invoiceItemsContainer').innerHTML = '';
+            itemCounter = 0;
+            addInvoiceItemRow();
+            updateInvoicePreview();
+            openModal('invoiceModal');
+        });
+
+        // ── Add Item Row (Invoice) ──
+        document.getElementById('addItemBtn').addEventListener('click', () => addInvoiceItemRow());
+
+        function addInvoiceItemRow(name = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0) {
+            const id = ++itemCounter;
+            const container = document.getElementById('invoiceItemsContainer');
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.dataset.rowId = id;
+            div.innerHTML = `
+                <input type="checkbox" class="item-check" data-row="${id}" style="width:auto;">
+                <input type="text" placeholder="Item name" class="inv-item-name" value="${escapeHtml(name)}" style="flex:2;" required>
+                <input type="number" placeholder="Packs" class="inv-item-qty" value="${Math.max(0,qty)}" min="0" step="1" style="flex:0.8;">
+                <input type="number" placeholder="Price/pack" class="inv-item-price" value="${Math.max(0,price)}" min="0" step="0.01" style="flex:1;">
+                <input type="number" placeholder="Disc %" class="inv-item-disc" value="${Math.max(0,discPct)}" min="0" max="100" step="0.5" style="flex:0.8;">
+                <input type="number" placeholder="Disc ₦" class="inv-item-disc-amt" value="${Math.max(0,discAmt)}" min="0" step="0.01" style="flex:0.8;">
+                <input type="number" placeholder="VAT %" class="inv-item-vat" value="${Math.max(0,vatPct)}" min="0" max="100" step="0.5" style="flex:0.8;">
+                <button type="button" class="remove-btn" onclick="removeInvoiceItem(this)">✖</button>
+            `;
+            container.appendChild(div);
+            div.querySelectorAll('input').forEach(inp => inp.addEventListener('input', updateInvoicePreview));
+            updateInvoicePreview();
+        }
+
+        window.removeInvoiceItem = function(btn) {
+            const container = document.getElementById('invoiceItemsContainer');
+            if (container.children.length <= 1) { showToast('Cannot remove last item.', 'error'); return; }
+            btn.closest('.item-row').remove();
+            updateInvoicePreview();
+        };
+
+        // ── Import Excel ──
+        document.getElementById('importExcelBtn').addEventListener('click', () => {
+            document.getElementById('excelFileInput').click();
+        });
+
+        document.getElementById('excelFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                try {
+                    const data = new Uint8Array(ev.target.result);
+                    const wb = XLSX.read(data, { type: 'array' });
+                    const sheet = wb.Sheets[wb.SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(sheet);
+                    if (!json.length) { showToast('No data found in file.', 'error'); return; }
+                    const headers = Object.keys(json[0]);
+                    const findCol = (variations) => {
+                        for (const h of headers) {
+                            const hL = h.toLowerCase().trim();
+                            for (const v of variations) {
+                                if (hL === v.toLowerCase().trim()) return h;
+                            }
+                        }
+                        for (const h of headers) {
+                            const hL = h.toLowerCase().trim();
+                            for (const v of variations) {
+                                const vL = v.toLowerCase().trim();
+                                if (hL.length > 2 && vL.length > 2 && (hL.includes(vL) || vL.includes(hL))) return h;
+                            }
+                        }
+                        return null;
+                    };
+                    const itemCol = findCol(['item', 'product', 'name']);
+                    const qtyCol = findCol(['quantity', 'qty', 'packs']);
+                    const priceCol = findCol(['price', 'unit price', 'cost']);
+                    if (!itemCol || !qtyCol || !priceCol) {
+                        showToast('Could not detect Item, Quantity, and Price columns.', 'error');
+                        return;
+                    }
+                    let added = 0;
+                    json.forEach(row => {
+                        const name = String(row[itemCol] || '').trim();
+                        const qty = parseFloat(row[qtyCol]) || 0;
+                        const price = parseFloat(row[priceCol]) || 0;
+                        if (name && qty > 0 && price > 0) {
+                            addInvoiceItemRow(name, qty, price);
+                            added++;
+                        }
+                    });
+                    showToast(`✅ Imported ${added} items.`, 'success');
+                } catch (err) {
+                    showToast('Error reading Excel: ' + err.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            this.value = '';
+        });
+
+        // ── Calculate totals (Invoice) ──
+        function calcInvoiceTotals() {
+            const rows = document.querySelectorAll('#invoiceItemsContainer .item-row');
+            const items = [];
+            let subtotal = 0,
+                totalDisc = 0,
+                totalVAT = 0,
+                grand = 0;
+            rows.forEach(row => {
+                const name = row.querySelector('.inv-item-name').value.trim();
+                const qty = parseFloat(row.querySelector('.inv-item-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.inv-item-price').value) || 0;
+                const discPct = parseFloat(row.querySelector('.inv-item-disc').value) || 0;
+                const discAmt = parseFloat(row.querySelector('.inv-item-disc-amt').value) || 0;
+                const vatPct = parseFloat(row.querySelector('.inv-item-vat').value) || 0;
+                if (name && qty > 0 && price > 0) {
+                    const sub = qty * price;
+                    subtotal += sub;
+                    const disc = (sub * (discPct / 100)) + discAmt;
+                    totalDisc += disc;
+                    const afterDisc = sub - disc;
+                    const vat = afterDisc * (vatPct / 100);
+                    totalVAT += vat;
+                    const total = afterDisc + vat;
+                    grand += total;
+                    items.push({ name, qty, price, discPct, discAmt, vatPct, subtotal: sub, discount: disc, vat, total });
+                }
+            });
+            const multiplier = parseFloat(document.getElementById('invMultiplier').value) || 1.00;
+            const adjustedGrand = grand * multiplier;
+            return { items, subtotal: subtotal * multiplier, totalDisc: totalDisc * multiplier, totalVAT: totalVAT * multiplier,
+                grandTotal: adjustedGrand, multiplier };
+        }
+
+        function updateInvoicePreview() {
+            const { grandTotal } = calcInvoiceTotals();
+            document.getElementById('invoiceTotalPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
+        }
+
+        // ── Preview Invoice ──
+        document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
+            const { items, subtotal, totalDisc, totalVAT, grandTotal, multiplier } = calcInvoiceTotals();
+            if (!items.length) { showToast('Add at least one item.', 'error'); return; }
+            const invNum = document.getElementById('invNumber').value;
+            const date = document.getElementById('invDate').value;
+            const customer = document.getElementById('invCustomer').value.trim() || 'N/A';
+            const email = document.getElementById('invEmail').value.trim() || 'N/A';
+            const vendor = document.getElementById('invVendor').value.trim() || '';
+            const branch = document.getElementById('invBranch').value;
+            const notes = document.getElementById('invNotes').value.trim();
+
+            let itemsHtml = items.map(it =>
+                `<tr><td>${escapeHtml(it.name)}</td><td>${it.qty}</td><td>₦${it.price.toFixed(2)}</td><td>${it.discPct}%</td><td>₦${it.discount.toFixed(2)}</td><td>${it.vatPct}%</td><td>₦${it.vat.toFixed(2)}</td><td>₦${it.total.toFixed(2)}</td></tr>`
+                ).join('');
+
+            const html = `
+                <div style="font-family:sans-serif;">
+                    <div style="text-align:center;margin-bottom:14px;"><h3 style="margin:0;">NEVAMAK Enterprises</h3><small>Invoice</small></div>
+                    <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:0.85rem;">
+                        <div><strong>#:</strong> ${escapeHtml(invNum)}</div>
+                        <div><strong>Date:</strong> ${escapeHtml(date)}</div>
+                        <div><strong>Customer:</strong> ${escapeHtml(customer)}</div>
+                        ${vendor ? `<div><strong>Vendor:</strong> ${escapeHtml(vendor)}</div>` : ''}
+                        <div><strong>Branch:</strong> ${escapeHtml(branch)}</div>
+                        <div><strong>Multiplier:</strong> ${multiplier.toFixed(2)}</div>
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:0.8rem;border:1px solid #ccc;">
+                        <tr><th style="border:1px solid #ccc;padding:6px;">Item</th><th style="border:1px solid #ccc;padding:6px;">Packs</th><th style="border:1px solid #ccc;padding:6px;">Price</th><th style="border:1px solid #ccc;padding:6px;">Disc%</th><th style="border:1px solid #ccc;padding:6px;">Disc₦</th><th style="border:1px solid #ccc;padding:6px;">VAT%</th><th style="border:1px solid #ccc;padding:6px;">VAT₦</th><th style="border:1px solid #ccc;padding:6px;">Total</th></tr>
+                        ${itemsHtml}
+                        <tr style="font-weight:bold;background:#eaf1fa;"><td colspan="7" style="border:1px solid #ccc;padding:6px;text-align:right;">Subtotal</td><td style="border:1px solid #ccc;padding:6px;">₦${subtotal.toFixed(2)}</td></tr>
+                        <tr style="font-weight:bold;"><td colspan="7" style="border:1px solid #ccc;padding:6px;text-align:right;">Discount</td><td style="border:1px solid #ccc;padding:6px;">-₦${totalDisc.toFixed(2)}</td></tr>
+                        <tr style="font-weight:bold;"><td colspan="7" style="border:1px solid #ccc;padding:6px;text-align:right;">VAT</td><td style="border:1px solid #ccc;padding:6px;">₦${totalVAT.toFixed(2)}</td></tr>
+                        <tr style="font-weight:bold;background:#d4e2f0;font-size:1.1rem;"><td colspan="7" style="border:1px solid #ccc;padding:6px;text-align:right;">Grand Total</td><td style="border:1px solid #ccc;padding:6px;">₦${grandTotal.toFixed(2)}</td></tr>
+                    </table>
+                    ${notes ? `<p style="font-size:0.8rem;"><strong>Notes:</strong> ${escapeHtml(notes)}</p>` : ''}
+                    <p style="font-size:0.7rem;color:#888;">Generated by ${escapeHtml(currentEmail)}</p>
+                </div>
+            `;
+            const area = document.getElementById('invoicePreviewArea');
+            area.innerHTML = html;
+            area.style.display = 'block';
+            showToast('Preview ready', 'info', 1200);
+        });
+
+        // ── Save Invoice ──
+        document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('saveInvoiceBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+            document.getElementById('invoiceFormMessage').textContent = '';
+
+            try {
+                const invNum = document.getElementById('invNumber').value;
+                const date = document.getElementById('invDate').value;
+                const customer = document.getElementById('invCustomer').value.trim();
+                if (!customer) { throw new Error('Customer name is required.'); }
+                const email = document.getElementById('invEmail').value.trim();
+                const vendor = document.getElementById('invVendor').value.trim();
+                const branch = document.getElementById('invBranch').value;
+                const notes = document.getElementById('invNotes').value.trim();
+                const multiplier = parseFloat(document.getElementById('invMultiplier').value) || 1.00;
+                const { items, subtotal, totalDisc, totalVAT, grandTotal } = calcInvoiceTotals();
+                if (!items.length) { throw new Error('Add at least one item.'); }
+
+                const savedItems = items.map(it => ({
+                    itemName: it.name,
+                    quantity: it.qty,
+                    unitPrice: it.price,
+                    packSize: 1,
+                    originalPrice: it.price,
+                    updatedPrice: it.price * multiplier,
+                    subtotal: it.subtotal * multiplier,
+                    discountPercent: it.discPct,
+                    discountAmount: it.discAmt,
+                    discountTotal: it.discount * multiplier,
+                    vatPercent: it.vatPct,
+                    vat: it.vat * multiplier,
+                    total: it.total * multiplier
+                }));
+
+                if (editingInvoiceId) {
+                    await db.collection('invoices').doc(editingInvoiceId).update({
+                        date,
+                        customer,
+                        customerEmail: email,
+                        vendor,
+                        branch,
+                        notes,
+                        items: savedItems,
+                        transportMultiplier: multiplier,
+                        subtotal,
+                        totalDiscount: totalDisc,
+                        totalVAT,
+                        total: grandTotal,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast('✅ Invoice updated!', 'success');
+                } else {
+                    const existing = await db.collection('invoices').where('invoiceNumber', '==', invNum).get();
+                    if (!existing.empty) {
+                        const newNum = 'INV-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36)
+                            .substring(2, 6).toUpperCase();
+                        document.getElementById('invNumber').value = newNum;
+                        throw new Error(`Invoice # already exists. Auto-generated: ${newNum}`);
+                    }
+                    await db.collection('invoices').add({
+                        invoiceNumber: invNum,
+                        date,
+                        customer,
+                        customerEmail: email,
+                        vendor,
+                        branch,
+                        notes,
+                        items: savedItems,
+                        transportMultiplier: multiplier,
+                        subtotal,
+                        totalDiscount: totalDisc,
+                        totalVAT,
+                        totalWHT: 0,
+                        total: grandTotal,
+                        movedToWarehouse: false,
+                        dispatched: false,
+                        acknowledged: false,
+                        createdBy: currentEmail,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast('✅ Invoice saved!', 'success');
+                }
+                closeModal('invoiceModal');
+                loadInvoices();
+            } catch (err) {
+                document.getElementById('invoiceFormMessage').textContent = '❌ ' + err.message;
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Save Invoice';
+            }
+        });
+
+        // ── View Invoice ──
+        window.viewInvoice = async function(id) {
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+                const d = doc.data();
+                let itemsHtml = '<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:0.8rem;"><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>';
+                if (d.items) {
+                    d.items.forEach(it => {
+                        itemsHtml +=
+                            `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td><td>₦${(it.total||0).toFixed(2)}</td></tr>`;
+                    });
+                }
+                itemsHtml += '</table>';
+                const status = d.dispatched ? '📦 Dispatched' : (d.movedToWarehouse ? '✅ Moved' : 'Pending');
+                document.getElementById('viewInvoiceContent').innerHTML = `
+                    <p><strong>#:</strong> ${d.invoiceNumber}</p>
+                    <p><strong>Date:</strong> ${d.date || 'N/A'}</p>
+                    <p><strong>Customer:</strong> ${d.customer || 'N/A'}</p>
+                    <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
+                    <p><strong>Vendor:</strong> ${d.vendor || 'N/A'}</p>
+                    <p><strong>Status:</strong> ${status}</p>
+                    <p><strong>Total:</strong> ₦${(d.total||0).toLocaleString()}</p>
+                    ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
+                    <h4>Items</h4>${itemsHtml}
+                    <p style="font-size:0.7rem;color:#888;">Created by ${d.createdBy || 'system'}</p>
+                `;
+                openModal('viewInvoiceModal');
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        };
+
+        // ── Delete Invoice ──
+        window.deleteInvoice = async function(id) {
+            if (!confirm('Delete this invoice permanently?')) return;
+            try {
+                await db.collection('invoices').doc(id).delete();
+                showToast('✅ Invoice deleted.', 'success');
+                loadInvoices();
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        };
+
+        // ── Move to Warehouse ──
+        window.openMoveWarehouseModal = async function(id) {
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+                const d = doc.data();
+                if (d.movedToWarehouse) { showToast('Already moved to warehouse.', 'info'); return; }
+                let itemsHtml = '<table style="width:100%;font-size:0.85rem;"><tr><th>Item</th><th>Qty</th><th>Price</th></tr>';
+                if (d.items) {
+                    d.items.forEach(it => {
+                        itemsHtml +=
+                            `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${(it.unitPrice||0).toFixed(2)}</td></tr>`;
+                    });
+                }
+                itemsHtml += '</table>';
+                document.getElementById('moveWarehouseContent').innerHTML = `
+                    <p><strong>Invoice #:</strong> ${d.invoiceNumber}</p>
+                    <p><strong>Customer:</strong> ${d.customer}</p>
+                    <p><strong>Branch:</strong> 
+                        <select id="moveBranchSel" style="padding:4px 12px;border-radius:30px;border:1px solid #ccc;">
+                            <option value="Lagos" ${d.branch==='Lagos'?'selected':''}>Lagos</option>
+                            <option value="Abuja" ${d.branch==='Abuja'?'selected':''}>Abuja</option>
+                            <option value="Portharcourt" ${d.branch==='Portharcourt'?'selected':''}>Port Harcourt</option>
+                        </select>
+                    </p>
+                    <h4>Items</h4>${itemsHtml}
+                `;
+                document.getElementById('moveMessage').textContent = '';
+                document.getElementById('confirmMoveBtn').dataset.invoiceId = id;
+                openModal('moveWarehouseModal');
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        };
+
+        document.getElementById('confirmMoveBtn').addEventListener('click', async function() {
+            const id = this.dataset.invoiceId;
+            if (!id) return;
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Moving…';
+            document.getElementById('moveMessage').textContent = '';
+
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { throw new Error('Invoice not found.'); }
+                const d = doc.data();
+                if (d.movedToWarehouse) { throw new Error('Already moved.'); }
+                const branch = document.getElementById('moveBranchSel').value;
+
+                for (const item of d.items || []) {
+                    const qty = item.quantity || 0;
+                    const price = item.unitPrice || 0;
+                    if (qty <= 0) continue;
+                    const snap = await db.collection('inventory')
+                        .where('itemName', '==', item.itemName)
+                        .where('branch', '==', branch)
+                        .get();
+                    if (snap.empty) {
+                        await db.collection('inventory').add({
+                            itemName: item.itemName,
+                            branch: branch,
+                            stock: qty,
+                            unitPrice: price,
+                            location: 'Shelf A',
+                            lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    } else {
+                        snap.forEach(ref => {
+                            ref.ref.update({
+                                stock: firebase.firestore.FieldValue.increment(qty),
+                                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        });
+                    }
+                }
+
+                await db.collection('invoices').doc(id).update({
+                    movedToWarehouse: true,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await db.collection('activityLog').add({
+                    actionType: 'invoice_moved_to_warehouse',
+                    invoiceNumber: d.invoiceNumber,
+                    branch: branch,
+                    details: `Moved ${(d.items||[]).length} items from invoice ${d.invoiceNumber} to ${branch}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+
+                document.getElementById('moveMessage').textContent = '✅ Moved to warehouse successfully!';
+                document.getElementById('moveMessage').style.color = '#1e7e34';
+                showToast('✅ Items moved to warehouse.', 'success');
+                setTimeout(() => { closeModal('moveWarehouseModal');
+                    loadInvoices(); }, 800);
+            } catch (err) {
+                document.getElementById('moveMessage').textContent = '❌ ' + err.message;
+                document.getElementById('moveMessage').style.color = '#c0392b';
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✅ Move All';
+            }
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   REPORTS – GENERATE INVOICE FROM RECEIVED GOODS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        function loadReceivedGoodsForReports() {
+            const container = document.getElementById('receivedGoodsList');
+            container.innerHTML = '<div class="loading-spinner"></div> Loading received goods…';
+            if (receivedReportsUnsub) receivedReportsUnsub();
+
+            receivedReportsUnsub = db.collection('goodsReceived')
+                .orderBy('receivedAt', 'desc')
+                .limit(50)
+                .onSnapshot((snap) => {
+                    if (snap.empty) {
+                        container.innerHTML =
+                            '<div class="text-muted" style="padding:20px; text-align:center;">No received goods records found.</div>';
+                        return;
+                    }
+                    let html =
+                        `<table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Action</th></tr>`;
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        const itemsCount = d.receivedItems ? d.receivedItems.filter(i => i.receivedQty > 0).length :
+                            0;
+                        const date = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleDateString() : '';
+                        html += `<tr>
+                            <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
+                            <td>${escapeHtml(d.customer || 'N/A')}</td>
+                            <td><span class="badge">${escapeHtml(d.branch || '—')}</span></td>
+                            <td>${escapeHtml(d.receivingOfficer || '')}</td>
+                            <td>${date}</td>
+                            <td>${itemsCount} items</td>
+                            <td><button class="btn-sm primary" onclick="generateInvoiceFromReceived('${doc.id}')">📄 Create Invoice</button></td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                    container.innerHTML = html;
+                }, (err) => {
+                    if (err.message && err.message.includes('message channel closed')) return;
+                    console.error('Received goods load error:', err);
+                    container.innerHTML =
+                        `<div class="text-muted" style="padding:20px; text-align:center;">⚠️ Error loading: ${escapeHtml(err.message)}</div>`;
+                });
+        }
+
+        // ── Generate Invoice from Received Goods ──
+        window.generateInvoiceFromReceived = async function(receivedId) {
+            try {
+                const doc = await db.collection('goodsReceived').doc(receivedId).get();
+                if (!doc.exists) { showToast('Record not found.', 'error'); return; }
+                const d = doc.data();
+
+                // Pre-fill invoice modal with received data
+                editingInvoiceId = null; // new invoice
+                document.getElementById('invoiceModalTitle').textContent = '🧾 New Invoice from Received Goods';
+                document.getElementById('invNumber').value = 'INV-' + Date.now().toString(36).toUpperCase();
+                document.getElementById('invDate').value = new Date().toISOString().slice(0, 10);
+                document.getElementById('invCustomer').value = d.customer || '';
+                document.getElementById('invEmail').value = ''; // not available in received
+                document.getElementById('invVendor').value = d.vendor || '';
+                document.getElementById('invBranch').value = d.branch || 'Lagos';
+                document.getElementById('invNotes').value = d.receivedNotes || `Generated from received goods (${d.invoiceNumber})`;
+                document.getElementById('invMultiplier').value = '1.00';
+                document.getElementById('bulkDiscPct').value = '0';
+                document.getElementById('bulkVAT').value = '0';
+                document.getElementById('invoiceFormMessage').textContent = '';
+                document.getElementById('invoicePreviewArea').style.display = 'none';
+
+                // Populate items from receivedItems
+                const container = document.getElementById('invoiceItemsContainer');
+                container.innerHTML = '';
+                itemCounter = 0;
+                if (d.receivedItems && d.receivedItems.length > 0) {
+                    d.receivedItems.forEach(it => {
+                        // Only add items with receivedQty > 0
+                        const qty = it.receivedQty || 0;
+                        const price = it.unitPrice || 0;
+                        if (qty > 0 && price > 0) {
+                            addInvoiceItemRow(it.itemName, qty, price, 0, 0, 0);
+                        }
+                    });
+                }
+                // If no items added, add a default row
+                if (document.querySelectorAll('#invoiceItemsContainer .item-row').length === 0) {
+                    addInvoiceItemRow('', 1, 0);
+                }
+                updateInvoicePreview();
+                openModal('invoiceModal');
+
+                showToast('✅ Received goods loaded into invoice. Edit and save.', 'success');
+            } catch (err) {
+                showToast('Error generating invoice: ' + err.message, 'error');
+            }
+        };
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   INVENTORY
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function loadInventory() {
+            const tbody = document.getElementById('inventoryBody');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Loading…</td></tr>';
+            if (inventoryUnsub) inventoryUnsub();
+            inventoryUnsub = db.collection('inventory').onSnapshot((snap) => {
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No inventory items</td></tr>';
+                    return;
+                }
+                let rows = '';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    rows += `<tr>
+                        <td>${escapeHtml(d.itemName || '—')}</td>
+                        <td><span class="badge">${escapeHtml(d.branch || '—')}</span></td>
+                        <td>${d.stock || 0}</td>
+                        <td class="cost-cell">₦${(d.unitPrice||0).toFixed(2)}</td>
+                    </tr>`;
+                });
+                tbody.innerHTML = rows;
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Inventory error:', err);
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">⚠️ Error loading inventory</td></tr>';
+            });
+        }
+
+        document.getElementById('invSearch').addEventListener('input', function() {
+            const q = this.value.toLowerCase().trim();
+            const rows = document.querySelectorAll('#inventoryBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(q) ? '' : 'none';
+            });
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   RETURNS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function loadReturns() {
+            if (returnsUnsub) returnsUnsub();
+            const tbody = document.getElementById('returnsBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Loading…</td></tr>';
+            returnsUnsub = db.collection('returns').orderBy('date', 'desc').limit(100).onSnapshot((snap) => {
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No returns recorded</td></tr>';
+                    return;
+                }
+                let rows = '';
+                snap.forEach(doc => {
+                    const r = doc.data();
+                    rows += `<tr>
+                        <td>${r.date ? new Date(r.date.toDate()).toLocaleDateString() : 'N/A'}</td>
+                        <td>${r.branch || '—'}</td>
+                        <td>${(r.shipmentId||'').slice(0,6)}</td>
+                        <td>${r.itemName || '—'}</td>
+                        <td>${r.returnedQty || 0}</td>
+                        <td>${r.reason || '—'}</td>
+                    </tr>`;
+                });
+                tbody.innerHTML = rows;
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Returns error:', err);
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">⚠️ Error loading returns</td></tr>';
+            });
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   AUDIT
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function loadAudit() {
+            const el = document.getElementById('auditLog');
+            el.innerHTML = '<div class="loading-spinner"></div> Loading…';
+            if (auditUnsub) auditUnsub();
+            auditUnsub = db.collection('activityLog').orderBy('timestamp', 'desc').limit(100).onSnapshot((snap) => {
+                if (snap.empty) { el.innerHTML =
+                    '<div class="text-center text-muted" style="padding:20px;">No activity yet</div>'; return; }
+                let html = '';
+                snap.forEach(doc => {
+                    const a = doc.data();
+                    const time = a.timestamp ? new Date(a.timestamp.toDate()).toLocaleString() : 'N/A';
+                    html += `<div style="display:flex;justify-content:space-between;border-bottom:1px solid #eef1f5;padding:6px 0;gap:8px;flex-wrap:wrap;">
+                        <span>${escapeHtml(a.actionType || 'action')} <strong>${escapeHtml(a.details || '')}</strong></span>
+                        <span style="color:#6b7f96;font-size:0.75rem;white-space:nowrap;">${time} · ${escapeHtml(a.user || 'system')}</span>
+                    </div>`;
+                });
+                el.innerHTML = html;
+            }, (err) => {
+                if (err.message && err.message.includes('message channel closed')) return;
+                console.error('Audit error:', err);
+                el.innerHTML = '<div class="text-center text-muted" style="padding:20px;">⚠️ Error loading audit log</div>';
+            });
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   PENDING REQUESTS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function loadPendingRequests() {
+            const el = document.getElementById('pendingList');
+            el.innerHTML = '<div class="loading-spinner"></div> Loading…';
+            if (pendingUnsub) pendingUnsub();
+            pendingUnsub = db.collection('invoiceRequests')
+                .where('status', '==', 'pending')
+                .orderBy('createdAt', 'desc')
+                .limit(50)
+                .onSnapshot((snap) => {
+                    document.getElementById('pendingBadge').textContent = snap.size;
+                    if (snap.empty) {
+                        el.innerHTML =
+                        '<div class="text-center text-muted" style="padding:20px;">✅ No pending requests</div>';
+                        return;
+                    }
+                    let html =
+                        `<table><tr><th>Request ID</th><th>Requested By</th><th>Items</th><th>Total</th><th>Date</th><th>Action</th></tr>`;
+                    snap.forEach(doc => {
+                        const d = doc.data();
+                        const itemsCount = d.items ? d.items.length : 0;
+                        const total = d.items ? d.items.reduce((s, i) => s + (i.totalItemCost || 0), 0) : 0;
+                        const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString() : 'N/A';
+                        html += `<tr>
+                            <td><strong>#${doc.id.slice(0,8)}</strong></td>
+                            <td>${escapeHtml(d.requestedBy || 'N/A')}</td>
+                            <td>${itemsCount} items</td>
+                            <td class="cost-cell">₦${total.toLocaleString()}</td>
+                            <td>${date}</td>
+                            <td>
+                                <button class="btn-sm primary" onclick="approveRequest('${doc.id}')">✅ Approve</button>
+                                <button class="btn-sm" style="background:#e74c3c;color:#fff;" onclick="rejectRequest('${doc.id}')">❌ Reject</button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</table>';
+                    el.innerHTML = html;
+                }, (err) => {
+                    if (err.message && err.message.includes('message channel closed')) return;
+                    console.error('Pending requests error:', err);
+                    el.innerHTML =
+                        `<div class="text-center text-muted" style="padding:20px;">⚠️ Error loading: ${escapeHtml(err.message)}</div>`;
+                });
+        }
+
+        window.approveRequest = async function(id) {
+            if (!confirm('Approve this invoice request?')) return;
+            try {
+                await db.collection('invoiceRequests').doc(id).update({
+                    status: 'approved',
+                    approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    approvedBy: currentEmail
+                });
+                showToast('✅ Request approved.', 'success');
+                loadPendingRequests();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        window.rejectRequest = async function(id) {
+            if (!confirm('Reject this invoice request?')) return;
+            const reason = prompt('Reason for rejection:') || 'No reason provided';
+            try {
+                await db.collection('invoiceRequests').doc(id).update({
+                    status: 'rejected',
+                    rejectedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    rejectedBy: currentEmail,
+                    rejectionReason: reason
+                });
+                showToast('❌ Request rejected.', 'success');
+                loadPendingRequests();
+            } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        };
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   UTILITY
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+        window.escapeHtml = escapeHtml;
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   INIT
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        console.log('🚀 NEVAMAK Unified Dashboard loaded with report generation.');
+
+        document.querySelectorAll('.modal-overlay').forEach(el => {
+            el.addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('open');
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeSidebar();
+        });
+
+        // Add item button for edit shipment modal
+        document.getElementById('addEditShipmentItemBtn').addEventListener('click', () => addEditShipmentItemRow());
+    </script>
+
+</body>
+</html>
