@@ -196,6 +196,33 @@
 </div>
 
 <script>
+    // ==================== Global error suppressor (ignores extension errors) ====================
+    window.addEventListener('error', function(e) {
+        const msg = e.message || '';
+        if (msg.includes('GmailAcrobatFteCoachmark') || 
+            msg.includes('showOneChild') || 
+            msg.includes('message channel closed') ||
+            msg.includes('Extension') ||
+            msg.includes('chrome-extension://') ||
+            msg.includes('moz-extension://')) {
+            e.preventDefault();
+            e.stopPropagation();
+            return true;
+        }
+    }, true);
+
+    window.addEventListener('unhandledrejection', function(e) {
+        const reason = e.reason || {};
+        const msg = reason.message || String(reason);
+        if (msg.includes('message channel closed') ||
+            msg.includes('Extension') ||
+            msg.includes('chrome-extension://') ||
+            msg.includes('moz-extension://')) {
+            e.preventDefault();
+            return true;
+        }
+    });
+
     // ==================== Firebase Config ====================
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
@@ -633,7 +660,7 @@
                     <td>${itemsShort}</td>
                     <td>₦${totalGoods.toLocaleString()}</td>
                     <td>${d.receivingRep || '-'}</td>
-                    <td><button onclick="openGenerateInvoice('${doc.id}')" style="background:#27ae60; color:white; border:none; padding:4px 16px; border-radius:40px; cursor:pointer;">📄 Generate Invoice</button></td>
+                    <td><button onclick="openGenerateInvoice('${d.id}')" style="background:#27ae60; color:white; border:none; padding:4px 16px; border-radius:40px; cursor:pointer;">📄 Generate Invoice</button></td>
                 </tr>`;
             });
             html += '</tbody></table>';
