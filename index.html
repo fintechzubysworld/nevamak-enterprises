@@ -909,38 +909,38 @@
 
             <div class="nav-divider"></div>
 
-            <!-- Full module navigation (opens in new tab) -->
-            <a class="nav-item" href="reports.html" target="_blank">
+            <!-- Full module navigation (opens in same tab) -->
+            <a class="nav-item" href="reports.html">
                 <span class="icon">📊</span> Reports
             </a>
-            <a class="nav-item" href="warehouse.html" target="_blank">
+            <a class="nav-item" href="warehouse.html">
                 <span class="icon">🏚️</span> Warehouse
             </a>
-            <a class="nav-item" href="request_invoice.html" target="_blank">
+            <a class="nav-item" href="request_invoice.html">
                 <span class="icon">📄</span> Request Invoice
             </a>
-            <a class="nav-item" href="invoice_repo.html" target="_blank">
+            <a class="nav-item" href="invoice_repo.html">
                 <span class="icon">🧾</span> Invoice Repo
             </a>
-            <a class="nav-item" href="goods-expected.html" target="_blank">
+            <a class="nav-item" href="goods-expected.html">
                 <span class="icon">📦</span> Goods Expected
             </a>
-            <a class="nav-item" href="shop_floor.html" target="_blank">
+            <a class="nav-item" href="shop_floor.html">
                 <span class="icon">🏪</span> Shop Floor
             </a>
-            <a class="nav-item" href="user.html" target="_blank">
+            <a class="nav-item" href="user.html">
                 <span class="icon">👥</span> Users
             </a>
-            <a class="nav-item" href="permissions.html" target="_blank">
+            <a class="nav-item" href="permissions.html">
                 <span class="icon">🔐</span> Permissions
             </a>
-            <a class="nav-item" href="admin_create_user.html" target="_blank">
+            <a class="nav-item" href="admin_create_user.html">
                 <span class="icon">👑</span> Admin
             </a>
-            <a class="nav-item" href="superadmin_zone.html" target="_blank">
+            <a class="nav-item" href="superadmin_zone.html">
                 <span class="icon">🛡️</span> Super Admin
             </a>
-            <a class="nav-item" href="update.html" target="_blank">
+            <a class="nav-item" href="update.html">
                 <span class="icon">🔄</span> Update
             </a>
         </nav>
@@ -1111,11 +1111,11 @@
         </div>
     </div>
 
-    <!-- ─── MODAL: New Shipment ─── -->
+    <!-- ─── MODAL: Create / Edit Shipment ─── -->
     <div class="modal-overlay" id="createShipmentModal">
         <div class="modal-box">
             <span class="modal-close" onclick="closeModal('createShipmentModal')">&times;</span>
-            <h2>🚛 Create New Shipment</h2>
+            <h2 id="shipmentModalTitle">🚛 Create New Shipment</h2>
             <form id="shipmentForm" novalidate>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
                     <div class="form-group"><label>Sender Name *</label><input type="text" id="shipSender" placeholder="Sender name" required></div>
@@ -1135,6 +1135,15 @@
                     <div class="form-group"><label>Expected Date</label><input type="date" id="shipExpectedDate"></div>
                     <div class="form-group"><label>Transport Cost (₦)</label><input type="number" id="shipTransport" placeholder="0" min="0" step="0.01"></div>
                 </div>
+                <div class="form-group"><label>Status</label>
+                    <select id="shipStatus">
+                        <option value="Dispatched">Dispatched</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Partial">Partial</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
+                </div>
                 <div class="form-group"><label>Notes</label><textarea id="shipNotes" rows="2" placeholder="Optional notes"></textarea></div>
 
                 <div class="flex-between"><label style="font-weight:600;">Items</label>
@@ -1145,10 +1154,58 @@
                 <div class="cost-summary" id="shipmentTotalPreview">Total Goods Value: ₦0</div>
 
                 <div class="modal-actions">
-                    <button type="submit" class="btn btn-success" id="saveShipmentBtn">🚀 Create Shipment</button>
+                    <button type="submit" class="btn btn-success" id="saveShipmentBtn">🚀 Save Shipment</button>
                     <button type="button" class="btn btn-outline" onclick="closeModal('createShipmentModal')">Cancel</button>
                 </div>
                 <div id="shipmentFormMessage" style="color:#c0392b; margin-top:8px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ─── MODAL: Create / Edit Invoice ─── -->
+    <div class="modal-overlay" id="invoiceModal">
+        <div class="modal-box">
+            <span class="modal-close" onclick="closeModal('invoiceModal')">&times;</span>
+            <h2 id="invoiceModalTitle">🧾 New Invoice</h2>
+            <form id="invoiceForm" novalidate>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Invoice #</label><input type="text" id="invNumber" readonly></div>
+                    <div class="form-group"><label>Date</label><input type="date" id="invDate"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Customer</label><input type="text" id="invCustomer" placeholder="Customer name" required></div>
+                    <div class="form-group"><label>Customer Email</label><input type="email" id="invEmail" placeholder="email@example.com"></div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="form-group"><label>Vendor</label><input type="text" id="invVendor" placeholder="Vendor name"></div>
+                    <div class="form-group"><label>Branch</label>
+                        <select id="invBranch"><option value="Lagos">Lagos</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
+                    </div>
+                </div>
+                <div class="form-group"><label>Notes</label><textarea id="invNotes" rows="2" placeholder="Optional notes"></textarea></div>
+
+                <div class="flex-between"><label style="font-weight:600;">Items</label>
+                    <button type="button" class="btn-sm primary" id="addItemBtn">＋ Add Item</button>
+                    <button type="button" class="btn-sm" id="importExcelBtn">📂 Import Excel</button>
+                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                </div>
+                <div id="invoiceItemsContainer"></div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin:10px 0;">
+                    <div class="form-group"><label>Transport Multiplier</label><input type="number" id="invMultiplier" value="1.00" step="0.01" min="0.01"></div>
+                    <div class="form-group"><label>Discount % (bulk)</label><input type="number" id="bulkDiscPct" value="0" step="0.5" min="0" max="100"></div>
+                    <div class="form-group"><label>VAT % (bulk)</label><input type="number" id="bulkVAT" value="0" step="0.5" min="0" max="100"></div>
+                </div>
+
+                <div class="cost-summary" id="invoiceTotalPreview">Total: ₦0</div>
+
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-success" id="saveInvoiceBtn">💾 Save Invoice</button>
+                    <button type="button" class="btn btn-primary" id="previewInvoiceBtn">👁️ Preview</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('invoiceModal')">Cancel</button>
+                </div>
+                <div id="invoiceFormMessage" style="color:#c0392b; margin-top:8px;"></div>
+                <div id="invoicePreviewArea" class="invoice-preview" style="display:none;"></div>
             </form>
         </div>
     </div>
@@ -1229,6 +1286,7 @@
         let currentEmail = '';
         let itemCounter = 0;
         let editingInvoiceId = null;
+        let editingShipmentId = null;
         let shipmentItemCounter = 0;
 
         // Chart instances
@@ -1447,7 +1505,10 @@
                         <td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td>
                         <td><span class="${statusClass}">${d.status || 'Dispatched'}</span></td>
                         <td>${lastUpdate}</td>
-                        <td><button class="btn-icon" onclick="viewShipment('${doc.id}')" title="View">👁️</button></td>
+                        <td>
+                            <button class="btn-icon" onclick="viewShipment('${doc.id}')" title="View">👁️</button>
+                            <button class="btn-icon" onclick="editShipment('${doc.id}')" title="Edit">✏️</button>
+                        </td>
                     </tr>`);
                 });
 
@@ -1584,28 +1645,54 @@
         };
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   REFRESH SHIPMENTS (manual)
+        //   EDIT SHIPMENT
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        function refreshShipments() {
-            if (shipmentsUnsub) {
-                shipmentsUnsub();
-                startDashboardListeners();
-                showToast('Shipments refreshed', 'info', 1200);
+        window.editShipment = async function(id) {
+            try {
+                const doc = await db.collection('shipments').doc(id).get();
+                if (!doc.exists) { showToast('Shipment not found.', 'error'); return; }
+                const d = doc.data();
+                editingShipmentId = id;
+                document.getElementById('shipmentModalTitle').textContent = '✏️ Edit Shipment';
+                document.getElementById('shipSender').value = d.senderName || '';
+                document.getElementById('shipDest').value = d.destinationBranch || 'Abuja';
+                document.getElementById('shipVehicle').value = d.vehicleNo || '';
+                document.getElementById('shipDriver').value = d.driver || '';
+                document.getElementById('shipExpectedDate').value = d.expectedDate || '';
+                document.getElementById('shipTransport').value = d.transportCost || 0;
+                document.getElementById('shipStatus').value = d.status || 'Dispatched';
+                document.getElementById('shipNotes').value = d.notes || '';
+                document.getElementById('shipmentFormMessage').textContent = '';
+                // Items
+                document.getElementById('shipmentItemsContainer').innerHTML = '';
+                shipmentItemCounter = 0;
+                if (d.items && d.items.length) {
+                    d.items.forEach(item => {
+                        addShipmentItemRow(item.itemName, item.orderedQty, item.unitPrice);
+                    });
+                } else {
+                    addShipmentItemRow();
+                }
+                updateShipmentPreview();
+                openModal('createShipmentModal');
+            } catch (err) {
+                showToast('Error loading shipment: ' + err.message, 'error');
             }
-        }
-        window.refreshShipments = refreshShipments;
+        };
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   CREATE SHIPMENT
+        //   CREATE / EDIT SHIPMENT - Form handlers
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         document.getElementById('newShipmentBtn').addEventListener('click', () => {
-            // Reset form
+            editingShipmentId = null;
+            document.getElementById('shipmentModalTitle').textContent = '🚛 Create New Shipment';
             document.getElementById('shipSender').value = '';
             document.getElementById('shipDest').value = 'Abuja';
             document.getElementById('shipVehicle').value = '';
             document.getElementById('shipDriver').value = '';
             document.getElementById('shipExpectedDate').value = '';
             document.getElementById('shipTransport').value = '';
+            document.getElementById('shipStatus').value = 'Dispatched';
             document.getElementById('shipNotes').value = '';
             document.getElementById('shipmentFormMessage').textContent = '';
             document.getElementById('shipmentItemsContainer').innerHTML = '';
@@ -1659,7 +1746,7 @@
             e.preventDefault();
             const btn = document.getElementById('saveShipmentBtn');
             btn.disabled = true;
-            btn.textContent = 'Creating…';
+            btn.textContent = 'Saving…';
             document.getElementById('shipmentFormMessage').textContent = '';
 
             try {
@@ -1670,6 +1757,7 @@
                 const driver = document.getElementById('shipDriver').value.trim();
                 const expectedDate = document.getElementById('shipExpectedDate').value;
                 const transport = parseFloat(document.getElementById('shipTransport').value) || 0;
+                const status = document.getElementById('shipStatus').value;
                 const notes = document.getElementById('shipNotes').value.trim();
 
                 const itemRows = document.querySelectorAll('#shipmentItemsContainer .item-row');
@@ -1687,29 +1775,40 @@
                 });
                 if (items.length === 0) { throw new Error('Add at least one valid item.'); }
 
-                await db.collection('shipments').add({
+                const shipmentData = {
                     senderName: sender,
                     destinationBranch: dest,
                     vehicleNo: vehicle,
                     driver: driver,
                     expectedDate: expectedDate,
                     transportCost: transport,
+                    status: status,
                     notes: notes,
                     items: items,
-                    status: 'Dispatched',
-                    createdBy: currentEmail,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                };
 
-                await db.collection('activityLog').add({
-                    actionType: 'shipment_created',
-                    details: `New shipment from ${sender} to ${dest}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentEmail
-                });
-
-                showToast('✅ Shipment created successfully!', 'success');
+                if (editingShipmentId) {
+                    await db.collection('shipments').doc(editingShipmentId).update(shipmentData);
+                    await db.collection('activityLog').add({
+                        actionType: 'shipment_updated',
+                        details: `Updated shipment ${editingShipmentId.slice(0,6)}`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        user: currentEmail
+                    });
+                    showToast('✅ Shipment updated!', 'success');
+                } else {
+                    shipmentData.createdBy = currentEmail;
+                    shipmentData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    await db.collection('shipments').add(shipmentData);
+                    await db.collection('activityLog').add({
+                        actionType: 'shipment_created',
+                        details: `New shipment from ${sender} to ${dest}`,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        user: currentEmail
+                    });
+                    showToast('✅ Shipment created!', 'success');
+                }
                 closeModal('createShipmentModal');
                 refreshShipments();
             } catch (err) {
@@ -1717,12 +1816,24 @@
                 showToast(err.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🚀 Create Shipment';
+                btn.textContent = '🚀 Save Shipment';
             }
         });
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   INVOICES
+        //   REFRESH SHIPMENTS (manual)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        function refreshShipments() {
+            if (shipmentsUnsub) {
+                shipmentsUnsub();
+                startDashboardListeners();
+                showToast('Shipments refreshed', 'info', 1200);
+            }
+        }
+        window.refreshShipments = refreshShipments;
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   INVOICES (with edit capability)
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function loadInvoices() {
             if (invoicesUnsub) invoicesUnsub();
@@ -1750,6 +1861,7 @@
                         <td><span class="badge ${moved === '✅ Moved' ? 'badge-success' : 'badge-warning'}">${moved}</span></td>
                         <td>
                             <button class="btn-icon" onclick="viewInvoice('${doc.id}')" title="View">👁️</button>
+                            <button class="btn-icon" onclick="editInvoice('${doc.id}')" title="Edit">✏️</button>
                             <button class="btn-icon" onclick="openShareInvoice('${doc.id}')" title="Share">📤</button>
                             <button class="btn-icon" onclick="openMoveWarehouseModal('${doc.id}')" title="Move to WH">🏚️</button>
                             <button class="btn-icon danger" onclick="deleteInvoice('${doc.id}')" title="Delete">🗑️</button>
@@ -1779,10 +1891,48 @@
                 showToast('No invoice selected.', 'error');
                 return;
             }
-            window.open(`share.html?id=${invoiceId}`, '_blank');
+            window.location.href = `share.html?id=${invoiceId}`;
         };
 
-        // ── New Invoice (existing code) ──
+        // ── Edit Invoice ──
+        window.editInvoice = async function(id) {
+            try {
+                const doc = await db.collection('invoices').doc(id).get();
+                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
+                const d = doc.data();
+                editingInvoiceId = id;
+                document.getElementById('invoiceModalTitle').textContent = '✏️ Edit Invoice';
+                document.getElementById('invNumber').value = d.invoiceNumber || '';
+                document.getElementById('invDate').value = d.date || '';
+                document.getElementById('invCustomer').value = d.customer || '';
+                document.getElementById('invEmail').value = d.customerEmail || '';
+                document.getElementById('invVendor').value = d.vendor || '';
+                document.getElementById('invBranch').value = d.branch || 'Lagos';
+                document.getElementById('invNotes').value = d.notes || '';
+                document.getElementById('invMultiplier').value = d.transportMultiplier || 1.00;
+                document.getElementById('bulkDiscPct').value = '0';
+                document.getElementById('bulkVAT').value = '0';
+                document.getElementById('invoiceFormMessage').textContent = '';
+                document.getElementById('invoicePreviewArea').style.display = 'none';
+                // Items
+                document.getElementById('invoiceItemsContainer').innerHTML = '';
+                itemCounter = 0;
+                if (d.items && d.items.length) {
+                    d.items.forEach(item => {
+                        addInvoiceItemRow(item.itemName, item.quantity, item.unitPrice,
+                            item.discountPercent || 0, item.discountAmount || 0, item.vatPercent || 0);
+                    });
+                } else {
+                    addInvoiceItemRow();
+                }
+                updateInvoicePreview();
+                openModal('invoiceModal');
+            } catch (err) {
+                showToast('Error loading invoice: ' + err.message, 'error');
+            }
+        };
+
+        // ── New Invoice ──
         document.getElementById('newInvoiceBtn').addEventListener('click', () => {
             editingInvoiceId = null;
             document.getElementById('invoiceModalTitle').textContent = '🧾 New Invoice';
@@ -1803,6 +1953,9 @@
             updateInvoicePreview();
             openModal('invoiceModal');
         });
+
+        // ── Add Item Row (Invoice) ──
+        document.getElementById('addItemBtn').addEventListener('click', () => addInvoiceItemRow());
 
         function addInvoiceItemRow(name = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0) {
             const id = ++itemCounter;
@@ -1972,7 +2125,7 @@
             showToast('Preview ready', 'info', 1200);
         });
 
-        document.getElementById('invoiceForm')?.addEventListener('submit', async (e) => {
+        document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('saveInvoiceBtn');
             btn.disabled = true;
