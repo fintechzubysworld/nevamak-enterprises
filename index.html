@@ -364,6 +364,13 @@
         .card-header .card-actions .btn-sm.primary:hover {
             background: #0e4d7a;
         }
+        .card-header .card-actions .btn-sm.success {
+            background: #27ae60;
+            color: #fff;
+        }
+        .card-header .card-actions .btn-sm.success:hover {
+            background: #1e8e4e;
+        }
 
         /* ── Tables ── */
         .table-wrap {
@@ -446,10 +453,6 @@
             background: #fff3cd;
             color: #8a6d00;
         }
-        .badge-info {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
 
         .cost-cell {
             font-family: 'JetBrains Mono', monospace;
@@ -473,14 +476,6 @@
         .btn-icon.danger:hover {
             background: #fde8e8;
             color: #c0392b;
-        }
-        .btn-icon.success:hover {
-            background: #d4edda;
-            color: #1e7e34;
-        }
-        .btn-icon.warning:hover {
-            background: #fff3cd;
-            color: #8a6d00;
         }
 
         .empty-state {
@@ -517,7 +512,7 @@
             margin-bottom: 6px;
         }
 
-        /* ── Invoice items rows ── */
+        /* ── Invoice / Shipment items rows ── */
         .item-row {
             display: flex;
             flex-wrap: wrap;
@@ -1012,13 +1007,14 @@
                 <div class="card-header">
                     <h3>🚛 Shipments</h3>
                     <div class="card-actions">
+                        <button class="btn-sm success" id="newShipmentBtn" style="display:none;">➕ New Shipment</button>
                         <input type="text" id="shipmentSearch" placeholder="🔍 Search..." style="padding:6px 16px; border-radius:40px; border:1px solid #d8e0ea; font-size:0.82rem;">
                         <button class="btn-sm primary" onclick="refreshShipments()">🔄 Refresh</button>
                     </div>
                 </div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>ID</th><th>Sender</th><th>Dest</th><th>Items</th><th>Goods</th><th>Transport</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
                         <tbody id="shipmentsBody"><tr><td colspan="9" class="text-center text-muted">Loading…</td></tr></tbody>
                     </table>
                 </div>
@@ -1106,7 +1102,7 @@
     <!-- ─── TOAST ─── -->
     <div class="toast-container"><div class="toast" id="toast"></div></div>
 
-    <!-- ─── MODAL: View Shipment (read-only) ─── -->
+    <!-- ─── MODAL: View Shipment ─── -->
     <div class="modal-overlay" id="viewShipmentModal">
         <div class="modal-box">
             <span class="modal-close" onclick="closeModal('viewShipmentModal')">&times;</span>
@@ -1115,99 +1111,44 @@
         </div>
     </div>
 
-    <!-- ─── MODAL: Edit Shipment ─── -->
-    <div class="modal-overlay" id="editShipmentModal">
+    <!-- ─── MODAL: New Shipment ─── -->
+    <div class="modal-overlay" id="createShipmentModal">
         <div class="modal-box">
-            <span class="modal-close" onclick="closeModal('editShipmentModal')">&times;</span>
-            <h2>✏️ Edit Shipment</h2>
-            <form id="editShipmentForm">
-                <input type="hidden" id="editShipmentId">
+            <span class="modal-close" onclick="closeModal('createShipmentModal')">&times;</span>
+            <h2>🚛 Create New Shipment</h2>
+            <form id="shipmentForm" novalidate>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group"><label>Sender</label><input type="text" id="editSender" required></div>
-                    <div class="form-group"><label>Destination</label>
-                        <select id="editDestination"><option value="Lagos">Lagos</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
-                    </div>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group"><label>Vehicle #</label><input type="text" id="editVehicle" placeholder="e.g., ABC-123"></div>
-                    <div class="form-group"><label>Driver</label><input type="text" id="editDriver" placeholder="Driver name"></div>
-                </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group"><label>Transport Cost (₦)</label><input type="number" id="editTransport" step="0.01" min="0"></div>
-                    <div class="form-group"><label>Status</label>
-                        <select id="editStatus">
-                            <option value="Dispatched">Dispatched</option>
-                            <option value="In Transit">In Transit</option>
-                            <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Cancelled</option>
-                            <option value="Partial">Partial</option>
-                            <option value="Rejected">Rejected</option>
+                    <div class="form-group"><label>Sender Name *</label><input type="text" id="shipSender" placeholder="Sender name" required></div>
+                    <div class="form-group"><label>Destination *</label>
+                        <select id="shipDest" required>
+                            <option value="Abuja">Abuja</option>
+                            <option value="Portharcourt">Port Harcourt</option>
+                            <option value="Lagos">Lagos</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group"><label>Notes</label><textarea id="editNotes" rows="2" placeholder="Optional notes"></textarea></div>
-
-                <div class="form-group">
-                    <label>Items</label>
-                    <div id="editShipmentItemsContainer"></div>
-                    <button type="button" class="btn-sm primary" id="addEditShipmentItemBtn">＋ Add Item</button>
-                </div>
-
-                <div class="cost-summary" id="editShipmentTotalPreview">Total Goods: ₦0</div>
-
-                <div class="modal-actions">
-                    <button type="submit" class="btn btn-success" id="updateShipmentBtn">💾 Update Shipment</button>
-                    <button type="button" class="btn btn-outline" onclick="closeModal('editShipmentModal')">Cancel</button>
-                </div>
-                <div id="editShipmentMessage" style="color:#c0392b; margin-top:8px;"></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- ─── MODAL: New / Edit Invoice ─── -->
-    <div class="modal-overlay" id="invoiceModal">
-        <div class="modal-box">
-            <span class="modal-close" onclick="closeModal('invoiceModal')">&times;</span>
-            <h2 id="invoiceModalTitle">🧾 New Invoice</h2>
-            <form id="invoiceForm" novalidate>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group"><label>Invoice #</label><input type="text" id="invNumber" readonly></div>
-                    <div class="form-group"><label>Date</label><input type="date" id="invDate"></div>
+                    <div class="form-group"><label>Vehicle No.</label><input type="text" id="shipVehicle" placeholder="e.g. ABC-123"></div>
+                    <div class="form-group"><label>Driver</label><input type="text" id="shipDriver" placeholder="Driver name"></div>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group"><label>Customer</label><input type="text" id="invCustomer" placeholder="Customer name" required></div>
-                    <div class="form-group"><label>Customer Email</label><input type="email" id="invEmail" placeholder="email@example.com"></div>
+                    <div class="form-group"><label>Expected Date</label><input type="date" id="shipExpectedDate"></div>
+                    <div class="form-group"><label>Transport Cost (₦)</label><input type="number" id="shipTransport" placeholder="0" min="0" step="0.01"></div>
                 </div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="form-group"><label>Vendor</label><input type="text" id="invVendor" placeholder="Vendor name"></div>
-                    <div class="form-group"><label>Branch</label>
-                        <select id="invBranch"><option value="Lagos">Lagos</option><option value="Abuja">Abuja</option><option value="Portharcourt">Port Harcourt</option></select>
-                    </div>
-                </div>
-                <div class="form-group"><label>Notes</label><textarea id="invNotes" rows="2" placeholder="Optional notes"></textarea></div>
+                <div class="form-group"><label>Notes</label><textarea id="shipNotes" rows="2" placeholder="Optional notes"></textarea></div>
 
                 <div class="flex-between"><label style="font-weight:600;">Items</label>
-                    <button type="button" class="btn-sm primary" id="addItemBtn">＋ Add Item</button>
-                    <button type="button" class="btn-sm" id="importExcelBtn">📂 Import Excel</button>
-                    <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                    <button type="button" class="btn-sm primary" id="addShipmentItemBtn">＋ Add Item</button>
                 </div>
-                <div id="invoiceItemsContainer"></div>
+                <div id="shipmentItemsContainer"></div>
 
-                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin:10px 0;">
-                    <div class="form-group"><label>Transport Multiplier</label><input type="number" id="invMultiplier" value="1.00" step="0.01" min="0.01"></div>
-                    <div class="form-group"><label>Discount % (bulk)</label><input type="number" id="bulkDiscPct" value="0" step="0.5" min="0" max="100"></div>
-                    <div class="form-group"><label>VAT % (bulk)</label><input type="number" id="bulkVAT" value="0" step="0.5" min="0" max="100"></div>
-                </div>
-
-                <div class="cost-summary" id="invoiceTotalPreview">Total: ₦0</div>
+                <div class="cost-summary" id="shipmentTotalPreview">Total Goods Value: ₦0</div>
 
                 <div class="modal-actions">
-                    <button type="submit" class="btn btn-success" id="saveInvoiceBtn">💾 Save Invoice</button>
-                    <button type="button" class="btn btn-primary" id="previewInvoiceBtn">👁️ Preview</button>
-                    <button type="button" class="btn btn-outline" onclick="closeModal('invoiceModal')">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="saveShipmentBtn">🚀 Create Shipment</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('createShipmentModal')">Cancel</button>
                 </div>
-                <div id="invoiceFormMessage" style="color:#c0392b; margin-top:8px;"></div>
-                <div id="invoicePreviewArea" class="invoice-preview" style="display:none;"></div>
+                <div id="shipmentFormMessage" style="color:#c0392b; margin-top:8px;"></div>
             </form>
         </div>
     </div>
@@ -1288,7 +1229,7 @@
         let currentEmail = '';
         let itemCounter = 0;
         let editingInvoiceId = null;
-        let editShipmentItemCounter = 0;
+        let shipmentItemCounter = 0;
 
         // Chart instances
         let shipmentChart = null;
@@ -1404,6 +1345,15 @@
                     document.getElementById('userAvatar').textContent = (user.email || 'U').charAt(0).toUpperCase();
                 }
 
+                // Show/hide new shipment button based on role
+                const newShipmentBtn = document.getElementById('newShipmentBtn');
+                if (currentRole === 'admin' || currentRole === 'lagos_sender') {
+                    newShipmentBtn.style.display = 'inline-block';
+                } else {
+                    newShipmentBtn.style.display = 'none';
+                }
+
+                // Show pending tab for admin / lagos_sender
                 const pendingTab = document.getElementById('pendingTabBtn');
                 if (currentRole === 'admin' || currentRole === 'lagos_sender') {
                     pendingTab.style.display = 'flex';
@@ -1424,6 +1374,7 @@
                 loadReturns();
                 loadAudit();
                 if (currentRole === 'admin' || currentRole === 'lagos_sender') loadPendingRequests();
+
                 initCharts();
 
             } catch (err) {
@@ -1496,13 +1447,7 @@
                         <td class="cost-cell">₦${(d.transportCost||0).toLocaleString()}</td>
                         <td><span class="${statusClass}">${d.status || 'Dispatched'}</span></td>
                         <td>${lastUpdate}</td>
-                        <td>
-                            <button class="btn-icon" onclick="viewShipment('${doc.id}')" title="View">👁️</button>
-                            <button class="btn-icon" onclick="editShipment('${doc.id}')" title="Edit">✏️</button>
-                            ${d.status !== 'Dispatched' ? `<button class="btn-icon warning" onclick="dispatchShipment('${doc.id}')" title="Dispatch">📦</button>` : ''}
-                            ${d.status !== 'Delivered' ? `<button class="btn-icon success" onclick="deliverShipment('${doc.id}')" title="Deliver">✅</button>` : ''}
-                            <button class="btn-icon danger" onclick="deleteShipment('${doc.id}')" title="Delete">🗑️</button>
-                        </td>
+                        <td><button class="btn-icon" onclick="viewShipment('${doc.id}')" title="View">👁️</button></td>
                     </tr>`);
                 });
 
@@ -1513,6 +1458,7 @@
                 document.getElementById('statGoods').textContent = `₦${goods.toLocaleString()}`;
                 document.getElementById('statTransport').textContent = `₦${transport.toLocaleString()}`;
                 document.getElementById('shipmentBadge').textContent = total;
+
                 document.getElementById('shipmentsBody').innerHTML = rows.length ? rows.join('') :
                     '<tr><td colspan="9" class="text-center text-muted">No shipments found</td></tr>';
 
@@ -1521,7 +1467,10 @@
                 updateCharts(data);
 
             }, (err) => {
-                if (err.message && err.message.includes('message channel closed')) return;
+                if (err.message && err.message.includes('message channel closed')) {
+                    console.warn('Shipments listener channel closed (benign)');
+                    return;
+                }
                 console.error('Shipments listener error:', err);
                 document.getElementById('shipmentsBody').innerHTML =
                     `<tr><td colspan="9" class="text-center text-muted">⚠️ Error loading shipments</td></tr>`;
@@ -1547,7 +1496,10 @@
                 document.getElementById('returnsBody').innerHTML = rows ||
                     '<tr><td colspan="6" class="text-center text-muted">No returns recorded</td></tr>';
             }, (err) => {
-                if (err.message && err.message.includes('message channel closed')) return;
+                if (err.message && err.message.includes('message channel closed')) {
+                    console.warn('Returns listener channel closed (benign)');
+                    return;
+                }
                 console.error('Returns listener error:', err);
             });
 
@@ -1557,7 +1509,10 @@
                 snap.forEach(d => { stock += d.data().stock || 0; });
                 document.getElementById('statStock').textContent = stock;
             }, (err) => {
-                if (err.message && err.message.includes('message channel closed')) return;
+                if (err.message && err.message.includes('message channel closed')) {
+                    console.warn('Inventory count channel closed (benign)');
+                    return;
+                }
                 console.error('Inventory count error:', err);
             });
         }
@@ -1595,10 +1550,8 @@
         }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   SHIPMENT ACTIONS (View, Edit, Update, Dispatch, Deliver, Delete)
+        //   VIEW SHIPMENT
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        // ── View Shipment (read-only) ──
         window.viewShipment = async function(id) {
             try {
                 const doc = await db.collection('shipments').doc(id).get();
@@ -1630,193 +1583,9 @@
             }
         };
 
-        // ── Edit Shipment ──
-        window.editShipment = async function(id) {
-            try {
-                const doc = await db.collection('shipments').doc(id).get();
-                if (!doc.exists) { showToast('Shipment not found.', 'error'); return; }
-                const d = doc.data();
-                document.getElementById('editShipmentId').value = id;
-                document.getElementById('editSender').value = d.senderName || '';
-                document.getElementById('editDestination').value = d.destinationBranch || 'Lagos';
-                document.getElementById('editVehicle').value = d.vehicleNo || '';
-                document.getElementById('editDriver').value = d.driver || '';
-                document.getElementById('editTransport').value = d.transportCost || 0;
-                document.getElementById('editStatus').value = d.status || 'Dispatched';
-                document.getElementById('editNotes').value = d.notes || '';
-
-                // Items
-                const container = document.getElementById('editShipmentItemsContainer');
-                container.innerHTML = '';
-                editShipmentItemCounter = 0;
-                if (d.items && d.items.length) {
-                    d.items.forEach(it => {
-                        addEditShipmentItemRow(it.itemName, it.orderedQty, it.unitPrice);
-                    });
-                } else {
-                    addEditShipmentItemRow();
-                }
-                updateEditShipmentTotal();
-
-                document.getElementById('editShipmentMessage').textContent = '';
-                openModal('editShipmentModal');
-            } catch (err) {
-                showToast('Error loading shipment: ' + err.message, 'error');
-            }
-        };
-
-        // ── Add item row in edit shipment modal ──
-        function addEditShipmentItemRow(name = '', qty = 1, price = 0) {
-            const id = ++editShipmentItemCounter;
-            const container = document.getElementById('editShipmentItemsContainer');
-            const div = document.createElement('div');
-            div.className = 'item-row';
-            div.dataset.rowId = id;
-            div.innerHTML = `
-                <input type="text" placeholder="Item name" class="edit-shipment-item-name" value="${escapeHtml(name)}" style="flex:2;" required>
-                <input type="number" placeholder="Qty" class="edit-shipment-item-qty" value="${Math.max(0,qty)}" min="0" step="1" style="flex:0.8;">
-                <input type="number" placeholder="Unit Price" class="edit-shipment-item-price" value="${Math.max(0,price)}" min="0" step="0.01" style="flex:1;">
-                <button type="button" class="remove-btn" onclick="removeEditShipmentItem(this)">✖</button>
-            `;
-            container.appendChild(div);
-            div.querySelectorAll('input').forEach(inp => inp.addEventListener('input', updateEditShipmentTotal));
-            updateEditShipmentTotal();
-        }
-
-        window.removeEditShipmentItem = function(btn) {
-            const container = document.getElementById('editShipmentItemsContainer');
-            if (container.children.length <= 1) { showToast('Cannot remove last item.', 'error'); return; }
-            btn.closest('.item-row').remove();
-            updateEditShipmentTotal();
-        };
-
-        function updateEditShipmentTotal() {
-            const rows = document.querySelectorAll('#editShipmentItemsContainer .item-row');
-            let total = 0;
-            rows.forEach(row => {
-                const qty = parseFloat(row.querySelector('.edit-shipment-item-qty').value) || 0;
-                const price = parseFloat(row.querySelector('.edit-shipment-item-price').value) || 0;
-                total += qty * price;
-            });
-            document.getElementById('editShipmentTotalPreview').textContent = `Total Goods: ₦${total.toLocaleString()}`;
-        }
-
-        // ── Update Shipment (submit edit form) ──
-        document.getElementById('editShipmentForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const id = document.getElementById('editShipmentId').value;
-            const btn = document.getElementById('updateShipmentBtn');
-            btn.disabled = true;
-            btn.textContent = 'Updating…';
-            document.getElementById('editShipmentMessage').textContent = '';
-
-            try {
-                const sender = document.getElementById('editSender').value.trim();
-                if (!sender) throw new Error('Sender is required.');
-                const destination = document.getElementById('editDestination').value;
-                const vehicle = document.getElementById('editVehicle').value.trim();
-                const driver = document.getElementById('editDriver').value.trim();
-                const transport = parseFloat(document.getElementById('editTransport').value) || 0;
-                const status = document.getElementById('editStatus').value;
-                const notes = document.getElementById('editNotes').value.trim();
-
-                // Collect items
-                const rows = document.querySelectorAll('#editShipmentItemsContainer .item-row');
-                const items = [];
-                rows.forEach(row => {
-                    const name = row.querySelector('.edit-shipment-item-name').value.trim();
-                    const qty = parseFloat(row.querySelector('.edit-shipment-item-qty').value) || 0;
-                    const price = parseFloat(row.querySelector('.edit-shipment-item-price').value) || 0;
-                    if (name && qty > 0 && price > 0) {
-                        items.push({ itemName: name, orderedQty: qty, unitPrice: price, totalItemCost: qty * price });
-                    }
-                });
-                if (items.length === 0) throw new Error('Add at least one item.');
-
-                await db.collection('shipments').doc(id).update({
-                    senderName: sender,
-                    destinationBranch: destination,
-                    vehicleNo: vehicle,
-                    driver: driver,
-                    transportCost: transport,
-                    status: status,
-                    notes: notes,
-                    items: items,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                await db.collection('activityLog').add({
-                    actionType: 'shipment_updated',
-                    shipmentId: id,
-                    details: `Shipment ${id.slice(0,6)} updated by ${currentEmail}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentEmail
-                });
-
-                showToast('✅ Shipment updated!', 'success');
-                closeModal('editShipmentModal');
-                refreshShipments();
-            } catch (err) {
-                document.getElementById('editShipmentMessage').textContent = '❌ ' + err.message;
-                showToast(err.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '💾 Update Shipment';
-            }
-        });
-
-        // ── Dispatch Shipment (set status to Dispatched) ──
-        window.dispatchShipment = async function(id) {
-            if (!confirm('Mark this shipment as Dispatched?')) return;
-            try {
-                await db.collection('shipments').doc(id).update({
-                    status: 'Dispatched',
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                await db.collection('activityLog').add({
-                    actionType: 'shipment_dispatched',
-                    shipmentId: id,
-                    details: `Shipment ${id.slice(0,6)} dispatched by ${currentEmail}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentEmail
-                });
-                showToast('✅ Shipment marked as Dispatched.', 'success');
-                refreshShipments();
-            } catch (err) { showToast('Error: ' + err.message, 'error'); }
-        };
-
-        // ── Deliver Shipment (set status to Delivered) ──
-        window.deliverShipment = async function(id) {
-            if (!confirm('Mark this shipment as Delivered?')) return;
-            try {
-                await db.collection('shipments').doc(id).update({
-                    status: 'Delivered',
-                    receivedDate: firebase.firestore.FieldValue.serverTimestamp(),
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                await db.collection('activityLog').add({
-                    actionType: 'shipment_delivered',
-                    shipmentId: id,
-                    details: `Shipment ${id.slice(0,6)} delivered by ${currentEmail}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentEmail
-                });
-                showToast('✅ Shipment marked as Delivered.', 'success');
-                refreshShipments();
-            } catch (err) { showToast('Error: ' + err.message, 'error'); }
-        };
-
-        // ── Delete Shipment ──
-        window.deleteShipment = async function(id) {
-            if (!confirm('Delete this shipment permanently?')) return;
-            try {
-                await db.collection('shipments').doc(id).delete();
-                showToast('✅ Shipment deleted.', 'success');
-                refreshShipments();
-            } catch (err) { showToast('Error: ' + err.message, 'error'); }
-        };
-
-        // ── Refresh Shipments (manual) ──
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   REFRESH SHIPMENTS (manual)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function refreshShipments() {
             if (shipmentsUnsub) {
                 shipmentsUnsub();
@@ -1827,7 +1596,133 @@
         window.refreshShipments = refreshShipments;
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        //   INVOICES (same as before, with edit, dispatch, etc.)
+        //   CREATE SHIPMENT
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        document.getElementById('newShipmentBtn').addEventListener('click', () => {
+            // Reset form
+            document.getElementById('shipSender').value = '';
+            document.getElementById('shipDest').value = 'Abuja';
+            document.getElementById('shipVehicle').value = '';
+            document.getElementById('shipDriver').value = '';
+            document.getElementById('shipExpectedDate').value = '';
+            document.getElementById('shipTransport').value = '';
+            document.getElementById('shipNotes').value = '';
+            document.getElementById('shipmentFormMessage').textContent = '';
+            document.getElementById('shipmentItemsContainer').innerHTML = '';
+            shipmentItemCounter = 0;
+            addShipmentItemRow();
+            updateShipmentPreview();
+            openModal('createShipmentModal');
+        });
+
+        document.getElementById('addShipmentItemBtn').addEventListener('click', addShipmentItemRow);
+
+        function addShipmentItemRow(name = '', qty = 1, price = 0) {
+            const id = ++shipmentItemCounter;
+            const container = document.getElementById('shipmentItemsContainer');
+            const div = document.createElement('div');
+            div.className = 'item-row';
+            div.dataset.rowId = id;
+            div.innerHTML = `
+                <input type="text" placeholder="Item name" class="ship-item-name" value="${escapeHtml(name)}" style="flex:2;" required>
+                <input type="number" placeholder="Qty" class="ship-item-qty" value="${Math.max(0,qty)}" min="0" step="1" style="flex:0.8;">
+                <input type="number" placeholder="Unit Price" class="ship-item-price" value="${Math.max(0,price)}" min="0" step="0.01" style="flex:1;">
+                <span class="ship-item-total" style="font-weight:600; min-width:80px;">₦0</span>
+                <button type="button" class="remove-btn" onclick="removeShipmentItem(this)">✖</button>
+            `;
+            container.appendChild(div);
+            div.querySelectorAll('input').forEach(inp => inp.addEventListener('input', updateShipmentPreview));
+            updateShipmentPreview();
+        }
+
+        window.removeShipmentItem = function(btn) {
+            const container = document.getElementById('shipmentItemsContainer');
+            if (container.children.length <= 1) { showToast('Cannot remove last item.', 'error'); return; }
+            btn.closest('.item-row').remove();
+            updateShipmentPreview();
+        };
+
+        function updateShipmentPreview() {
+            const rows = document.querySelectorAll('#shipmentItemsContainer .item-row');
+            let totalGoods = 0;
+            rows.forEach(row => {
+                const qty = parseFloat(row.querySelector('.ship-item-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.ship-item-price').value) || 0;
+                const total = qty * price;
+                row.querySelector('.ship-item-total').textContent = `₦${total.toFixed(2)}`;
+                totalGoods += total;
+            });
+            document.getElementById('shipmentTotalPreview').textContent = `Total Goods Value: ₦${totalGoods.toLocaleString()}`;
+        }
+
+        document.getElementById('shipmentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('saveShipmentBtn');
+            btn.disabled = true;
+            btn.textContent = 'Creating…';
+            document.getElementById('shipmentFormMessage').textContent = '';
+
+            try {
+                const sender = document.getElementById('shipSender').value.trim();
+                if (!sender) { throw new Error('Sender name is required.'); }
+                const dest = document.getElementById('shipDest').value;
+                const vehicle = document.getElementById('shipVehicle').value.trim();
+                const driver = document.getElementById('shipDriver').value.trim();
+                const expectedDate = document.getElementById('shipExpectedDate').value;
+                const transport = parseFloat(document.getElementById('shipTransport').value) || 0;
+                const notes = document.getElementById('shipNotes').value.trim();
+
+                const itemRows = document.querySelectorAll('#shipmentItemsContainer .item-row');
+                const items = [];
+                let totalGoods = 0;
+                itemRows.forEach(row => {
+                    const name = row.querySelector('.ship-item-name').value.trim();
+                    const qty = parseFloat(row.querySelector('.ship-item-qty').value) || 0;
+                    const price = parseFloat(row.querySelector('.ship-item-price').value) || 0;
+                    if (name && qty > 0 && price > 0) {
+                        const total = qty * price;
+                        totalGoods += total;
+                        items.push({ itemName: name, orderedQty: qty, unitPrice: price, totalItemCost: total });
+                    }
+                });
+                if (items.length === 0) { throw new Error('Add at least one valid item.'); }
+
+                await db.collection('shipments').add({
+                    senderName: sender,
+                    destinationBranch: dest,
+                    vehicleNo: vehicle,
+                    driver: driver,
+                    expectedDate: expectedDate,
+                    transportCost: transport,
+                    notes: notes,
+                    items: items,
+                    status: 'Dispatched',
+                    createdBy: currentEmail,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await db.collection('activityLog').add({
+                    actionType: 'shipment_created',
+                    details: `New shipment from ${sender} to ${dest}`,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                    user: currentEmail
+                });
+
+                showToast('✅ Shipment created successfully!', 'success');
+                closeModal('createShipmentModal');
+                refreshShipments();
+            } catch (err) {
+                document.getElementById('shipmentFormMessage').textContent = '❌ ' + err.message;
+                showToast(err.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Create Shipment';
+            }
+        });
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        //   INVOICES
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         function loadInvoices() {
             if (invoicesUnsub) invoicesUnsub();
@@ -1847,20 +1742,15 @@
                     count++;
                     const total = d.total || 0;
                     const moved = d.movedToWarehouse ? '✅ Moved' : 'Pending';
-                    const dispatched = d.dispatched ? '📦 Dispatched' : '';
-                    const statusBadge = dispatched ? `<span class="badge badge-info">${dispatched}</span>` :
-                        `<span class="badge ${moved === '✅ Moved' ? 'badge-success' : 'badge-warning'}">${moved}</span>`;
                     rows += `<tr>
                         <td><strong>${d.invoiceNumber || doc.id.slice(0,6)}</strong></td>
                         <td>${d.customer || '—'}</td>
                         <td><span class="badge">${d.branch || '—'}</span></td>
                         <td class="cost-cell">₦${total.toLocaleString()}</td>
-                        <td>${statusBadge}</td>
+                        <td><span class="badge ${moved === '✅ Moved' ? 'badge-success' : 'badge-warning'}">${moved}</span></td>
                         <td>
-                            <button class="btn-icon" onclick="editInvoice('${doc.id}')" title="Edit">✏️</button>
                             <button class="btn-icon" onclick="viewInvoice('${doc.id}')" title="View">👁️</button>
                             <button class="btn-icon" onclick="openShareInvoice('${doc.id}')" title="Share">📤</button>
-                            ${!d.dispatched ? `<button class="btn-icon success" onclick="dispatchInvoice('${doc.id}')" title="Dispatch">📦</button>` : ''}
                             <button class="btn-icon" onclick="openMoveWarehouseModal('${doc.id}')" title="Move to WH">🏚️</button>
                             <button class="btn-icon danger" onclick="deleteInvoice('${doc.id}')" title="Delete">🗑️</button>
                         </td>
@@ -1869,7 +1759,10 @@
                 tbody.innerHTML = rows;
                 document.getElementById('invoiceBadge').textContent = count;
             }, (err) => {
-                if (err.message && err.message.includes('message channel closed')) return;
+                if (err.message && err.message.includes('message channel closed')) {
+                    console.warn('Invoices listener channel closed (benign)');
+                    return;
+                }
                 console.error('Invoices error:', err);
                 tbody.innerHTML =
                 `<tr><td colspan="6" class="text-center text-muted">⚠️ Error loading invoices</td></tr>`;
@@ -1881,104 +1774,15 @@
             showToast('Invoices refreshed', 'info', 1000);
         });
 
-        // ── Edit Invoice ──
-        window.editInvoice = async function(id) {
-            try {
-                const doc = await db.collection('invoices').doc(id).get();
-                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
-                const d = doc.data();
-                editingInvoiceId = id;
-                document.getElementById('invoiceModalTitle').textContent = '✏️ Edit Invoice';
-                document.getElementById('invNumber').value = d.invoiceNumber || '';
-                document.getElementById('invDate').value = d.date || new Date().toISOString().slice(0, 10);
-                document.getElementById('invCustomer').value = d.customer || '';
-                document.getElementById('invEmail').value = d.customerEmail || '';
-                document.getElementById('invVendor').value = d.vendor || '';
-                document.getElementById('invBranch').value = d.branch || 'Lagos';
-                document.getElementById('invNotes').value = d.notes || '';
-                document.getElementById('invMultiplier').value = d.transportMultiplier || 1.00;
-                document.getElementById('bulkDiscPct').value = '0';
-                document.getElementById('bulkVAT').value = '0';
-                document.getElementById('invoiceFormMessage').textContent = '';
-                document.getElementById('invoicePreviewArea').style.display = 'none';
-
-                const container = document.getElementById('invoiceItemsContainer');
-                container.innerHTML = '';
-                itemCounter = 0;
-                if (d.items && d.items.length) {
-                    d.items.forEach(it => {
-                        addInvoiceItemRow(it.itemName, it.quantity, it.unitPrice,
-                            it.discountPercent || 0, it.discountAmount || 0, it.vatPercent || 0);
-                    });
-                } else {
-                    addInvoiceItemRow();
-                }
-                updateInvoicePreview();
-                openModal('invoiceModal');
-            } catch (err) {
-                showToast('Error loading invoice: ' + err.message, 'error');
-            }
-        };
-
-        // ── Dispatch Invoice (create shipment) ──
-        window.dispatchInvoice = async function(id) {
-            if (!confirm('Dispatch this invoice? A shipment will be created.')) return;
-            try {
-                const doc = await db.collection('invoices').doc(id).get();
-                if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
-                const d = doc.data();
-                if (d.dispatched) { showToast('Already dispatched.', 'info'); return; }
-
-                const shipmentItems = (d.items || []).map(it => ({
-                    itemName: it.itemName || '',
-                    orderedQty: it.quantity || 0,
-                    unitPrice: it.unitPrice || 0,
-                    totalItemCost: (it.quantity || 0) * (it.unitPrice || 0)
-                }));
-
-                await db.collection('shipments').add({
-                    senderName: d.customer || 'Unknown',
-                    destinationBranch: d.branch || 'Lagos',
-                    items: shipmentItems,
-                    transportCost: 0,
-                    status: 'Dispatched',
-                    vehicleNo: '',
-                    driver: '',
-                    notes: `Dispatched from invoice ${d.invoiceNumber}`,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: currentEmail,
-                    invoiceId: id
-                });
-
-                await db.collection('invoices').doc(id).update({
-                    dispatched: true,
-                    dispatchedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    dispatchedBy: currentEmail
-                });
-
-                await db.collection('activityLog').add({
-                    actionType: 'invoice_dispatched',
-                    invoiceNumber: d.invoiceNumber,
-                    details: `Invoice ${d.invoiceNumber} dispatched by ${currentEmail}`,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                    user: currentEmail
-                });
-
-                showToast('✅ Invoice dispatched and shipment created!', 'success');
-                loadInvoices();
-                refreshShipments();
-            } catch (err) {
-                showToast('Error dispatching: ' + err.message, 'error');
-            }
-        };
-
-        // ── Share Invoice ──
         window.openShareInvoice = function(invoiceId) {
-            if (!invoiceId) { showToast('No invoice selected.', 'error'); return; }
+            if (!invoiceId) {
+                showToast('No invoice selected.', 'error');
+                return;
+            }
             window.open(`share.html?id=${invoiceId}`, '_blank');
         };
 
-        // ── New Invoice ──
+        // ── New Invoice (existing code) ──
         document.getElementById('newInvoiceBtn').addEventListener('click', () => {
             editingInvoiceId = null;
             document.getElementById('invoiceModalTitle').textContent = '🧾 New Invoice';
@@ -1999,9 +1803,6 @@
             updateInvoicePreview();
             openModal('invoiceModal');
         });
-
-        // ── Add Item Row (Invoice) ──
-        document.getElementById('addItemBtn').addEventListener('click', () => addInvoiceItemRow());
 
         function addInvoiceItemRow(name = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0) {
             const id = ++itemCounter;
@@ -2031,12 +1832,11 @@
             updateInvoicePreview();
         };
 
-        // ── Import Excel ──
-        document.getElementById('importExcelBtn').addEventListener('click', () => {
+        document.getElementById('importExcelBtn')?.addEventListener('click', () => {
             document.getElementById('excelFileInput').click();
         });
 
-        document.getElementById('excelFileInput').addEventListener('change', function(e) {
+        document.getElementById('excelFileInput')?.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -2090,7 +1890,6 @@
             this.value = '';
         });
 
-        // ── Calculate totals (Invoice) ──
         function calcInvoiceTotals() {
             const rows = document.querySelectorAll('#invoiceItemsContainer .item-row');
             const items = [];
@@ -2129,8 +1928,7 @@
             document.getElementById('invoiceTotalPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
         }
 
-        // ── Preview Invoice ──
-        document.getElementById('previewInvoiceBtn').addEventListener('click', () => {
+        document.getElementById('previewInvoiceBtn')?.addEventListener('click', () => {
             const { items, subtotal, totalDisc, totalVAT, grandTotal, multiplier } = calcInvoiceTotals();
             if (!items.length) { showToast('Add at least one item.', 'error'); return; }
             const invNum = document.getElementById('invNumber').value;
@@ -2174,8 +1972,7 @@
             showToast('Preview ready', 'info', 1200);
         });
 
-        // ── Save Invoice ──
-        document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
+        document.getElementById('invoiceForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('saveInvoiceBtn');
             btn.disabled = true;
@@ -2252,7 +2049,6 @@
                         totalWHT: 0,
                         total: grandTotal,
                         movedToWarehouse: false,
-                        dispatched: false,
                         acknowledged: false,
                         createdBy: currentEmail,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2271,7 +2067,6 @@
             }
         });
 
-        // ── View Invoice ──
         window.viewInvoice = async function(id) {
             try {
                 const doc = await db.collection('invoices').doc(id).get();
@@ -2285,14 +2080,14 @@
                     });
                 }
                 itemsHtml += '</table>';
-                const status = d.dispatched ? '📦 Dispatched' : (d.movedToWarehouse ? '✅ Moved' : 'Pending');
+                const moved = d.movedToWarehouse ? '✅ Moved to Warehouse' : 'Pending';
                 document.getElementById('viewInvoiceContent').innerHTML = `
                     <p><strong>#:</strong> ${d.invoiceNumber}</p>
                     <p><strong>Date:</strong> ${d.date || 'N/A'}</p>
                     <p><strong>Customer:</strong> ${d.customer || 'N/A'}</p>
                     <p><strong>Branch:</strong> ${d.branch || 'N/A'}</p>
                     <p><strong>Vendor:</strong> ${d.vendor || 'N/A'}</p>
-                    <p><strong>Status:</strong> ${status}</p>
+                    <p><strong>Status:</strong> ${moved}</p>
                     <p><strong>Total:</strong> ₦${(d.total||0).toLocaleString()}</p>
                     ${d.notes ? `<p><strong>Notes:</strong> ${d.notes}</p>` : ''}
                     <h4>Items</h4>${itemsHtml}
@@ -2304,7 +2099,6 @@
             }
         };
 
-        // ── Delete Invoice ──
         window.deleteInvoice = async function(id) {
             if (!confirm('Delete this invoice permanently?')) return;
             try {
@@ -2316,7 +2110,6 @@
             }
         };
 
-        // ── Move to Warehouse ──
         window.openMoveWarehouseModal = async function(id) {
             try {
                 const doc = await db.collection('invoices').doc(id).get();
@@ -2446,7 +2239,10 @@
                 });
                 tbody.innerHTML = rows;
             }, (err) => {
-                if (err.message && err.message.includes('message channel closed')) return;
+                if (err.message && err.message.includes('message channel closed')) {
+                    console.warn('Inventory listener channel closed (benign)');
+                    return;
+                }
                 console.error('Inventory error:', err);
                 tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">⚠️ Error loading inventory</td></tr>';
             });
@@ -2487,7 +2283,10 @@
                 });
                 tbody.innerHTML = rows;
             }, (err) => {
-                if (err.message && err.message.includes('message channel closed')) return;
+                if (err.message && err.message.includes('message channel closed')) {
+                    console.warn('Returns listener channel closed (benign)');
+                    return;
+                }
                 console.error('Returns error:', err);
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">⚠️ Error loading returns</td></tr>';
             });
@@ -2514,7 +2313,10 @@
                 });
                 el.innerHTML = html;
             }, (err) => {
-                if (err.message && err.message.includes('message channel closed')) return;
+                if (err.message && err.message.includes('message channel closed')) {
+                    console.warn('Audit listener channel closed (benign)');
+                    return;
+                }
                 console.error('Audit error:', err);
                 el.innerHTML = '<div class="text-center text-muted" style="padding:20px;">⚠️ Error loading audit log</div>';
             });
@@ -2560,7 +2362,10 @@
                     html += '</table>';
                     el.innerHTML = html;
                 }, (err) => {
-                    if (err.message && err.message.includes('message channel closed')) return;
+                    if (err.message && err.message.includes('message channel closed')) {
+                        console.warn('Pending requests listener channel closed (benign)');
+                        return;
+                    }
                     console.error('Pending requests error:', err);
                     el.innerHTML =
                         `<div class="text-center text-muted" style="padding:20px;">⚠️ Error loading: ${escapeHtml(err.message)}</div>`;
@@ -2609,20 +2414,19 @@
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         //   INIT
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        console.log('🚀 NEVAMAK Unified Dashboard loaded with shipment edit & dispatch.');
+        console.log('🚀 NEVAMAK Unified Dashboard loaded.');
 
+        // Close modals on backdrop click
         document.querySelectorAll('.modal-overlay').forEach(el => {
             el.addEventListener('click', function(e) {
                 if (e.target === this) this.classList.remove('open');
             });
         });
 
+        // Close sidebar on Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') closeSidebar();
         });
-
-        // Add item button for edit shipment modal
-        document.getElementById('addEditShipmentItemBtn').addEventListener('click', () => addEditShipmentItemRow());
     </script>
 
 </body>
