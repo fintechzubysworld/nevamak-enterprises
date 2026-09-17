@@ -517,6 +517,7 @@
             <p><strong>Branch:</strong> <span id="reconcileBranch"></span></p>
             <p><strong>Received By:</strong> <span id="reconcileReceivedBy"></span></p>
             <p><strong>Date:</strong> <span id="reconcileDate"></span></p>
+            <p><strong>Original Invoice Total:</strong> ₦<span id="reconcileOriginalTotal"></span></p>
             <hr />
             <div style="margin:12px 0;">
                 <label><strong>Invoice Notes (for the new invoice)</strong></label>
@@ -617,6 +618,30 @@
         const div = document.createElement('div');
         div.textContent = String(text);
         return div.innerHTML;
+    }
+
+    /**
+     * Format a numeric value with digit grouping (thousands separators)
+     * and exactly 2 decimal places.
+     * e.g. 1234567.5 -> "1,234,567.50"
+     */
+    function formatCurrency(num) {
+        const n = parseFloat(num);
+        if (isNaN(n)) return '0.00';
+        return n.toLocaleString('en-NG', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    /**
+     * Format an integer quantity with digit grouping.
+     * e.g. 12345 -> "12,345"
+     */
+    function formatQuantity(num) {
+        const n = parseFloat(num);
+        if (isNaN(n)) return '0';
+        return n.toLocaleString('en-NG');
     }
 
     function showToast(message, type = 'info', duration = 3000) {
@@ -781,14 +806,14 @@
 
     function updateCostPreview() {
         const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals('invoiceItemsContainer');
-        document.getElementById('invoiceCostPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('invoiceCostPreview').textContent = `Total: ₦${formatCurrency(grandTotal)}`;
         document.getElementById('taxBreakdown').innerHTML = `
-            Subtotal: ₦${subtotal.toLocaleString()} | 
-            Discount: ₦${totalDisc.toLocaleString()} | 
-            VAT: ₦${totalVAT.toLocaleString()} | 
-            WHT: ₦${totalWHT.toLocaleString()} | 
+            Subtotal: ₦${formatCurrency(subtotal)} | 
+            Discount: ₦${formatCurrency(totalDisc)} | 
+            VAT: ₦${formatCurrency(totalVAT)} | 
+            WHT: ₦${formatCurrency(totalWHT)} | 
             Transport Multiplier: ${multiplier.toFixed(2)} |
-            <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
+            <strong>Grand Total: ₦${formatCurrency(grandTotal)}</strong>
         `;
     }
 
@@ -1054,7 +1079,7 @@
                 let previewHtml = `<p><strong>✅ Imported ${rows.length} items:</strong></p>
                     <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>`;
                 rows.forEach(it => {
-                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${formatQuantity(it.quantity)}</td><td>₦${formatCurrency(it.unitPrice)}</td></tr>`;
                 });
                 previewHtml += `</table></div>
                     <div style="display:flex; gap:8px; margin-top:8px;">
@@ -1190,23 +1215,23 @@
         items.forEach(it => {
             itemsHtml += `<tr>
                 <td>${escapeHtml(it.name)}</td>
-                <td>${it.qty}</td>
-                <td>₦${it.originalPrice.toFixed(2)}</td>
-                <td>₦${it.updatedPrice.toFixed(2)}</td>
+                <td>${formatQuantity(it.qty)}</td>
+                <td>₦${formatCurrency(it.originalPrice)}</td>
+                <td>₦${formatCurrency(it.updatedPrice)}</td>
                 <td>${it.discPct}%</td>
-                <td>₦${it.discAmt.toFixed(2)}</td>
+                <td>₦${formatCurrency(it.discAmt)}</td>
                 <td>${it.vatPct}%</td>
-                <td>₦${it.itemVAT.toFixed(2)}</td>
-                <td>₦${it.total.toFixed(2)}</td>
+                <td>₦${formatCurrency(it.itemVAT)}</td>
+                <td>₦${formatCurrency(it.total)}</td>
             </tr>`;
         });
 
         const totalsHtml = `
-            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${formatCurrency(subtotal)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${formatCurrency(totalDisc)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${formatCurrency(totalVAT)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${formatCurrency(totalWHT)}</strong></td></tr>
+            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${formatCurrency(grandTotal)}</strong></td></tr>
         `;
 
         let ackFootnote = '';
@@ -1665,7 +1690,7 @@
                 <td>${escapeHtml(d.vendor || '')}</td>
                 <td>${escapeHtml(d.branch || 'N/A')}</td>
                 <td class="items-cell">${escapeHtml(itemsShort)}</td>
-                <td class="cost-cell">₦${total.toLocaleString()}</td>
+                <td class="cost-cell">₦${formatCurrency(total)}</td>
                 <td>
                     ${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}
                     ${ackStatus}
@@ -1889,7 +1914,7 @@
             currentInvoiceData = d;
             document.getElementById('ackLoginInvoiceNumber').textContent = d.invoiceNumber;
             document.getElementById('ackLoginCustomer').textContent = d.customer || 'N/A';
-            document.getElementById('ackLoginTotal').textContent = (d.total || 0).toLocaleString();
+            document.getElementById('ackLoginTotal').textContent = formatCurrency(d.total || 0);
             document.getElementById('ackLoginStep1').style.display = 'block';
             document.getElementById('ackLoginStep2').style.display = 'none';
             document.getElementById('ackCurrentPassword').value = '';
@@ -1919,7 +1944,7 @@
         invoiceData.items.forEach((item, index) => {
             html += `<tr>
                 <td>${escapeHtml(item.itemName)}</td>
-                <td style="text-align:center;">${item.quantity}</td>
+                <td style="text-align:center;">${formatQuantity(item.quantity)}</td>
                 <td style="text-align:center;">
                     <input type="number" class="received-qty" data-index="${index}" value="${item.quantity}" min="0" max="${item.quantity}" style="width:60px; padding:4px; border-radius:20px; border:1px solid #ccc; text-align:center;">
                 </td>
@@ -2035,6 +2060,9 @@
                 ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
+            // Store original total
+            const originalTotal = invDoc.data().total || 0;
+
             await secondaryDb.collection('goodsReceived').add({
                 invoiceId: ackLoginTargetId,
                 invoiceNumber: invDoc.data().invoiceNumber,
@@ -2042,6 +2070,7 @@
                 branch: invDoc.data().branch || '',
                 vendor: invDoc.data().vendor || '',
                 originalItems: invDoc.data().items || [],
+                originalTotal: originalTotal, // capture original invoice total
                 receivedItems: receivedItems,
                 receivingOfficer: officerUser.email,
                 officerSignature: signature,
@@ -2099,7 +2128,7 @@
                 if (snap.empty) {
                     html = '<p style="text-align:center; color:#888; padding:20px;">No goods received claims.</p>';
                 } else {
-                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Status</th><th>Actions</th></tr>';
+                    html = '<div class="scroll"><table><tr><th>Invoice #</th><th>Customer</th><th>Branch</th><th>Received By</th><th>Date</th><th>Items</th><th>Original Total</th><th>Received Total</th><th>Status</th><th>Actions</th></tr>';
                     snap.forEach(doc => {
                         const d = doc.data();
                         let match = false;
@@ -2112,6 +2141,8 @@
                         const itemsCount = d.receivedItems ? d.receivedItems.filter(i => i.receivedQty > 0).length : 0;
                         const date = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
                         const status = d.resolved ? '<span class="resolved-badge">✅ Resolved</span>' : '<span class="received-badge">Open</span>';
+                        const originalTotal = d.originalTotal || 0;
+                        const receivedTotal = d.receivedItems ? d.receivedItems.reduce((sum, i) => sum + (i.total || 0), 0) : 0;
                         html += `<tr>
                             <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                             <td>${escapeHtml(d.customer || 'N/A')}</td>
@@ -2119,6 +2150,8 @@
                             <td>${escapeHtml(d.receivingOfficer || '')}</td>
                             <td>${date}</td>
                             <td>${itemsCount} item(s)</td>
+                            <td>₦${formatCurrency(originalTotal)}</td>
+                            <td>₦${formatCurrency(receivedTotal)}</td>
                             <td>${status}</td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="viewReceivedClaim('${doc.id}')">👁️</button>
@@ -2149,15 +2182,16 @@
                 d.receivedItems.forEach(it => {
                     itemsHtml += `<tr>
                         <td>${escapeHtml(it.itemName)}</td>
-                        <td>${it.orderedQty}</td>
-                        <td>${it.receivedQty}</td>
-                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
-                        <td>₦${(it.total||0).toFixed(2)}</td>
+                        <td>${formatQuantity(it.orderedQty)}</td>
+                        <td>${formatQuantity(it.receivedQty)}</td>
+                        <td>₦${formatCurrency(it.unitPrice || 0)}</td>
+                        <td>₦${formatCurrency(it.total || 0)}</td>
                     </tr>`;
                 });
             }
             itemsHtml += '</table>';
             const totalReceived = d.receivedItems ? d.receivedItems.reduce((sum, i) => sum + (i.total || 0), 0) : 0;
+            const originalTotal = d.originalTotal || 0;
             const totalOrdered = d.originalItems ? d.originalItems.reduce((sum, i) => sum + (i.quantity * (i.unitPrice || 0)), 0) : 0;
             const html = `
                 <h4>Goods Received Claim</h4>
@@ -2169,8 +2203,9 @@
                 <p><strong>Signature:</strong> ${escapeHtml(d.officerSignature)}</p>
                 <p><strong>Date:</strong> ${d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : ''}</p>
                 ${d.receivedNotes ? `<p><strong>Notes:</strong> ${escapeHtml(d.receivedNotes)}</p>` : ''}
-                <p><strong>Total Ordered Value:</strong> ₦${totalOrdered.toLocaleString()}</p>
-                <p><strong>Total Received Value:</strong> ₦${totalReceived.toLocaleString()}</p>
+                <p><strong>Original Invoice Total:</strong> ₦${formatCurrency(originalTotal)}</p>
+                <p><strong>Total Ordered Value:</strong> ₦${formatCurrency(totalOrdered)}</p>
+                <p><strong>Total Received Value:</strong> ₦${formatCurrency(totalReceived)}</p>
                 <h5>Items</h5>
                 ${itemsHtml}
             `;
@@ -2199,24 +2234,35 @@
             document.getElementById('reconcileBranch').textContent = d.branch || 'N/A';
             document.getElementById('reconcileReceivedBy').textContent = d.receivingOfficer || '';
             document.getElementById('reconcileDate').textContent = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
+            document.getElementById('reconcileOriginalTotal').textContent = formatCurrency(d.originalTotal || 0);
 
             // Build editable items table
             const container = document.getElementById('reconcileItemsContainer');
             container.innerHTML = '';
             let allFullyReceived = true;
+
+            // Create a map of original item prices from originalItems (if available)
+            const originalPrices = {};
+            if (d.originalItems && Array.isArray(d.originalItems)) {
+                d.originalItems.forEach(orig => {
+                    originalPrices[orig.itemName] = orig.unitPrice || 0;
+                });
+            }
+
             if (d.receivedItems && d.receivedItems.length > 0) {
                 let html = `<table class="reconcile-items-table" style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
                     <tr><th>Item</th><th style="text-align:center;">Ordered</th><th style="text-align:center;">Received (edit)</th><th style="text-align:center;">Unit Price (edit)</th><th style="text-align:center;">Status</th></tr>`;
                 d.receivedItems.forEach((item, idx) => {
                     const ordered = item.orderedQty || 0;
-                    const received = item.receivedQty || 0;
-                    const price = item.unitPrice || 0;
+                    let received = item.receivedQty || 0;
+                    // Use original price if available, fallback to item.unitPrice, then 0
+                    let price = originalPrices[item.itemName] !== undefined ? originalPrices[item.itemName] : (item.unitPrice || 0);
                     const shortage = ordered - received;
                     const status = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
                     if (shortage > 0) allFullyReceived = false;
                     html += `<tr>
                         <td>${escapeHtml(item.itemName)}</td>
-                        <td style="text-align:center;">${ordered}</td>
+                        <td style="text-align:center;">${formatQuantity(ordered)}</td>
                         <td style="text-align:center;">
                             <input type="number" class="reconcile-received-qty" data-index="${idx}" value="${received}" min="0" max="${ordered}" style="width:80px; padding:4px; border-radius:20px; border:1px solid #ccc; text-align:center;">
                         </td>
@@ -2257,7 +2303,7 @@
             const priceInput = row.querySelector('.reconcile-unit-price');
             const orderedCell = row.cells[1]; // assumes structure: item, ordered, received, price, status
             if (qtyInput && orderedCell) {
-                const ordered = parseFloat(orderedCell.textContent) || 0;
+                const ordered = parseFloat(orderedCell.textContent.replace(/,/g, '')) || 0;
                 const received = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
                 totalOrdered += ordered * price;
@@ -2273,9 +2319,9 @@
             }
         });
         document.getElementById('reconcileSummary').innerHTML = `
-            Total Ordered: ₦${totalOrdered.toLocaleString()} | 
-            Total Received: ₦${totalReceived.toLocaleString()} | 
-            Shortage: ₦${totalShortage.toLocaleString()}
+            Total Ordered: ₦${formatCurrency(totalOrdered)} | 
+            Total Received: ₦${formatCurrency(totalReceived)} | 
+            Shortage: ₦${formatCurrency(totalShortage)}
         `;
         // Enable/disable buttons
         const completeBtn = document.getElementById('reconcileCompleteBtn');
@@ -2314,7 +2360,7 @@
                 const qtyInput = row.querySelector('.reconcile-received-qty');
                 const priceInput = row.querySelector('.reconcile-unit-price');
                 const itemName = row.cells[0] ? row.cells[0].textContent.trim() : '';
-                const ordered = parseFloat(row.cells[1] ? row.cells[1].textContent : 0) || 0;
+                const ordered = parseFloat(row.cells[1] ? row.cells[1].textContent.replace(/,/g, '') : 0) || 0;
                 let received = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
                 let price = parseFloat(priceInput ? priceInput.value : 0) || 0;
                 // If price is 0, fallback to the original unit price from the claim data
@@ -2495,7 +2541,7 @@
                             <td>${escapeHtml(d.customer || 'N/A')}</td>
                             <td>${escapeHtml(d.destinationBranch || 'N/A')}</td>
                             <td>${escapeHtml(d.date || '')}</td>
-                            <td class="cost-cell">₦${total.toLocaleString()}</td>
+                            <td class="cost-cell">₦${formatCurrency(total)}</td>
                             <td><span class="${statusClass}">${escapeHtml(d.status)}</span></td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="openApproveModal('${doc.id}')">👁️ View/Edit</button>
@@ -2629,7 +2675,7 @@
 
     function updateApprovePreview() {
         const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateApproveTotals();
-        document.getElementById('approveCostPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('approveCostPreview').textContent = `Total: ₦${formatCurrency(grandTotal)}`;
     }
 
     document.getElementById('approveConfirmBtn').addEventListener('click', async function() {
@@ -2767,7 +2813,7 @@
             sendInvoiceData = doc.data();
             document.getElementById('sendInvoiceNumber').textContent = sendInvoiceData.invoiceNumber;
             document.getElementById('sendInvoiceCustomer').textContent = sendInvoiceData.customer || 'N/A';
-            document.getElementById('sendInvoiceTotal').textContent = sendInvoiceData.total.toLocaleString();
+            document.getElementById('sendInvoiceTotal').textContent = formatCurrency(sendInvoiceData.total || 0);
             document.getElementById('sendMessage').textContent = '';
             document.getElementById('sendModal').style.display = 'flex';
         } catch (err) {
@@ -2802,12 +2848,12 @@
         let itemsList = '';
         if (sendInvoiceData.items && sendInvoiceData.items.length > 0) {
             itemsList = sendInvoiceData.items.map(item => 
-                `  - ${item.itemName} (${item.quantity} x ₦${(item.updatedPrice || item.unitPrice || 0).toFixed(2)}) = ₦${(item.total || 0).toFixed(2)}`
+                `  - ${item.itemName} (${item.quantity} x ₦${formatCurrency(item.updatedPrice || item.unitPrice || 0)}) = ₦${formatCurrency(item.total || 0)}`
             ).join('\n');
         }
 
         const body = `Dear ${sendInvoiceData.customer || 'Customer'},\n\n` +
-            `Please find attached invoice ${sendInvoiceData.invoiceNumber} for ₦${(sendInvoiceData.total || 0).toFixed(2)}.\n\n` +
+            `Please find attached invoice ${sendInvoiceData.invoiceNumber} for ₦${formatCurrency(sendInvoiceData.total || 0)}.\n\n` +
             `Invoice Details:\n` +
             `- Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `- Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
@@ -2840,7 +2886,7 @@
 
         const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}*\n` +
             `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
-            `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
+            `💰 Total: ₦${formatCurrency(sendInvoiceData.total || 0)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
             `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
@@ -2861,7 +2907,7 @@
         }
         const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}* from ${companyName}\n\n` +
             `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
-            `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
+            `💰 Total: ₦${formatCurrency(sendInvoiceData.total || 0)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
             `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
@@ -2888,7 +2934,7 @@
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             shareInvoiceData = { id, data: doc.data() };
             document.getElementById('shareInvoiceNumber').textContent = shareInvoiceData.data.invoiceNumber;
-            document.getElementById('shareInvoiceTotal').textContent = shareInvoiceData.data.total.toLocaleString();
+            document.getElementById('shareInvoiceTotal').textContent = formatCurrency(shareInvoiceData.data.total || 0);
             document.getElementById('shareRecipientType').value = '';
             document.getElementById('shareVendorSelect').style.display = 'none';
             document.getElementById('shareRecipientInfo').innerHTML = '';
@@ -3061,7 +3107,7 @@
                         const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
                         if (invDoc.exists) {
                             const invData = invDoc.data();
-                            invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                            invoiceTotal = invData.total ? `₦${formatCurrency(invData.total)}` : 'N/A';
                             invoiceDate = invData.date || '';
                         }
                     } catch (e) { /* ignore */ }
@@ -3152,7 +3198,7 @@
                 const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
                 if (invDoc.exists) {
                     const invData = invDoc.data();
-                    invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                    invoiceTotal = invData.total ? `₦${formatCurrency(invData.total)}` : 'N/A';
                     invoiceDate = invData.date || '';
                 }
             } catch (e) { /* ignore */ }
@@ -3222,7 +3268,7 @@
             let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
-                    itemsHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${(it.updatedPrice || it.unitPrice || 0).toFixed(2)}</td></tr>`;
+                    itemsHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${formatQuantity(it.quantity)}</td><td>₦${formatCurrency(it.updatedPrice || it.unitPrice || 0)}</td></tr>`;
                 });
             } else {
                 itemsHtml += '<tr><td colspan="3">No items</td></tr>';
@@ -3310,7 +3356,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal and pagination.');
+    console.log('NEVAMAK Invoice Repository loaded with digit grouping enabled for all currency values.');
 </script>
 </body>
 </html>
