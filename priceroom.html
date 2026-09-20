@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes" />
+    <title>NEVAMAK – Price Room</title>
+
+    <!-- Firebase & libs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
+        body { background: #f0f2f5; margin: 0; padding: 12px; color: #1a2634; }
+        .container { max-width: 1300px; margin: auto; }
+        header {
+            background: linear-gradient(135deg, #0a3d62 0%, #1a5a8a 100%);
+            color: white; padding: 16px 22px; border-radius: 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            flex-wrap: wrap; gap: 10px; margin-bottom: 18px;
+            box-shadow: 0 4px 14px rgba(10,61,98,0.18);
+        }
+        header h1 { margin: 0; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
+        header .badge { background: rgba(255,255,255,0.2); padding: 3px 12px; border-radius: 40px; font-size: 0.75rem; font-weight: 500; }
+        .nav-links { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nav-links a, .logout-btn {
+            background: rgba(255,255,255,0.15); color: white; text-decoration: none;
+            padding: 7px 15px; border-radius: 40px; font-size: 0.83rem;
+            border: none; cursor: pointer; transition: 0.15s;
+        }
+        .nav-links a:hover, .logout-btn:hover { background: rgba(255,255,255,0.28); }
+
+        .card {
+            background: white; border-radius: 20px; padding: 20px;
+            margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+        }
+        .card h2 { margin: 0 0 14px; font-size: 1.15rem; color: #0a3d62; display: flex; align-items: center; gap: 8px; }
+        .card h2 small { font-size: 0.75rem; color: #6b7f96; font-weight: 400; margin-left: 6px; }
+
+        input[type="text"], input[type="number"], input[type="file"], select, textarea {
+            padding: 9px 14px; border-radius: 40px; border: 1px solid #d8e0ea;
+            font-size: 0.9rem; background: white; width: 100%;
+        }
+        input[type="file"] { padding: 8px 12px; }
+        textarea { border-radius: 16px; min-height: 70px; resize: vertical; }
+        button {
+            padding: 9px 20px; border-radius: 40px; border: none; font-weight: 600;
+            cursor: pointer; font-size: 0.86rem; transition: 0.15s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        button:hover:not(:disabled) { transform: translateY(-1px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-primary { background: #0a3d62; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #0e4d7a; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover:not(:disabled) { background: #1e8e4e; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-warning:hover:not(:disabled) { background: #d68910; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover:not(:disabled) { background: #c0392b; }
+        .btn-info { background: #3498db; color: white; }
+        .btn-info:hover:not(:disabled) { background: #2980b9; }
+        .btn-secondary { background: #8e44ad; color: white; }
+        .btn-sm { padding: 5px 14px; font-size: 0.76rem; }
+
+        .flex-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+        .flex-row > .grow { flex: 1; min-width: 180px; }
+
+        .upload-zone {
+            border: 2px dashed #b0c4db; border-radius: 18px; padding: 30px;
+            text-align: center; cursor: pointer; transition: 0.15s;
+            background: #f8faff; margin-bottom: 14px;
+        }
+        .upload-zone:hover { background: #eef4ff; border-color: #0a3d62; }
+        .upload-zone.dragover { background: #e2ecfa; border-color: #0a3d62; }
+        .upload-zone .icon { font-size: 2.4rem; margin-bottom: 6px; }
+        .upload-zone .hint { color: #6b7f96; font-size: 0.85rem; margin-top: 6px; }
+
+        .table-wrap { overflow-x: auto; margin-top: 10px; border-radius: 12px; border: 1px solid #eef1f5; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.83rem; min-width: 700px; }
+        th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #eef1f5; vertical-align: middle; }
+        th {
+            background: #f8faff; font-weight: 600; color: #3a4e66;
+            font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.3px;
+            position: sticky; top: 0; z-index: 2;
+        }
+        tr:hover td { background: #fafcff; }
+        .matched-row td { background: #f0fbf4 !important; }
+        .unmatched-row td { background: #fff9f0 !important; }
+        .price-cell { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #0a3d62; }
+        .confidence-high { color: #27ae60; font-weight: 600; }
+        .confidence-medium { color: #f39c12; font-weight: 600; }
+        .confidence-low { color: #e74c3c; font-weight: 600; }
+        .source-badge {
+            font-size: 0.65rem; padding: 2px 8px; border-radius: 20px;
+            background: #e9ecf0; color: #3a4e66; white-space: nowrap;
+        }
+        .source-shipment { background: #d4e2f0; color: #0a3d62; }
+        .source-invoice { background: #d4edda; color: #0e5a2b; }
+        .source-received { background: #fff3cd; color: #8a6d00; }
+        .source-manual { background: #e2ddf5; color: #4a2e8a; }
+        .source-none { background: #f8d7da; color: #721c24; }
+
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px; margin-bottom: 16px;
+        }
+        .stat-card {
+            background: white; border-radius: 16px; padding: 14px 16px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+            border-left: 4px solid #0a3d62;
+        }
+        .stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px; color: #6b7f96; font-weight: 600; }
+        .stat-card .value { font-size: 1.4rem; font-weight: 700; color: #0a1e2f; margin-top: 3px; }
+        .stat-card.green { border-left-color: #27ae60; }
+        .stat-card.orange { border-left-color: #f39c12; }
+        .stat-card.red { border-left-color: #e74c3c; }
+
+        .loading-spinner {
+            display: inline-block; width: 18px; height: 18px;
+            border: 3px solid #e9ecf0; border-top: 3px solid #0a3d62;
+            border-radius: 50%; animation: spin 0.7s linear infinite;
+            vertical-align: middle; margin-right: 6px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: #1a2634; color: white; padding: 12px 26px; border-radius: 60px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.25); z-index: 9999;
+            opacity: 0; transition: 0.25s; font-size: 0.9rem; max-width: 90vw; text-align: center;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #1e7e34; }
+        .toast.error { background: #b13e30; }
+        .toast.info { background: #1a4a6a; }
+
+        .empty-state { text-align: center; padding: 36px 16px; color: #7a8a9e; }
+        .empty-state .icon { font-size: 2.6rem; opacity: 0.5; margin-bottom: 6px; }
+
+        .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+        .tab-btn {
+            background: #eef2f7; color: #3a4e66; padding: 8px 16px;
+            border-radius: 40px; border: none; cursor: pointer; font-weight: 500;
+            font-size: 0.83rem;
+        }
+        .tab-btn.active { background: #0a3d62; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .progress-bar-wrap {
+            background: #e9ecf0; border-radius: 40px; height: 8px; overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%; background: linear-gradient(90deg, #0a3d62, #3498db);
+            transition: width 0.3s; border-radius: 40px;
+        }
+
+        .manual-entry-row {
+            display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 8px; align-items: center; margin-bottom: 8px;
+            padding: 8px; background: #f8faff; border-radius: 12px;
+        }
+        @media (max-width: 700px) {
+            .manual-entry-row { grid-template-columns: 1fr 1fr; }
+            .manual-entry-row button { grid-column: span 2; }
+        }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            display: none; align-items: center; justify-content: center;
+            z-index: 1000; padding: 16px;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: white; border-radius: 24px; padding: 24px 26px;
+            max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-box h3 { margin-top: 0; color: #0a3d62; }
+        .modal-box .close-btn {
+            float: right; font-size: 1.6rem; cursor: pointer;
+            background: none; border: none; color: #6b7f96; padding: 0; line-height: 1;
+        }
+
+        .help-text { font-size: 0.78rem; color: #6b7f96; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- Header -->
+    <header>
+        <h1>💰 Price Room <span class="badge" id="roleBadge">Loading…</span></h1>
+        <div class="nav-links">
+            <a href="index.html">🏠 Dashboard</a>
+            <a href="invoice_repo.html">🧾 Invoices</a>
+            <a href="reports.html">📊 Reports</a>
+            <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
+        </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="label">Items Uploaded</div><div class="value" id="statTotal">0</div></div>
+        <div class="stat-card green"><div class="label">Matched</div><div class="value" id="statMatched">0</div></div>
+        <div class="stat-card orange"><div class="label">Partial / Review</div><div class="value" id="statPartial">0</div></div>
+        <div class="stat-card red"><div class="label">Unmatched</div><div class="value" id="statUnmatched">0</div></div>
+        <div class="stat-card"><div class="label">Total Value</div><div class="value" id="statValue">₦0</div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="upload">📤 Upload Items</button>
+        <button class="tab-btn" data-tab="manual">✍️ Manual Entry</button>
+        <button class="tab-btn" data-tab="results">🔍 Matched Results</button>
+        <button class="tab-btn" data-tab="history">📜 Price History</button>
+    </div>
+
+    <!-- Upload Tab -->
+    <div class="tab-content active" id="tab-upload">
+        <div class="card">
+            <h2>📤 Upload Item List <small>Excel / CSV — no prices required</small></h2>
+            <div class="upload-zone" id="uploadZone">
+                <div class="icon">📁</div>
+                <div><strong>Click to browse</strong> or drag and drop your file here</div>
+                <div class="hint">Supported: .xlsx, .xls, .csv — Columns like ITEM, QTY, PACK SIZE are auto-detected</div>
+                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+            </div>
+            <div class="flex-row" style="margin-top:10px;">
+                <button class="btn-primary" id="autoMatchBtn" disabled>🔍 Run Price Match</button>
+                <button class="btn-warning" id="reMatchBtn" disabled>🔄 Re-match All</button>
+                <button class="btn-info" id="loadDemoBtn">📄 Load Sample</button>
+                <button class="btn-danger" id="clearAllBtn">🗑️ Clear All</button>
+            </div>
+            <div id="uploadInfo" class="help-text" style="margin-top:8px;"></div>
+        </div>
+    </div>
+
+    <!-- Manual Entry Tab -->
+    <div class="tab-content" id="tab-manual">
+        <div class="card">
+            <h2>✍️ Manual Item Entry</h2>
+            <p class="help-text">Type in items you want to price. Each row will be matched against the price database.</p>
+            <div id="manualEntryContainer"></div>
+            <button class="btn-success btn-sm" id="addManualRowBtn">＋ Add Row</button>
+            <div class="flex-row" style="margin-top:14px;">
+                <button class="btn-primary" id="manualMatchBtn">🔍 Match Manual Entries</button>
+                <button class="btn-danger btn-sm" id="clearManualBtn">Clear Manual</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Tab -->
+    <div class="tab-content" id="tab-results">
+        <div class="card">
+            <h2>🔍 Matched Results <small id="resultsCount">0 items</small></h2>
+            <div class="flex-row" style="margin-bottom:10px;">
+                <input type="text" id="resultsSearch" placeholder="🔍 Filter matched results…" class="grow">
+                <select id="filterMatchStatus" style="width:auto;">
+                    <option value="all">All Status</option>
+                    <option value="matched">✅ Matched</option>
+                    <option value="partial">⚠️ Partial</option>
+                    <option value="unmatched">❌ Unmatched</option>
+                </select>
+                <button class="btn-primary btn-sm" id="exportPdfBtn">📄 PDF</button>
+                <button class="btn-success btn-sm" id="exportCsvBtn">📊 CSV</button>
+                <button class="btn-info btn-sm" id="exportXlsxBtn">📂 Excel</button>
+                <button class="btn-secondary btn-sm" id="saveAsInvoiceBtn">💾 Save as Invoice</button>
+            </div>
+            <div class="table-wrap" id="resultsWrap">
+                <div class="empty-state"><div class="icon">📭</div>No items loaded. Upload a file or add manual entries to begin.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Price History Tab -->
+    <div class="tab-content" id="tab-history">
+        <div class="card">
+            <h2>📜 Price History Database <small id="historyCount"></small></h2>
+            <p class="help-text">All known items and their most recent prices, gathered from shipments, invoices, and received goods.</p>
+            <div class="flex-row" style="margin-bottom:10px;">
+                <input type="text" id="historySearch" placeholder="🔍 Search history…" class="grow">
+                <button class="btn-primary btn-sm" id="reloadHistoryBtn">🔄 Reload</button>
+                <button class="btn-warning btn-sm" id="rebuildHistoryBtn">♻️ Rebuild from All Sources</button>
+            </div>
+            <div class="table-wrap" id="historyWrap">
+                <div class="empty-state"><div class="icon">🗄️</div>Click "Rebuild from All Sources" to load price history.</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Modal: choose match -->
+<div class="modal-overlay" id="matchModal">
+    <div class="modal-box">
+        <button class="close-btn" onclick="closeModal('matchModal')">&times;</button>
+        <h3>🔍 Choose Price for Item</h3>
+        <div id="matchModalContent"></div>
+    </div>
+</div>
+
+<script>
+    /* =========================================================
+       FIREBASE CONFIG
+    ========================================================= */
+    const firebaseConfig = {
+        apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
+        authDomain: "nevamak-enterprises.firebaseapp.com",
+        projectId: "nevamak-enterprises",
+        storageBucket: "nevamak-enterprises.firebasestorage.app",
+        messagingSenderId: "144324172534",
+        appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
+        measurementId: "G-MZ8NT6KK8KK8N"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    /* =========================================================
+       STATE
+    ========================================================= */
+    let currentUser = null;
+    let currentUserEmail = '';
+    let currentUserRole = '';
+
+    let uploadedItems = [];   // { id, brand, itemName, qty, packSize, unitPrice, matchedSource, matchedFrom, confidence, status }
+    let manualCounter = 0;
+
+    let priceHistory = {};    // lowercased name -> array of { price, source, date, brand, packSize }
+
+    /* =========================================================
+       HELPERS
+    ========================================================= */
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(text);
+        return div.innerHTML;
+    }
+
+    function formatCurrency(num) {
+        const n = parseFloat(num);
+        if (isNaN(n)) return '0.00';
+        return n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatQuantity(num) {
+        const n = parseFloat(num);
+        if (isNaN(n)) return '—';
+        return n.toLocaleString('en-NG');
+    }
+
+    function showToast(msg, type = 'info', duration = 2800) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast ' + type;
+        void t.offsetWidth;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove('show'), duration);
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    window.closeModal = closeModal;
+
+    function normalizeName(s) {
+        return String(s || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9 ]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    /**
+     * Similarity between two strings (Jaccard on word tokens).
+     * Returns 0..1
+     */
+    function similarity(a, b) {
+        const A = new Set(normalizeName(a).split(' ').filter(Boolean));
+        const B = new Set(normalizeName(b).split(' ').filter(Boolean));
+        if (!A.size || !B.size) return 0;
+        const inter = [...A].filter(w => B.has(w)).length;
+        const union = new Set([...A, ...B]).size;
+        return inter / union;
+    }
+
+    /* =========================================================
+       AUTH
+    ========================================================= */
+    auth.onAuthStateChanged(async (user) => {
+        if (!user) { window.location.href = 'login.html'; return; }
+        currentUser = user;
+        currentUserEmail = user.email;
+        try {
+            const doc = await db.collection('users').doc(user.uid).get();
+            if (doc.exists) {
+                currentUserRole = doc.data().role || 'member';
+            }
+        } catch (e) { console.warn('Role load failed', e); }
+        document.getElementById('roleBadge').textContent = currentUserRole || 'member';
+
+        // Preload the price history on load
+        await rebuildPriceHistory(true);
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut().then(() => window.location.href = 'login.html');
+    });
+
+    /* =========================================================
+       TABS
+    ========================================================= */
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        });
+    });
+
+    function switchTab(name) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+    }
+
+    /* =========================================================
+       FILE UPLOAD
+    ========================================================= */
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault(); uploadZone.classList.remove('dragover');
+        const f = e.dataTransfer.files[0];
+        if (f) handleFile(f);
+    });
+    fileInput.addEventListener('change', e => {
+        const f = e.target.files[0];
+        if (f) handleFile(f);
+        fileInput.value = '';
+    });
+
+    function handleFile(file) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            try {
+                const data = new Uint8Array(ev.target.result);
+                const wb = XLSX.read(data, { type: 'array' });
+                let allRows = [];
+                wb.SheetNames.forEach(sheetName => {
+                    const sheet = wb.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                    if (json.length) allRows.push(...parseSheet(json, sheetName));
+                });
+
+                if (!allRows.length) {
+                    showToast('No valid items found in the file.', 'error');
+                    return;
+                }
+
+                uploadedItems = allRows.map((it, idx) => ({
+                    id: 'up_' + Date.now() + '_' + idx,
+                    brand: it.brand || '',
+                    itemName: it.itemName,
+                    qty: it.qty,
+                    packSize: it.packSize,
+                    unitPrice: it.unitPrice || 0,
+                    matchedSource: it.unitPrice > 0 ? 'Uploaded' : '',
+                    matchedFrom: '',
+                    confidence: it.unitPrice > 0 ? 1 : 0,
+                    status: it.unitPrice > 0 ? 'matched' : 'unmatched'
+                }));
+
+                document.getElementById('uploadInfo').textContent =
+                    `✅ Loaded ${uploadedItems.length} items from "${file.name}".`;
+                showToast(`✅ ${uploadedItems.length} items loaded.`, 'success');
+
+                document.getElementById('autoMatchBtn').disabled = false;
+                document.getElementById('reMatchBtn').disabled = false;
+
+                renderResults();
+                updateStats();
+            } catch (err) {
+                console.error(err);
+                showToast('Error reading file: ' + err.message, 'error');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    /**
+     * Try to parse a JSON sheet into normalized rows.
+     * Handles both "with headers" and "raw rows" situations.
+     */
+    function parseSheet(json, sheetName) {
+        if (!json.length) return [];
+        const headers = Object.keys(json[0]).map(h => h.toLowerCase().trim());
+
+        // Detected headers?
+        const findCol = (variations) => {
+            const keys = Object.keys(json[0]);
+            for (const k of keys) {
+                const kl = k.toLowerCase().trim();
+                if (variations.includes(kl)) return k;
+            }
+            for (const k of keys) {
+                const kl = k.toLowerCase().trim();
+                for (const v of variations) {
+                    if (kl.includes(v) || v.includes(kl)) return k;
+                }
+            }
+            return null;
+        };
+
+        const brandCol = findCol(['brand', 'manufacturer', 'company', 'make']);
+        const itemCol = findCol(['item', 'items', 'product', 'product name', 'item name', 'description', 'name', 'goods']);
+        const qtyCol = findCol(['qty', 'quantity', 'qty (packs)', 'packs', 'count', 'units']);
+        const packCol = findCol(['pack size', 'packing', 'units per pack']);
+        const priceCol = findCol(['price', 'unit price', 'price per pack', 'cost', 'rate']);
+
+        const rows = [];
+        json.forEach(row => {
+            const itemName = itemCol ? String(row[itemCol] || '').trim() : '';
+            const brand = brandCol ? String(row[brandCol] || '').trim() : '';
+            const qty = qtyCol ? parseFloat(String(row[qtyCol]).replace(/,/g, '')) || 0 : 0;
+            const packSize = packCol ? parseFloat(String(row[packCol]).replace(/,/g, '')) || 0 : 0;
+            const unitPrice = priceCol ? parseFloat(String(row[priceCol]).replace(/,/g, '')) || 0 : 0;
+
+            // Skip fully empty rows
+            if (!itemName && !brand && !qty && !packSize && !unitPrice) return;
+
+            // If no item column, try to synthesize from brand + description if available
+            let finalName = itemName;
+            if (!finalName && brand) finalName = brand;
+
+            if (!finalName) return;
+
+            rows.push({ brand, itemName: finalName, qty, packSize, unitPrice });
+        });
+        return rows;
+    }
+
+    /* =========================================================
+       MANUAL ENTRY
+    ========================================================= */
+    function addManualRow() {
+        manualCounter++;
+        const id = 'man_' + manualCounter + '_' + Date.now();
+        const container = document.getElementById('manualEntryContainer');
+        const div = document.createElement('div');
+        div.className = 'manual-entry-row';
+        div.dataset.rowId = id;
+        div.innerHTML = `
+            <input type="text" placeholder="Item name *" class="man-name">
+            <input type="text" placeholder="Brand" class="man-brand">
+            <input type="number" placeholder="Qty" class="man-qty" min="1" step="1" value="1">
+            <input type="number" placeholder="Pack size" class="man-pack" min="1" step="1" value="1">
+            <button type="button" class="btn-danger btn-sm" onclick="removeManualRow(this)">✖</button>
+        `;
+        container.appendChild(div);
+    }
+    window.removeManualRow = function(btn) {
+        btn.closest('.manual-entry-row').remove();
+    };
+    document.getElementById('addManualRowBtn').addEventListener('click', addManualRow);
+
+    document.getElementById('manualMatchBtn').addEventListener('click', async () => {
+        const rows = document.querySelectorAll('#manualEntryContainer .manual-entry-row');
+        if (!rows.length) { showToast('Add at least one row.', 'error'); return; }
+        const items = [];
+        rows.forEach(row => {
+            const name = row.querySelector('.man-name').value.trim();
+            if (!name) return;
+            items.push({
+                id: 'man_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                brand: row.querySelector('.man-brand').value.trim(),
+                itemName: name,
+                qty: parseFloat(row.querySelector('.man-qty').value) || 1,
+                packSize: parseFloat(row.querySelector('.man-pack').value) || 1,
+                unitPrice: 0,
+                matchedSource: '',
+                matchedFrom: '',
+                confidence: 0,
+                status: 'unmatched'
+            });
+        });
+        if (!items.length) { showToast('No valid items.', 'error'); return; }
+
+        uploadedItems = uploadedItems.concat(items);
+        document.getElementById('autoMatchBtn').disabled = false;
+        document.getElementById('reMatchBtn').disabled = false;
+        await runMatching(items);
+        renderResults();
+        updateStats();
+        switchTab('results');
+        showToast(`✅ ${items.length} manual items added and matched.`, 'success');
+    });
+
+    document.getElementById('clearManualBtn').addEventListener('click', () => {
+        document.getElementById('manualEntryContainer').innerHTML = '';
+        manualCounter = 0;
+        showToast('Manual rows cleared.', 'info', 1200);
+    });
+
+    /* =========================================================
+       PRICE HISTORY BUILDER
+    ========================================================= */
+    async function rebuildPriceHistory(silent = false) {
+        if (!silent) showToast('Building price history from all sources…', 'info', 1500);
+        priceHistory = {};
+        let totalFound = 0;
+
+        try {
+            // 1) Shipments
+            const shipSnap = await db.collection('shipments').limit(500).get();
+            shipSnap.forEach(doc => {
+                const d = doc.data();
+                (d.items || []).forEach(it => {
+                    const name = it.itemName || it.name;
+                    const price = it.unitPrice || it.updatedPrice || it.originalPrice || 0;
+                    if (name && price > 0) {
+                        addToHistory(name, {
+                            price,
+                            source: 'Shipment',
+                            sourceId: doc.id,
+                            date: d.createdAt ? safeDate(d.createdAt) : null,
+                            brand: it.brand || d.vendorName || '',
+                            packSize: it.packSize || 1
+                        });
+                        totalFound++;
+                    }
+                });
+            });
+
+            // 2) Invoices
+            const invSnap = await db.collection('invoices').limit(500).get();
+            invSnap.forEach(doc => {
+                const d = doc.data();
+                (d.items || []).forEach(it => {
+                    const name = it.itemName;
+                    const price = it.updatedPrice || it.unitPrice || it.originalPrice || 0;
+                    if (name && price > 0) {
+                        addToHistory(name, {
+                            price,
+                            source: 'Invoice',
+                            sourceId: doc.id,
+                            date: d.createdAt ? safeDate(d.createdAt) : null,
+                            brand: it.brand || d.vendor || '',
+                            packSize: it.packSize || 1
+                        });
+                        totalFound++;
+                    }
+                });
+            });
+
+            // 3) Goods Received
+            const grSnap = await db.collection('goodsReceived').limit(500).get();
+            grSnap.forEach(doc => {
+                const d = doc.data();
+                (d.receivedItems || []).forEach(it => {
+                    const name = it.itemName;
+                    const price = it.unitPrice || 0;
+                    if (name && price > 0) {
+                        addToHistory(name, {
+                            price,
+                            source: 'Received',
+                            sourceId: doc.id,
+                            date: d.receivedAt ? safeDate(d.receivedAt) : null,
+                            brand: '',
+                            packSize: it.packSize || 1
+                        });
+                        totalFound++;
+                    }
+                });
+            });
+
+            document.getElementById('historyCount').textContent =
+                `${Object.keys(priceHistory).length} unique items · ${totalFound} price points`;
+            if (!silent) showToast(`✅ Price history built: ${Object.keys(priceHistory).length} items.`, 'success');
+            renderHistory();
+        } catch (err) {
+            console.error('History build error', err);
+            showToast('Error building history: ' + err.message, 'error');
+        }
+    }
+
+    function safeDate(ts) {
+        try {
+            if (!ts) return null;
+            if (ts.toDate) return ts.toDate();
+            if (ts.seconds) return new Date(ts.seconds * 1000);
+            return new Date(ts);
+        } catch (e) { return null; }
+    }
+
+    function addToHistory(name, entry) {
+        const key = normalizeName(name);
+        if (!priceHistory[key]) priceHistory[key] = { displayName: name, points: [] };
+        priceHistory[key].points.push(entry);
+    }
+
+    /* =========================================================
+       MATCHING ENGINE
+    ========================================================= */
+    async function runMatching(items = null) {
+        const list = items || uploadedItems;
+        let processed = 0;
+        const progressEl = document.getElementById('uploadInfo');
+
+        for (const item of list) {
+            if (item.matchedSource && item.matchedSource !== 'Uploaded') continue;
+            const result = matchItem(item);
+            item.unitPrice = result.price;
+            item.matchedSource = result.source;
+            item.matchedFrom = result.fromName;
+            item.confidence = result.confidence;
+            item.status = result.status;
+            processed++;
+            if (progressEl && processed % 5 === 0) {
+                progressEl.textContent = `Matching… ${processed}/${list.length}`;
+            }
+        }
+
+        if (progressEl) progressEl.textContent = `✅ Matching complete. ${list.length} items processed.`;
+    }
+
+    function matchItem(item) {
+        const query = ((item.brand || '') + ' ' + item.itemName).trim();
+        const candidates = [];
+
+        // Exact match first
+        const exactKey = normalizeName(item.itemName);
+        if (priceHistory[exactKey]) {
+            const pts = priceHistory[exactKey].points;
+            const latest = pts.reduce((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db_ = b.date ? b.date.getTime() : 0;
+                return db_ > da ? b : a;
+            }, pts[0]);
+            candidates.push({
+                price: latest.price,
+                source: latest.source,
+                fromName: priceHistory[exactKey].displayName,
+                confidence: 1.0
+            });
+        }
+
+        // Fuzzy match on all history keys
+        for (const key in priceHistory) {
+            const sim = similarity(query, key);
+            if (sim < 0.35) continue;
+            const pts = priceHistory[key].points;
+            const latest = pts.reduce((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db_ = b.date ? b.date.getTime() : 0;
+                return db_ > da ? b : a;
+            }, pts[0]);
+            candidates.push({
+                price: latest.price,
+                source: latest.source,
+                fromName: priceHistory[key].displayName,
+                confidence: sim
+            });
+        }
+
+        if (!candidates.length) {
+            return { price: 0, source: '', fromName: '', confidence: 0, status: 'unmatched' };
+        }
+
+        // Sort by confidence, then latest price
+        candidates.sort((a, b) => b.confidence - a.confidence);
+        const best = candidates[0];
+
+        let status = 'matched';
+        if (best.confidence < 0.6) status = 'partial';
+        else if (best.confidence < 0.85) status = 'partial';
+
+        return {
+            price: best.price,
+            source: best.source,
+            fromName: best.fromName,
+            confidence: best.confidence,
+            status
+        };
+    }
+
+    /* =========================================================
+       ACTION BUTTONS
+    ========================================================= */
+    document.getElementById('autoMatchBtn').addEventListener('click', async function() {
+        if (!uploadedItems.length) { showToast('No items loaded.', 'error'); return; }
+        this.disabled = true;
+        this.innerHTML = '<span class="loading-spinner"></span> Matching…';
+        await runMatching();
+        renderResults();
+        updateStats();
+        switchTab('results');
+        this.disabled = false;
+        this.innerHTML = '🔍 Run Price Match';
+        showToast('✅ Matching complete.', 'success');
+    });
+
+    document.getElementById('reMatchBtn').addEventListener('click', async function() {
+        if (!uploadedItems.length) { showToast('No items loaded.', 'error'); return; }
+        this.disabled = true;
+        this.innerHTML = '<span class="loading-spinner"></span> Re-matching…';
+        uploadedItems.forEach(i => { if (i.matchedSource !== 'Uploaded') {
+            i.unitPrice = 0; i.matchedSource = ''; i.status = 'unmatched'; i.confidence = 0;
+        }});
+        await rebuildPriceHistory(true);
+        await runMatching();
+        renderResults();
+        updateStats();
+        this.disabled = false;
+        this.innerHTML = '🔄 Re-match All';
+        showToast('✅ Re-match complete.', 'success');
+    });
+
+    document.getElementById('loadDemoBtn').addEventListener('click', () => {
+        uploadedItems = [
+            { id: 'demo1', brand: 'SUNRIPE', itemName: 'HOTDOG SAUSAGE', qty: 5, packSize: 12, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
+            { id: 'demo2', brand: 'TROPICAL SUN', itemName: 'COCONUT PEANUTS 50G', qty: 40, packSize: 24, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
+            { id: 'demo3', brand: 'TILDA', itemName: 'GOLDEN SELLA 5KG', qty: 30, packSize: 4, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
+            { id: 'demo4', brand: 'TILDA', itemName: 'PURE BASMATI RICE 5KG', qty: 20, packSize: 4, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
+            { id: 'demo5', brand: 'MAHAAMA', itemName: 'RICE 1KG', qty: 2, packSize: 0, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
+        ];
+        document.getElementById('autoMatchBtn').disabled = false;
+        document.getElementById('reMatchBtn').disabled = false;
+        document.getElementById('uploadInfo').textContent = `📄 Loaded ${uploadedItems.length} demo items.`;
+        renderResults();
+        updateStats();
+        showToast('Demo loaded. Click "Run Price Match".', 'info');
+    });
+
+    document.getElementById('clearAllBtn').addEventListener('click', () => {
+        if (!confirm('Clear all uploaded and matched items?')) return;
+        uploadedItems = [];
+        renderResults();
+        updateStats();
+        document.getElementById('autoMatchBtn').disabled = true;
+        document.getElementById('reMatchBtn').disabled = true;
+        document.getElementById('uploadInfo').textContent = '';
+        showToast('Cleared.', 'info', 1200);
+    });
+
+    /* =========================================================
+       STATS & RESULT RENDER
+    ========================================================= */
+    function updateStats() {
+        const total = uploadedItems.length;
+        const matched = uploadedItems.filter(i => i.status === 'matched').length;
+        const partial = uploadedItems.filter(i => i.status === 'partial').length;
+        const unmatched = uploadedItems.filter(i => i.status === 'unmatched').length;
+        const value = uploadedItems.reduce((sum, i) => sum + (i.qty * i.unitPrice || 0), 0);
+
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statMatched').textContent = matched;
+        document.getElementById('statPartial').textContent = partial;
+        document.getElementById('statUnmatched').textContent = unmatched;
+        document.getElementById('statValue').textContent = '₦' + formatCurrency(value);
+        document.getElementById('resultsCount').textContent = `${total} items`;
+    }
+
+    function renderResults() {
+        const wrap = document.getElementById('resultsWrap');
+        if (!uploadedItems.length) {
+            wrap.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No items loaded. Upload a file or add manual entries to begin.</div>';
+            return;
+        }
+
+        const search = (document.getElementById('resultsSearch').value || '').toLowerCase().trim();
+        const filter = document.getElementById('filterMatchStatus').value;
+
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Item</th>
+                    <th>Brand</th>
+                    <th>Qty</th>
+                    <th>Pack</th>
+                    <th>Unit Price (₦)</th>
+                    <th>Total (₦)</th>
+                    <th>Source</th>
+                    <th>Confidence</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        let count = 0;
+        uploadedItems.forEach((item, idx) => {
+            if (filter !== 'all' && item.status !== filter) return;
+            if (search) {
+                const text = (item.itemName + ' ' + item.brand).toLowerCase();
+                if (!text.includes(search)) return;
+            }
+            count++;
+
+            const rowClass = item.status === 'matched' ? 'matched-row' :
+                            item.status === 'partial' ? '' : 'unmatched-row';
+
+            const sourceCls = item.matchedSource === 'Invoice' ? 'source-invoice' :
+                              item.matchedSource === 'Shipment' ? 'source-shipment' :
+                              item.matchedSource === 'Received' ? 'source-received' :
+                              item.matchedSource === 'Uploaded' ? 'source-manual' :
+                              item.matchedSource === 'Manual' ? 'source-manual' : 'source-none';
+
+            const confPct = Math.round((item.confidence || 0) * 100);
+            const confCls = confPct >= 85 ? 'confidence-high' :
+                            confPct >= 60 ? 'confidence-medium' : 'confidence-low';
+
+            const totalValue = (item.qty || 0) * (item.unitPrice || 0);
+
+            html += `<tr class="${rowClass}">
+                <td>${count}</td>
+                <td><strong>${escapeHtml(item.itemName)}</strong></td>
+                <td>${escapeHtml(item.brand || '—')}</td>
+                <td>${formatQuantity(item.qty)}</td>
+                <td>${item.packSize ? formatQuantity(item.packSize) : '—'}</td>
+                <td><input type="number" class="price-cell" style="width:110px; padding:4px 8px; border-radius:20px; border:1px solid #d8e0ea; font-size:0.8rem;"
+                    value="${item.unitPrice ? item.unitPrice.toFixed(2) : ''}" min="0" step="0.01"
+                    onchange="updateItemPrice('${item.id}', this.value)"></td>
+                <td class="price-cell">₦${formatCurrency(totalValue)}</td>
+                <td><span class="source-badge ${sourceCls}">${escapeHtml(item.matchedSource || 'None')}</span>
+                    ${item.matchedFrom ? `<div style="font-size:0.68rem;color:#6b7f96;margin-top:2px;">${escapeHtml(item.matchedFrom)}</div>` : ''}
+                </td>
+                <td><span class="${confCls}">${confPct}%</span></td>
+                <td>
+                    <button class="btn-info btn-sm" onclick="openMatchModal('${item.id}')" title="Choose another price">🔍</button>
+                </td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        if (!count) {
+            html = `<div class="empty-state"><div class="icon">🔍</div>No items match the current filter.</div>`;
+        }
+        wrap.innerHTML = html;
+    }
+
+    window.updateItemPrice = function(id, value) {
+        const item = uploadedItems.find(i => i.id === id);
+        if (!item) return;
+        item.unitPrice = parseFloat(value) || 0;
+        if (item.unitPrice > 0 && item.matchedSource !== 'Uploaded') {
+            item.matchedSource = 'Manual';
+            item.status = 'matched';
+            item.confidence = 1;
+        }
+        renderResults();
+        updateStats();
+    };
+
+    document.getElementById('resultsSearch').addEventListener('input', renderResults);
+    document.getElementById('filterMatchStatus').addEventListener('change', renderResults);
+
+    /* =========================================================
+       MATCH MODAL
+    ========================================================= */
+    window.openMatchModal = function(itemId) {
+        const item = uploadedItems.find(i => i.id === itemId);
+        if (!item) return;
+
+        const query = ((item.brand || '') + ' ' + item.itemName).trim();
+        const candidates = [];
+
+        for (const key in priceHistory) {
+            const sim = similarity(query, key);
+            if (sim < 0.2) continue;
+            const pts = priceHistory[key].points;
+            const latest = pts.reduce((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db_ = b.date ? b.date.getTime() : 0;
+                return db_ > da ? b : a;
+            }, pts[0]);
+            candidates.push({
+                key,
+                displayName: priceHistory[key].displayName,
+                price: latest.price,
+                source: latest.source,
+                date: latest.date,
+                brand: latest.brand,
+                confidence: sim
+            });
+        }
+
+        candidates.sort((a, b) => b.confidence - a.confidence);
+
+        let html = `<p><strong>Looking for:</strong> ${escapeHtml(query)}</p>`;
+        html += `<div style="margin:14px 0;">
+            <label style="font-weight:600; font-size:0.85rem;">Manual Price Entry (₦)</label>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <input type="number" id="manualPriceInput" placeholder="0.00" step="0.01" min="0"
+                    value="${item.unitPrice ? item.unitPrice.toFixed(2) : ''}" style="flex:1;">
+                <button class="btn-success btn-sm" onclick="applyManualPrice('${item.id}')">Apply</button>
+            </div>
+        </div>`;
+
+        if (candidates.length) {
+            html += `<h4 style="margin-top:16px;">Suggested Matches</h4>`;
+            html += `<div class="table-wrap"><table>
+                <thead><tr><th>Item</th><th>Source</th><th>Price (₦)</th><th>Date</th><th>Confidence</th><th></th></tr></thead><tbody>`;
+            candidates.slice(0, 12).forEach((c, idx) => {
+                const confPct = Math.round(c.confidence * 100);
+                html += `<tr>
+                    <td>${escapeHtml(c.displayName)}<div style="font-size:0.7rem;color:#6b7f96;">${escapeHtml(c.brand || '')}</div></td>
+                    <td><span class="source-badge">${escapeHtml(c.source)}</span></td>
+                    <td class="price-cell">₦${formatCurrency(c.price)}</td>
+                    <td style="font-size:0.75rem;">${c.date ? c.date.toLocaleDateString() : '—'}</td>
+                    <td>${confPct}%</td>
+                    <td><button class="btn-primary btn-sm" onclick="applyMatch('${item.id}', ${c.price}, '${escapeHtml(c.source)}', '${escapeHtml(c.displayName).replace(/'/g, "\\'")}')">Use</button></td>
+                </tr>`;
+            });
+            html += `</tbody></table></div>`;
+        } else {
+            html += `<p class="help-text">No close matches found in the price database. Enter a manual price above.</p>`;
+        }
+
+        document.getElementById('matchModalContent').innerHTML = html;
+        document.getElementById('matchModal').classList.add('open');
+    };
+
+    window.applyMatch = function(itemId, price, source, fromName) {
+        const item = uploadedItems.find(i => i.id === itemId);
+        if (!item) return;
+        item.unitPrice = parseFloat(price) || 0;
+        item.matchedSource = source;
+        item.matchedFrom = fromName;
+        item.confidence = 1;
+        item.status = 'matched';
+        closeModal('matchModal');
+        renderResults();
+        updateStats();
+        showToast('✅ Price applied.', 'success', 1400);
+    };
+
+    window.applyManualPrice = function(itemId) {
+        const val = parseFloat(document.getElementById('manualPriceInput').value) || 0;
+        const item = uploadedItems.find(i => i.id === itemId);
+        if (!item) return;
+        item.unitPrice = val;
+        item.matchedSource = 'Manual';
+        item.matchedFrom = 'Manual entry';
+        item.confidence = 1;
+        item.status = val > 0 ? 'matched' : 'unmatched';
+        closeModal('matchModal');
+        renderResults();
+        updateStats();
+        showToast('✅ Manual price applied.', 'success', 1400);
+    };
+
+    /* =========================================================
+       EXPORTS
+    ========================================================= */
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+        if (!uploadedItems.length) { showToast('No items to export.', 'error'); return; }
+        const rows = [['Item', 'Brand', 'Qty', 'Pack Size', 'Unit Price', 'Total', 'Source', 'Confidence']];
+        uploadedItems.forEach(it => {
+            rows.push([
+                it.itemName, it.brand || '', it.qty, it.packSize || '', it.unitPrice || 0,
+                (it.qty || 0) * (it.unitPrice || 0), it.matchedSource || '', Math.round((it.confidence || 0) * 100) + '%'
+            ]);
+        });
+        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PriceRoom_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('✅ CSV exported.', 'success');
+    });
+
+    document.getElementById('exportXlsxBtn').addEventListener('click', () => {
+        if (!uploadedItems.length) { showToast('No items to export.', 'error'); return; }
+        const data = uploadedItems.map(it => ({
+            Item: it.itemName,
+            Brand: it.brand || '',
+            Qty: it.qty,
+            'Pack Size': it.packSize || '',
+            'Unit Price': it.unitPrice || 0,
+            Total: (it.qty || 0) * (it.unitPrice || 0),
+            Source: it.matchedSource || '',
+            Confidence: Math.round((it.confidence || 0) * 100) + '%'
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Matched');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `PriceRoom_${new Date().toISOString().slice(0,10)}.xlsx`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('✅ Excel exported.', 'success');
+    });
+
+    document.getElementById('exportPdfBtn').addEventListener('click', async () => {
+        if (!uploadedItems.length) { showToast('No items to export.', 'error'); return; }
+        const btn = document.getElementById('exportPdfBtn');
+        btn.disabled = true;
+        try {
+            let rows = '';
+            let totalValue = 0;
+            uploadedItems.forEach((it, idx) => {
+                const total = (it.qty || 0) * (it.unitPrice || 0);
+                totalValue += total;
+                rows += `<tr>
+                    <td>${idx + 1}</td>
+                    <td>${escapeHtml(it.itemName)}</td>
+                    <td>${escapeHtml(it.brand || '')}</td>
+                    <td>${it.qty || 0}</td>
+                    <td>${it.packSize || ''}</td>
+                    <td>₦${formatCurrency(it.unitPrice || 0)}</td>
+                    <td>₦${formatCurrency(total)}</td>
+                    <td>${escapeHtml(it.matchedSource || '')}</td>
+                </tr>`;
+            });
+            const html = `
+                <div style="padding:20px;font-family:sans-serif;">
+                    <h2 style="margin:0;color:#0a3d62;">NEVAMAK – Price Room Report</h2>
+                    <p style="color:#6b7f96;margin:4px 0 14px;">Generated ${new Date().toLocaleString()} by ${escapeHtml(currentUserEmail)}</p>
+                    <table style="width:100%;border-collapse:collapse;border:1px solid #ccc;font-size:0.8rem;">
+                        <tr style="background:#0a3d62;color:white;"><th style="padding:6px;">#</th><th style="padding:6px;">Item</th><th style="padding:6px;">Brand</th><th style="padding:6px;">Qty</th><th style="padding:6px;">Pack</th><th style="padding:6px;">Unit Price</th><th style="padding:6px;">Total</th><th style="padding:6px;">Source</th></tr>
+                        ${rows}
+                        <tr style="font-weight:700;background:#eaf1fa;"><td colspan="6" style="padding:6px;text-align:right;">Grand Total</td><td colspan="2" style="padding:6px;">₦${formatCurrency(totalValue)}</td></tr>
+                    </table>
+                </div>
+            `;
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            document.body.appendChild(tempDiv);
+            const canvas = await html2canvas(tempDiv, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL('image/png');
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+            pdf.save(`PriceRoom_${Date.now()}.pdf`);
+            document.body.removeChild(tempDiv);
+            showToast('✅ PDF exported.', 'success');
+        } catch (err) {
+            console.error(err);
+            showToast('PDF error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    /* =========================================================
+       SAVE AS INVOICE
+    ========================================================= */
+    document.getElementById('saveAsInvoiceBtn').addEventListener('click', async () => {
+        if (!uploadedItems.length) { showToast('No items to save.', 'error'); return; }
+        const validItems = uploadedItems.filter(i => i.unitPrice > 0);
+        if (!validItems.length) { showToast('No priced items to save.', 'error'); return; }
+
+        if (!confirm(`Create a new invoice with ${validItems.length} priced items?`)) return;
+
+        try {
+            const invoiceNumber = 'PR-' + Date.now().toString(36).toUpperCase();
+            const items = validItems.map(it => ({
+                itemName: it.itemName,
+                quantity: it.qty || 1,
+                unitPrice: it.unitPrice,
+                packSize: it.packSize || 1,
+                originalPrice: it.unitPrice,
+                updatedPrice: it.unitPrice,
+                subtotal: (it.qty || 0) * it.unitPrice,
+                discountPercent: 0, discountAmount: 0, discountTotal: 0,
+                vatPercent: 0, whtPercent: 0, vat: 0, wht: 0,
+                total: (it.qty || 0) * it.unitPrice
+            }));
+            const total = items.reduce((s, i) => s + i.total, 0);
+
+            await db.collection('invoices').add({
+                invoiceNumber,
+                date: new Date().toISOString().slice(0, 10),
+                customer: 'Price Room Import',
+                customerEmail: '',
+                notes: `Generated from Price Room matching on ${new Date().toLocaleString()}`,
+                branch: 'Lagos',
+                vendor: '',
+                items,
+                transportMultiplier: 1,
+                subtotal: total,
+                totalDiscount: 0,
+                totalVAT: 0,
+                totalWHT: 0,
+                total,
+                movedToWarehouse: false,
+                acknowledged: false,
+                createdBy: currentUserEmail,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await db.collection('activityLog').add({
+                actionType: 'price_room_invoice_created',
+                invoiceNumber,
+                details: `Price Room generated invoice ${invoiceNumber} with ${items.length} items`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                user: currentUserEmail
+            });
+
+            showToast(`✅ Invoice ${invoiceNumber} created.`, 'success');
+        } catch (err) {
+            console.error(err);
+            showToast('Error saving invoice: ' + err.message, 'error');
+        }
+    });
+
+    /* =========================================================
+       PRICE HISTORY TAB
+    ========================================================= */
+    document.getElementById('reloadHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
+    document.getElementById('rebuildHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
+
+    function renderHistory() {
+        const wrap = document.getElementById('historyWrap');
+        const search = (document.getElementById('historySearch').value || '').toLowerCase().trim();
+        const keys = Object.keys(priceHistory);
+        if (!keys.length) {
+            wrap.innerHTML = '<div class="empty-state"><div class="icon">🗄️</div>No price history yet. Click "Rebuild from All Sources".</div>';
+            return;
+        }
+        let html = `<table>
+            <thead><tr><th>Item</th><th>Most Recent Price</th><th>Source</th><th># Price Points</th><th>Last Updated</th><th>Action</th></tr></thead><tbody>`;
+        let count = 0;
+        keys.forEach(k => {
+            const entry = priceHistory[k];
+            if (search && !k.includes(search)) return;
+            const latest = entry.points.reduce((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db_ = b.date ? b.date.getTime() : 0;
+                return db_ > da ? b : a;
+            }, entry.points[0]);
+            count++;
+            html += `<tr>
+                <td><strong>${escapeHtml(entry.displayName)}</strong></td>
+                <td class="price-cell">₦${formatCurrency(latest.price)}</td>
+                <td><span class="source-badge">${escapeHtml(latest.source)}</span></td>
+                <td>${entry.points.length}</td>
+                <td style="font-size:0.75rem;">${latest.date ? latest.date.toLocaleDateString() : '—'}</td>
+                <td><button class="btn-info btn-sm" onclick="quickAddToMatch('${escapeHtml(k).replace(/'/g, "\\'")}')">➕ Add to List</button></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        if (!count) html = `<div class="empty-state"><div class="icon">🔍</div>No matches.</div>`;
+        wrap.innerHTML = html;
+    }
+
+    window.quickAddToMatch = function(key) {
+        const entry = priceHistory[key];
+        if (!entry) return;
+        uploadedItems.push({
+            id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+            brand: entry.points[0]?.brand || '',
+            itemName: entry.displayName,
+            qty: 1,
+            packSize: entry.points[0]?.packSize || 1,
+            unitPrice: entry.points[0]?.price || 0,
+            matchedSource: entry.points[0]?.source || 'History',
+            matchedFrom: entry.displayName,
+            confidence: 1,
+            status: 'matched'
+        });
+        renderResults();
+        updateStats();
+        showToast('✅ Added to matched list.', 'success', 1400);
+    };
+
+    document.getElementById('historySearch').addEventListener('input', renderHistory);
+
+    /* =========================================================
+       INIT
+    ========================================================= */
+    addManualRow();
+    addManualRow();
+
+    console.log('💰 Price Room loaded.');
+</script>
+</body>
+</html>
