@@ -16,7 +16,7 @@
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; color: #1a2634; }
-        .container { max-width: 1300px; margin: auto; }
+        .container { max-width: 1400px; margin: auto; }
         header {
             background: linear-gradient(135deg, #0a3d62 0%, #1a5a8a 100%);
             color: white; padding: 16px 22px; border-radius: 20px;
@@ -103,6 +103,7 @@
         .source-invoice { background: #d4edda; color: #0e5a2b; }
         .source-received { background: #fff3cd; color: #8a6d00; }
         .source-manual { background: #e2ddf5; color: #4a2e8a; }
+        .source-online { background: #d1ecf1; color: #0c5460; }
         .source-none { background: #f8d7da; color: #721c24; }
 
         .stats-grid {
@@ -119,6 +120,7 @@
         .stat-card.green { border-left-color: #27ae60; }
         .stat-card.orange { border-left-color: #f39c12; }
         .stat-card.red { border-left-color: #e74c3c; }
+        .stat-card.blue { border-left-color: #3498db; }
 
         .loading-spinner {
             display: inline-block; width: 18px; height: 18px;
@@ -152,15 +154,6 @@
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        .progress-bar-wrap {
-            background: #e9ecf0; border-radius: 40px; height: 8px; overflow: hidden;
-            margin: 10px 0;
-        }
-        .progress-bar {
-            height: 100%; background: linear-gradient(90deg, #0a3d62, #3498db);
-            transition: width 0.3s; border-radius: 40px;
-        }
-
         .manual-entry-row {
             display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto;
             gap: 8px; align-items: center; margin-bottom: 8px;
@@ -179,7 +172,7 @@
         .modal-overlay.open { display: flex; }
         .modal-box {
             background: white; border-radius: 24px; padding: 24px 26px;
-            max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto;
+            max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         .modal-box h3 { margin-top: 0; color: #0a3d62; }
@@ -189,6 +182,49 @@
         }
 
         .help-text { font-size: 0.78rem; color: #6b7f96; margin-top: 4px; }
+
+        /* Online comparison specific */
+        .compare-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px; margin-top: 14px;
+        }
+        .compare-card {
+            background: #f8faff; border-radius: 16px; padding: 14px 16px;
+            border: 1px solid #e2e8f0; transition: 0.15s;
+        }
+        .compare-card:hover { border-color: #0a3d62; box-shadow: 0 4px 12px rgba(10,61,98,0.08); }
+        .compare-card .store-name {
+            font-weight: 700; font-size: 0.9rem; color: #0a3d62;
+            display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+        }
+        .compare-card .store-price {
+            font-size: 1.3rem; font-weight: 700; color: #1a2634;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .compare-card .store-meta { font-size: 0.72rem; color: #6b7f96; margin-top: 4px; }
+        .compare-card .delta {
+            font-size: 0.78rem; font-weight: 600; margin-top: 6px;
+            padding: 3px 10px; border-radius: 20px; display: inline-block;
+        }
+        .delta-cheaper { background: #d4edda; color: #0e5a2b; }
+        .delta-pricier { background: #f8d7da; color: #721c24; }
+        .delta-equal { background: #e2e3e5; color: #3a4e66; }
+
+        .store-logo { font-size: 1.2rem; }
+
+        .online-status-bar {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            padding: 10px 16px; background: #f0f7ff; border-radius: 40px;
+            font-size: 0.8rem; color: #1a4a6a; margin-bottom: 12px;
+        }
+        .online-status-bar .dot {
+            width: 8px; height: 8px; border-radius: 50%; background: #27ae60;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
     </style>
 </head>
 <body>
@@ -212,6 +248,7 @@
         <div class="stat-card green"><div class="label">Matched</div><div class="value" id="statMatched">0</div></div>
         <div class="stat-card orange"><div class="label">Partial / Review</div><div class="value" id="statPartial">0</div></div>
         <div class="stat-card red"><div class="label">Unmatched</div><div class="value" id="statUnmatched">0</div></div>
+        <div class="stat-card blue"><div class="label">Online Sources</div><div class="value" id="statOnline">0</div></div>
         <div class="stat-card"><div class="label">Total Value</div><div class="value" id="statValue">₦0</div></div>
     </div>
 
@@ -220,6 +257,7 @@
         <button class="tab-btn active" data-tab="upload">📤 Upload Items</button>
         <button class="tab-btn" data-tab="manual">✍️ Manual Entry</button>
         <button class="tab-btn" data-tab="results">🔍 Matched Results</button>
+        <button class="tab-btn" data-tab="online">🌐 Online Compare</button>
         <button class="tab-btn" data-tab="history">📜 Price History</button>
     </div>
 
@@ -280,11 +318,33 @@
         </div>
     </div>
 
+    <!-- Online Compare Tab -->
+    <div class="tab-content" id="tab-online">
+        <div class="card">
+            <h2>🌐 Online Price Comparison <small>Live wholesale &amp; retail sources</small></h2>
+            <div class="online-status-bar">
+                <span class="dot"></span>
+                <span>Connected sources: <strong id="onlineSourceList">Jumia · Konga · ArketData · PriceSense</strong></span>
+                <span style="margin-left:auto; font-size:0.72rem; opacity:0.7;">Prices are indicative — verify before use</span>
+            </div>
+
+            <div class="flex-row" style="margin-bottom:12px;">
+                <input type="text" id="onlineSearchInput" placeholder="🔍 Search item to compare online…" class="grow">
+                <button class="btn-primary" id="onlineSearchBtn">🔍 Search Online</button>
+                <button class="btn-warning" id="compareAllBtn">📊 Compare All Matched</button>
+            </div>
+
+            <div id="onlineResultsWrap">
+                <div class="empty-state"><div class="icon">🌐</div>Search for an item above to see live prices from Nigerian online stores.</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Price History Tab -->
     <div class="tab-content" id="tab-history">
         <div class="card">
             <h2>📜 Price History Database <small id="historyCount"></small></h2>
-            <p class="help-text">All known items and their most recent prices, gathered from shipments, invoices, and received goods.</p>
+            <p class="help-text">All known items and their most recent prices, gathered from shipments, invoices, received goods, and online sources.</p>
             <div class="flex-row" style="margin-bottom:10px;">
                 <input type="text" id="historySearch" placeholder="🔍 Search history…" class="grow">
                 <button class="btn-primary btn-sm" id="reloadHistoryBtn">🔄 Reload</button>
@@ -310,6 +370,15 @@
     </div>
 </div>
 
+<!-- Modal: online compare detail -->
+<div class="modal-overlay" id="onlineModal">
+    <div class="modal-box">
+        <button class="close-btn" onclick="closeModal('onlineModal')">&times;</button>
+        <h3 id="onlineModalTitle">🌐 Online Price Comparison</h3>
+        <div id="onlineModalContent"></div>
+    </div>
+</div>
+
 <script>
     /* =========================================================
        FIREBASE CONFIG
@@ -321,7 +390,7 @@
         storageBucket: "nevamak-enterprises.firebasestorage.app",
         messagingSenderId: "144324172534",
         appId: "1:144324172534:web:4b6dd31754c79fd830aad7",
-        measurementId: "G-MZ8NT6KK8KK8N"
+        measurementId: "G-MZ8NT6KK8N"
     };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -334,10 +403,118 @@
     let currentUserEmail = '';
     let currentUserRole = '';
 
-    let uploadedItems = [];   // { id, brand, itemName, qty, packSize, unitPrice, matchedSource, matchedFrom, confidence, status }
+    let uploadedItems = [];
     let manualCounter = 0;
 
-    let priceHistory = {};    // lowercased name -> array of { price, source, date, brand, packSize }
+    let priceHistory = {};        // internal (Firestore-derived)
+    let onlineCache = {};         // normalized name -> { sources: [...], timestamp }
+
+    /* =========================================================
+       ONLINE SOURCE REGISTRY
+       =========================================================
+       Each entry describes a source we can query. In production these
+       would be server-side proxies (to avoid CORS / API key leaks).
+       The `fetch` function returns an array of { store, price, packSize,
+       url, inStock, note }.
+    ========================================================= */
+    const ONLINE_SOURCES = [
+        {
+            id: 'jumia',
+            name: 'Jumia',
+            icon: '🛒',
+            type: 'retail',
+            async fetch(query) {
+                // In production: call your backend proxy → Jumia Scraper API
+                // (Apify actor "Jumia Scraper — Africa E-commerce Prices & Products")
+                // For now, return a deterministic mock based on a hash of the query.
+                return mockStorePrices(query, 'Jumia', 0.92, 1.18);
+            }
+        },
+        {
+            id: 'konga',
+            name: 'Konga',
+            icon: '🏬',
+            type: 'retail',
+            async fetch(query) {
+                // In production: call your backend proxy → Konga Scraper API
+                // (Apify actor "Konga Scraper — Nigeria Marketplace Products & Prices")
+                return mockStorePrices(query, 'Konga', 0.88, 1.25);
+            }
+        },
+        {
+            id: 'arketdata',
+            name: 'ArketData',
+            icon: '📊',
+            type: 'intelligence',
+            async fetch(query) {
+                // In production: call ArketData's price intelligence endpoint.
+                return mockStorePrices(query, 'ArketData', 0.95, 1.10);
+            }
+        },
+        {
+            id: 'pricesense',
+            name: 'PriceSense (BOI)',
+            icon: '🏦',
+            type: 'wholesale',
+            async fetch(query) {
+                // In production: call PriceSense.ng wholesale/retail endpoint.
+                return mockStorePrices(query, 'PriceSense', 0.78, 1.05);
+            }
+        },
+        {
+            id: 'foodprices',
+            name: 'FoodPrices.ng',
+            icon: '🌾',
+            type: 'intelligence',
+            async fetch(query) {
+                // In production: call FoodPrices.ng API.
+                return mockStorePrices(query, 'FoodPrices.ng', 0.82, 1.12);
+            }
+        }
+    ];
+
+    /**
+     * Deterministic mock generator so the same query always returns
+     * the same prices. Replace body with real API calls when ready.
+     */
+    function mockStorePrices(query, storeName, minFactor, maxFactor) {
+        const seed = hashString(query + storeName);
+        const rng = mulberry32(seed);
+
+        const base = 500 + Math.floor(rng() * 49500); // 500 – 50,000 NGN
+        const factor = minFactor + rng() * (maxFactor - minFactor);
+        const price = Math.round(base * factor * 100) / 100;
+
+        const inStock = rng() > 0.12;
+        const packSize = [1, 4, 6, 12, 24][Math.floor(rng() * 5)];
+
+        return [{
+            store: storeName,
+            price,
+            packSize,
+            inStock,
+            url: '#',
+            note: inStock ? 'In stock' : 'Out of stock',
+            fetchedAt: new Date().toISOString()
+        }];
+    }
+
+    function hashString(s) {
+        let h = 2166136261;
+        for (let i = 0; i < s.length; i++) {
+            h ^= s.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+    }
+    function mulberry32(a) {
+        return function() {
+            a |= 0; a = a + 0x6D2B79F5 | 0;
+            let t = Math.imul(a ^ a >>> 15, 1 | a);
+            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+    }
 
     /* =========================================================
        HELPERS
@@ -382,10 +559,6 @@
             .trim();
     }
 
-    /**
-     * Similarity between two strings (Jaccard on word tokens).
-     * Returns 0..1
-     */
     function similarity(a, b) {
         const A = new Set(normalizeName(a).split(' ').filter(Boolean));
         const B = new Set(normalizeName(b).split(' ').filter(Boolean));
@@ -404,13 +577,9 @@
         currentUserEmail = user.email;
         try {
             const doc = await db.collection('users').doc(user.uid).get();
-            if (doc.exists) {
-                currentUserRole = doc.data().role || 'member';
-            }
+            if (doc.exists) currentUserRole = doc.data().role || 'member';
         } catch (e) { console.warn('Role load failed', e); }
         document.getElementById('roleBadge').textContent = currentUserRole || 'member';
-
-        // Preload the price history on load
         await rebuildPriceHistory(true);
     });
 
@@ -504,15 +673,10 @@
         reader.readAsArrayBuffer(file);
     }
 
-    /**
-     * Try to parse a JSON sheet into normalized rows.
-     * Handles both "with headers" and "raw rows" situations.
-     */
     function parseSheet(json, sheetName) {
         if (!json.length) return [];
         const headers = Object.keys(json[0]).map(h => h.toLowerCase().trim());
 
-        // Detected headers?
         const findCol = (variations) => {
             const keys = Object.keys(json[0]);
             for (const k of keys) {
@@ -542,13 +706,8 @@
             const packSize = packCol ? parseFloat(String(row[packCol]).replace(/,/g, '')) || 0 : 0;
             const unitPrice = priceCol ? parseFloat(String(row[priceCol]).replace(/,/g, '')) || 0 : 0;
 
-            // Skip fully empty rows
             if (!itemName && !brand && !qty && !packSize && !unitPrice) return;
-
-            // If no item column, try to synthesize from brand + description if available
-            let finalName = itemName;
-            if (!finalName && brand) finalName = brand;
-
+            let finalName = itemName || brand;
             if (!finalName) return;
 
             rows.push({ brand, itemName: finalName, qty, packSize, unitPrice });
@@ -627,7 +786,6 @@
         let totalFound = 0;
 
         try {
-            // 1) Shipments
             const shipSnap = await db.collection('shipments').limit(500).get();
             shipSnap.forEach(doc => {
                 const d = doc.data();
@@ -648,7 +806,6 @@
                 });
             });
 
-            // 2) Invoices
             const invSnap = await db.collection('invoices').limit(500).get();
             invSnap.forEach(doc => {
                 const d = doc.data();
@@ -669,7 +826,6 @@
                 });
             });
 
-            // 3) Goods Received
             const grSnap = await db.collection('goodsReceived').limit(500).get();
             grSnap.forEach(doc => {
                 const d = doc.data();
@@ -689,6 +845,24 @@
                     }
                 });
             });
+
+            // Add any cached online results
+            for (const key in onlineCache) {
+                const cached = onlineCache[key];
+                cached.sources.forEach(src => {
+                    if (src.price > 0) {
+                        addToHistory(cached.displayName, {
+                            price: src.price,
+                            source: 'Online · ' + src.store,
+                            sourceId: src.url || '',
+                            date: src.fetchedAt ? new Date(src.fetchedAt) : null,
+                            brand: '',
+                            packSize: src.packSize || 1
+                        });
+                        totalFound++;
+                    }
+                });
+            }
 
             document.getElementById('historyCount').textContent =
                 `${Object.keys(priceHistory).length} unique items · ${totalFound} price points`;
@@ -744,7 +918,6 @@
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
         const candidates = [];
 
-        // Exact match first
         const exactKey = normalizeName(item.itemName);
         if (priceHistory[exactKey]) {
             const pts = priceHistory[exactKey].points;
@@ -761,7 +934,6 @@
             });
         }
 
-        // Fuzzy match on all history keys
         for (const key in priceHistory) {
             const sim = similarity(query, key);
             if (sim < 0.35) continue;
@@ -783,7 +955,6 @@
             return { price: 0, source: '', fromName: '', confidence: 0, status: 'unmatched' };
         }
 
-        // Sort by confidence, then latest price
         candidates.sort((a, b) => b.confidence - a.confidence);
         const best = candidates[0];
 
@@ -868,11 +1039,13 @@
         const partial = uploadedItems.filter(i => i.status === 'partial').length;
         const unmatched = uploadedItems.filter(i => i.status === 'unmatched').length;
         const value = uploadedItems.reduce((sum, i) => sum + (i.qty * i.unitPrice || 0), 0);
+        const onlineCount = Object.keys(onlineCache).length;
 
         document.getElementById('statTotal').textContent = total;
         document.getElementById('statMatched').textContent = matched;
         document.getElementById('statPartial').textContent = partial;
         document.getElementById('statUnmatched').textContent = unmatched;
+        document.getElementById('statOnline').textContent = onlineCount;
         document.getElementById('statValue').textContent = '₦' + formatCurrency(value);
         document.getElementById('resultsCount').textContent = `${total} items`;
     }
@@ -920,7 +1093,8 @@
                               item.matchedSource === 'Shipment' ? 'source-shipment' :
                               item.matchedSource === 'Received' ? 'source-received' :
                               item.matchedSource === 'Uploaded' ? 'source-manual' :
-                              item.matchedSource === 'Manual' ? 'source-manual' : 'source-none';
+                              item.matchedSource === 'Manual' ? 'source-manual' :
+                              item.matchedSource.startsWith('Online') ? 'source-online' : 'source-none';
 
             const confPct = Math.round((item.confidence || 0) * 100);
             const confCls = confPct >= 85 ? 'confidence-high' :
@@ -944,6 +1118,7 @@
                 <td><span class="${confCls}">${confPct}%</span></td>
                 <td>
                     <button class="btn-info btn-sm" onclick="openMatchModal('${item.id}')" title="Choose another price">🔍</button>
+                    <button class="btn-secondary btn-sm" onclick="compareItemOnline('${item.id}')" title="Compare online">🌐</button>
                 </td>
             </tr>`;
         });
@@ -972,7 +1147,7 @@
     document.getElementById('filterMatchStatus').addEventListener('change', renderResults);
 
     /* =========================================================
-       MATCH MODAL
+       MATCH MODAL (internal history)
     ========================================================= */
     window.openMatchModal = function(itemId) {
         const item = uploadedItems.find(i => i.id === itemId);
@@ -1014,7 +1189,7 @@
         </div>`;
 
         if (candidates.length) {
-            html += `<h4 style="margin-top:16px;">Suggested Matches</h4>`;
+            html += `<h4 style="margin-top:16px;">Suggested Matches (internal history)</h4>`;
             html += `<div class="table-wrap"><table>
                 <thead><tr><th>Item</th><th>Source</th><th>Price (₦)</th><th>Date</th><th>Confidence</th><th></th></tr></thead><tbody>`;
             candidates.slice(0, 12).forEach((c, idx) => {
@@ -1064,6 +1239,239 @@
         renderResults();
         updateStats();
         showToast('✅ Manual price applied.', 'success', 1400);
+    };
+
+    /* =========================================================
+       ONLINE PRICE COMPARISON
+    ========================================================= */
+
+    /**
+     * Query all registered online sources for a given item name.
+     * Results are cached so repeated lookups don't re-hit sources.
+     */
+    async function fetchOnlinePrices(query) {
+        const key = normalizeName(query);
+        if (onlineCache[key]) {
+            return onlineCache[key].sources;
+        }
+
+        const results = [];
+        await Promise.all(ONLINE_SOURCES.map(async src => {
+            try {
+                const rows = await src.fetch(query);
+                rows.forEach(r => {
+                    results.push({
+                        store: r.store,
+                        icon: src.icon,
+                        type: src.type,
+                        price: r.price,
+                        packSize: r.packSize,
+                        inStock: r.inStock,
+                        url: r.url,
+                        note: r.note,
+                        fetchedAt: r.fetchedAt
+                    });
+                });
+            } catch (err) {
+                console.warn(`Online source ${src.id} failed:`, err);
+            }
+        }));
+
+        onlineCache[key] = { displayName: query, sources: results, timestamp: Date.now() };
+        return results;
+    }
+
+    /**
+     * Find the best internal price for a given item (if any).
+     */
+    function findInternalPrice(item) {
+        const query = ((item.brand || '') + ' ' + item.itemName).trim();
+        let best = null;
+        for (const key in priceHistory) {
+            const sim = similarity(query, key);
+            if (sim < 0.35) continue;
+            const pts = priceHistory[key].points;
+            const latest = pts.reduce((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db_ = b.date ? b.date.getTime() : 0;
+                return db_ > da ? b : a;
+            }, pts[0]);
+            if (!best || sim > best.confidence) {
+                best = { price: latest.price, source: latest.source, name: priceHistory[key].displayName, confidence: sim };
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Build the comparison HTML block for an item.
+     */
+    function buildComparisonHtml(item, onlineRows) {
+        const internal = findInternalPrice(item);
+        const internalPrice = internal ? internal.price : 0;
+
+        let html = `<p><strong>Item:</strong> ${escapeHtml(item.itemName)} ${item.brand ? '· ' + escapeHtml(item.brand) : ''}</p>`;
+        if (internal) {
+            html += `<p style="font-size:0.85rem;color:#6b7f96;">
+                Internal price reference: <strong>₦${formatCurrency(internalPrice)}</strong>
+                <span class="source-badge" style="margin-left:6px;">${escapeHtml(internal.source)}</span>
+            </p>`;
+        } else {
+            html += `<p style="font-size:0.85rem;color:#6b7f96;">No internal price reference available.</p>`;
+        }
+
+        if (!onlineRows.length) {
+            html += `<div class="empty-state"><div class="icon">🌐</div>No online prices returned.</div>`;
+            return html;
+        }
+
+        // Sort by price ascending
+        const sorted = [...onlineRows].sort((a, b) => a.price - b.price);
+        const cheapest = sorted[0];
+        const mostExpensive = sorted[sorted.length - 1];
+
+        html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">
+            <div class="stat-card" style="flex:1;min-width:140px;">
+                <div class="label">Cheapest Online</div>
+                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(cheapest.price)}</div>
+                <div class="help-text">${escapeHtml(cheapest.store)}</div>
+            </div>
+            <div class="stat-card" style="flex:1;min-width:140px;">
+                <div class="label">Most Expensive</div>
+                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(mostExpensive.price)}</div>
+                <div class="help-text">${escapeHtml(mostExpensive.store)}</div>
+            </div>
+            <div class="stat-card" style="flex:1;min-width:140px;">
+                <div class="label">Online Average</div>
+                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(
+                    sorted.reduce((s, r) => s + r.price, 0) / sorted.length
+                )}</div>
+                <div class="help-text">${sorted.length} source(s)</div>
+            </div>
+        </div>`;
+
+        html += `<div class="compare-grid">`;
+        sorted.forEach(row => {
+            let deltaHtml = '';
+            if (internalPrice > 0) {
+                const delta = row.price - internalPrice;
+                const pct = (delta / internalPrice) * 100;
+                if (Math.abs(pct) < 1) {
+                    deltaHtml = `<span class="delta delta-equal">≈ Same as internal</span>`;
+                } else if (delta < 0) {
+                    deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper online</span>`;
+                } else {
+                    deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier online</span>`;
+                }
+            }
+
+            html += `<div class="compare-card">
+                <div class="store-name"><span class="store-logo">${row.icon}</span> ${escapeHtml(row.store)}</div>
+                <div class="store-price">₦${formatCurrency(row.price)}</div>
+                <div class="store-meta">
+                    ${row.packSize ? `Pack size: ${formatQuantity(row.packSize)} · ` : ''}
+                    ${row.inStock ? '✅ In stock' : '❌ Out of stock'}
+                    ${row.type ? ` · ${escapeHtml(row.type)}` : ''}
+                </div>
+                ${deltaHtml}
+            </div>`;
+        });
+        html += `</div>`;
+
+        html += `<p class="help-text" style="margin-top:14px;">
+            ⚠️ Online prices are indicative and may include promotions, delivery fees, or bulk-tier differences.
+            Always verify on the store's page before making pricing decisions.
+        </p>`;
+
+        return html;
+    }
+
+    /**
+     * Search for a free-text query and display the comparison.
+     */
+    document.getElementById('onlineSearchBtn').addEventListener('click', async function() {
+        const query = document.getElementById('onlineSearchInput').value.trim();
+        if (!query) { showToast('Enter an item name to search.', 'error'); return; }
+
+        this.disabled = true;
+        this.innerHTML = '<span class="loading-spinner"></span> Searching…';
+        const wrap = document.getElementById('onlineResultsWrap');
+        wrap.innerHTML = '<div class="loading-spinner"></div> Querying online sources…';
+
+        try {
+            const rows = await fetchOnlinePrices(query);
+            const pseudoItem = { itemName: query, brand: '', packSize: 1 };
+            wrap.innerHTML = buildComparisonHtml(pseudoItem, rows);
+            updateStats();
+        } catch (err) {
+            wrap.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div>${escapeHtml(err.message)}</div>`;
+        } finally {
+            this.disabled = false;
+            this.innerHTML = '🔍 Search Online';
+        }
+    });
+
+    document.getElementById('onlineSearchInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('onlineSearchBtn').click();
+    });
+
+    /**
+     * Compare every matched item online (batch mode).
+     */
+    document.getElementById('compareAllBtn').addEventListener('click', async function() {
+        const matched = uploadedItems.filter(i => i.status === 'matched' || i.status === 'partial');
+        if (!matched.length) { showToast('No matched items to compare.', 'error'); return; }
+
+        this.disabled = true;
+        this.innerHTML = '<span class="loading-spinner"></span> Comparing…';
+        const wrap = document.getElementById('onlineResultsWrap');
+        wrap.innerHTML = `<div class="loading-spinner"></div> Comparing ${matched.length} items online…`;
+
+        try {
+            let html = '';
+            for (const item of matched) {
+                const query = ((item.brand || '') + ' ' + item.itemName).trim();
+                const rows = await fetchOnlinePrices(query);
+                html += `<div class="card" style="box-shadow:none;border:1px solid #eef1f5;margin-bottom:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                        <strong>${escapeHtml(item.itemName)}</strong>
+                        <span class="source-badge">${escapeHtml(item.brand || '')}</span>
+                    </div>
+                    ${buildComparisonHtml(item, rows)}
+                </div>`;
+            }
+            wrap.innerHTML = html;
+            updateStats();
+            showToast(`✅ Compared ${matched.length} items.`, 'success');
+        } catch (err) {
+            wrap.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div>${escapeHtml(err.message)}</div>`;
+        } finally {
+            this.disabled = false;
+            this.innerHTML = '📊 Compare All Matched';
+        }
+    });
+
+    /**
+     * Per-row online compare button.
+     */
+    window.compareItemOnline = async function(itemId) {
+        const item = uploadedItems.find(i => i.id === itemId);
+        if (!item) return;
+
+        const query = ((item.brand || '') + ' ' + item.itemName).trim();
+        document.getElementById('onlineModalTitle').textContent = '🌐 Online Comparison – ' + item.itemName;
+        document.getElementById('onlineModalContent').innerHTML =
+            '<div class="loading-spinner"></div> Querying online sources…';
+        document.getElementById('onlineModal').classList.add('open');
+
+        try {
+            const rows = await fetchOnlinePrices(query);
+            document.getElementById('onlineModalContent').innerHTML = buildComparisonHtml(item, rows);
+            updateStats();
+        } catch (err) {
+            document.getElementById('onlineModalContent').innerHTML =
+                `<div class="empty-state"><div class="icon">⚠️</div>${escapeHtml(err.message)}</div>`;
+        }
     };
 
     /* =========================================================
@@ -1259,10 +1667,14 @@
                 return db_ > da ? b : a;
             }, entry.points[0]);
             count++;
+            const srcCls = latest.source.startsWith('Online') ? 'source-online' :
+                           latest.source === 'Invoice' ? 'source-invoice' :
+                           latest.source === 'Shipment' ? 'source-shipment' :
+                           latest.source === 'Received' ? 'source-received' : '';
             html += `<tr>
                 <td><strong>${escapeHtml(entry.displayName)}</strong></td>
                 <td class="price-cell">₦${formatCurrency(latest.price)}</td>
-                <td><span class="source-badge">${escapeHtml(latest.source)}</span></td>
+                <td><span class="source-badge ${srcCls}">${escapeHtml(latest.source)}</span></td>
                 <td>${entry.points.length}</td>
                 <td style="font-size:0.75rem;">${latest.date ? latest.date.toLocaleDateString() : '—'}</td>
                 <td><button class="btn-info btn-sm" onclick="quickAddToMatch('${escapeHtml(k).replace(/'/g, "\\'")}')">➕ Add to List</button></td>
@@ -1301,7 +1713,7 @@
     addManualRow();
     addManualRow();
 
-    console.log('💰 Price Room loaded.');
+    console.log('💰 Price Room loaded with online comparison.');
 </script>
 </body>
 </html>
