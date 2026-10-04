@@ -11,6 +11,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <!-- Barcode scanning library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', -apple-system, sans-serif; }
         body { background: #f0f2f5; margin: 0; padding: 12px; }
@@ -37,10 +39,13 @@
         .btn-info { background: #3498db; color: white; }
         .btn-sm { padding: 4px 12px; font-size: 0.8rem; }
         .btn-secondary { background: #8e44ad; color: white; }
+        .btn-barcode { background: #16a085; color: white; padding: 6px 12px; font-size: 0.75rem; }
         .item-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; padding: 8px; background: #f8f9fa; border-radius: 16px; border-left: 3px solid #0a3d62; }
         .item-row select, .item-row input { flex: 1; margin: 0; min-width: 70px; }
         .item-row .item-checkbox { flex: 0 0 30px; }
         .item-row .removeItem { background: #e74c3c; color: white; width: auto; padding: 8px 12px; border-radius: 40px; border: none; cursor: pointer; }
+        .item-row .scanBarcodeBtn { background: #16a085; color: white; width: auto; padding: 8px 12px; border-radius: 40px; border: none; cursor: pointer; font-size: 0.8rem; white-space: nowrap; }
+        .item-row .itemBarcode { flex: 0.9; min-width: 100px; font-family: monospace; font-size: 0.8rem; background: #f0fdf9; border-color: #16a085; }
         .cost-summary { background: #e8f0fe; padding: 12px; border-radius: 20px; margin: 12px 0; text-align: center; font-weight: bold; word-wrap: break-word; }
         .flex-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .flex-row > * { flex: 1; }
@@ -53,6 +58,7 @@
         .submitted-badge { background: #f39c12; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .approved-badge { background: #27ae60; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
         .resolved-badge { background: #2ecc71; color: white; padding: 2px 10px; border-radius: 20px; font-size: 0.7rem; white-space: nowrap; }
+        .barcode-badge { background: #16a085; color: white; padding: 2px 8px; border-radius: 20px; font-size: 0.65rem; font-family: monospace; white-space: nowrap; }
         .scroll { overflow-x: auto; }
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 24px; border-radius: 24px; max-width: 1000px; width: 95%; max-height: 90vh; overflow-y: auto; }
@@ -89,6 +95,12 @@
             font-weight: bold;
             font-size: 1.1rem;
             background-color: #d4e2f0;
+        }
+        .invoice-table .barcode-cell {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #16a085;
+            font-weight: 600;
         }
         .invoice-header {
             text-align: center;
@@ -148,6 +160,7 @@
         .toast.show { opacity: 1; }
         .toast.success { background: #27ae60; }
         .toast.error { background: #e74c3c; }
+        .toast.info { background: #16a085; }
         .ack-signature { border: 1px solid #ccc; padding: 12px; border-radius: 16px; background: #f9f9f9; margin: 12px 0; }
         .ack-signature textarea { width: 100%; border-radius: 12px; padding: 8px; border: 1px solid #ccc; }
         .ack-login-step { border-left: 4px solid #3498db; padding-left: 16px; margin: 12px 0; }
@@ -163,6 +176,11 @@
         .reconcile-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
         .reconcile-actions button { flex: 1; }
         #loadMoreBtn { margin: 16px auto; display: block; width: 200px; }
+        /* Barcode scanner styles */
+        #barcodeReader { width: 100%; max-width: 500px; margin: 0 auto; border-radius: 16px; overflow: hidden; background: #000; }
+        .barcode-scanner-hint { font-size: 0.85rem; color: #555; text-align: center; margin: 8px 0; }
+        .barcode-result-box { background: #f0fdf9; padding: 12px; border-radius: 12px; text-align: center; font-family: monospace; font-size: 1.1rem; color: #0a3d62; border: 2px dashed #16a085; margin-top: 12px; }
+        .barcode-target-label { font-size: 0.8rem; color: #16a085; font-weight: 600; text-align: center; margin-bottom: 8px; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } .vendor-field { flex-direction: column; } }
     </style>
 </head>
@@ -179,6 +197,7 @@
             <a href="warehouse.html">🏚️ Warehouse</a>
             <a href="permissions.html">🔐 Permissions</a>
             <a href="goods-expected.html">📦 Goods Expected</a>
+            <a href="priceroom.html">price room</a>
             <button class="settings-btn" onclick="openSettingsModal()">⚙️ Settings</button>
             <button id="logoutBtn" class="logout-btn">🚪 Logout</button>
         </div>
@@ -221,7 +240,7 @@
                     </select>
                     <input type="text" id="invoiceNotes" placeholder="Notes (optional)">
                 </div>
-                <label>Items:</label>
+                <label>Items: <span class="search-hint">📷 Use the green scanner button on any row to attach a barcode (optional)</span></label>
                 <div id="invoiceItemsContainer"></div>
 
                 <!-- Bulk Actions -->
@@ -229,6 +248,7 @@
                     <button type="button" id="addItemBtn" class="btn-success">+ Add Product</button>
                     <button type="button" id="importExcelBtn" class="btn-info">📂 Import Excel</button>
                     <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv,.json" style="display:none;">
+                    <button type="button" id="scanBarcodeBulkBtn" class="btn-barcode">📷 Scan Barcode (Quick Add)</button>
                     <button type="button" id="applyToSelectedBtn" class="btn-warning">📋 Apply to Selected</button>
                     <button type="button" id="applyToAllBtn" class="btn-primary">📋 Apply to All</button>
                     <button type="button" id="clearTaxesBtn" class="btn-danger">🧹 Clear Taxes</button>
@@ -411,6 +431,28 @@
     </div>
 </div>
 
+<!-- ========== BARCODE SCANNER MODAL ========== -->
+<div id="barcodeScanModal" class="modal">
+    <div class="modal-content" style="max-width: 560px;">
+        <span class="close" onclick="closeBarcodeScanner()">&times;</span>
+        <h3>📷 Scan Product Barcode</h3>
+        <p class="barcode-target-label" id="barcodeTargetLabel">Scanning will attach barcode to item row</p>
+        <div id="barcodeReader"></div>
+        <div class="barcode-scanner-hint">
+            Point the camera at a barcode (EAN-13, UPC, Code-128, etc.). Scanning is optional — you can also type the barcode manually below.
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+            <input type="text" id="manualBarcodeInput" placeholder="Or type barcode manually…" style="flex:2; font-family:monospace;">
+            <button type="button" class="btn-success" onclick="applyManualBarcode()" style="flex:1;">Apply</button>
+        </div>
+        <div class="barcode-result-box" id="barcodeResultBox" style="display:none;"></div>
+        <div id="barcodeScannerMessage" style="color:red; margin-top:8px; text-align:center;"></div>
+        <div style="display:flex; gap:12px; margin-top:12px;">
+            <button type="button" class="btn-danger" onclick="closeBarcodeScanner()" style="flex:1;">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Acknowledgment Login Modal (two-step) -->
 <div id="ackLoginModal" class="modal">
     <div class="modal-content">
@@ -586,6 +628,11 @@
     let currentSearch = '';
     let invoiceDocsCache = [];
 
+    // Barcode scanner state
+    let html5QrCode = null;          // active Html5Qrcode instance
+    let barcodeTargetRowId = null;   // which item row will receive the scan
+    let barcodeScannerActive = false;
+
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
     const addItemBtn = document.getElementById('addItemBtn');
@@ -618,6 +665,30 @@
         const div = document.createElement('div');
         div.textContent = String(text);
         return div.innerHTML;
+    }
+
+    /**
+     * Format a numeric value with digit grouping (thousands separators)
+     * and exactly 2 decimal places.
+     * e.g. 1234567.5 -> "1,234,567.50"
+     */
+    function formatCurrency(num) {
+        const n = parseFloat(num);
+        if (isNaN(n)) return '0.00';
+        return n.toLocaleString('en-NG', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    }
+
+    /**
+     * Format an integer quantity with digit grouping.
+     * e.g. 12345 -> "12,345"
+     */
+    function formatQuantity(num) {
+        const n = parseFloat(num);
+        if (isNaN(n)) return '0';
+        return n.toLocaleString('en-NG');
     }
 
     function showToast(message, type = 'info', duration = 3000) {
@@ -685,12 +756,176 @@
 
     window.onclick = function(event) {
         if (event.target.classList.contains('modal')) {
-            closeModal(event.target.id);
+            if (event.target.id === 'barcodeScanModal') {
+                closeBarcodeScanner();
+            } else {
+                closeModal(event.target.id);
+            }
         }
     };
 
+    // ==================== Barcode Scanner ====================
+    /**
+     * Open the barcode scanner for a specific item row.
+     * Barcode scanning is entirely OPTIONAL — the user may simply close the modal.
+     */
+    function openBarcodeScannerForRow(rowId) {
+        barcodeTargetRowId = rowId;
+        const row = document.querySelector(`.item-row[data-row-id="${rowId}"]`);
+        const itemName = row ? (row.querySelector('.itemName')?.value || '(unnamed item)') : '(unknown)';
+        document.getElementById('barcodeTargetLabel').textContent = 'Scanning for: ' + itemName;
+        document.getElementById('barcodeScannerMessage').textContent = '';
+        document.getElementById('barcodeResultBox').style.display = 'none';
+        document.getElementById('barcodeResultBox').textContent = '';
+        document.getElementById('manualBarcodeInput').value = '';
+        document.getElementById('barcodeScanModal').style.display = 'flex';
+
+        // Start the scanner
+        startBarcodeScanner();
+    }
+    window.openBarcodeScannerForRow = openBarcodeScannerForRow;
+
+    /**
+     * Start html5-qrcode scanner targeting the #barcodeReader element.
+     * Falls back gracefully if the library or camera is unavailable.
+     */
+    function startBarcodeScanner() {
+        if (typeof Html5Qrcode === 'undefined') {
+            document.getElementById('barcodeScannerMessage').textContent =
+                '⚠️ Barcode library not loaded. You can still type the barcode manually below.';
+            return;
+        }
+
+        // If an instance already exists, clear it
+        if (html5QrCode) {
+            try { html5QrCode.clear(); } catch (e) { /* ignore */ }
+            html5QrCode = null;
+        }
+
+        html5QrCode = new Html5Qrcode("barcodeReader", { verbose: false });
+
+        const config = {
+            fps: 12,
+            qrbox: { width: 260, height: 160 },
+            aspectRatio: 1.5,
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        };
+
+        html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText, decodedResult) => {
+                // Successful scan
+                onBarcodeScanned(decodedText, decodedResult);
+            },
+            (errorMessage) => {
+                // Per-frame decode errors are normal — do not spam the UI
+            }
+        ).then(() => {
+            barcodeScannerActive = true;
+        }).catch(err => {
+            console.warn('Camera start failed:', err);
+            document.getElementById('barcodeScannerMessage').textContent =
+                '⚠️ Camera unavailable: ' + (err.message || err) + '. You can type the barcode manually below.';
+            barcodeScannerActive = false;
+        });
+    }
+
+    /**
+     * Called when a barcode is successfully decoded.
+     */
+    function onBarcodeScanned(code, result) {
+        const resultBox = document.getElementById('barcodeResultBox');
+        resultBox.textContent = '✅ Detected: ' + code;
+        resultBox.style.display = 'block';
+
+        // Auto-apply and close after a short delay so the user sees confirmation
+        setTimeout(() => {
+            applyBarcodeToTargetRow(code);
+            stopBarcodeScanner();
+            closeBarcodeScanner();
+            showToast('✅ Barcode applied: ' + code, 'success');
+        }, 500);
+    }
+
+    /**
+     * Apply a barcode to the target row's input field.
+     */
+    function applyBarcodeToTargetRow(code) {
+        if (!barcodeTargetRowId) return;
+        const row = document.querySelector(`.item-row[data-row-id="${barcodeTargetRowId}"]`);
+        if (!row) return;
+        const input = row.querySelector('.itemBarcode');
+        if (input) {
+            input.value = code;
+            // Trigger any change listeners (for potential future features)
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    /**
+     * Apply the manually typed barcode.
+     */
+    window.applyManualBarcode = function() {
+        const code = document.getElementById('manualBarcodeInput').value.trim();
+        if (!code) {
+            document.getElementById('barcodeScannerMessage').textContent = 'Please type a barcode first.';
+            return;
+        }
+        applyBarcodeToTargetRow(code);
+        stopBarcodeScanner();
+        closeBarcodeScanner();
+        showToast('✅ Barcode applied: ' + code, 'success');
+    };
+
+    /**
+     * Stop the underlying scanner if active. Safe to call multiple times.
+     */
+    function stopBarcodeScanner() {
+        if (!html5QrCode) return;
+        const instance = html5QrCode;
+        html5QrCode = null;
+        try {
+            if (barcodeScannerActive) {
+                instance.stop().then(() => {
+                    try { instance.clear(); } catch (e) { /* ignore */ }
+                }).catch(err => {
+                    console.warn('Scanner stop error:', err);
+                });
+            } else {
+                try { instance.clear(); } catch (e) { /* ignore */ }
+            }
+        } catch (e) { /* ignore */ }
+        barcodeScannerActive = false;
+    }
+
+    /**
+     * Close the barcode modal and stop the scanner.
+     */
+    function closeBarcodeScanner() {
+        stopBarcodeScanner();
+        document.getElementById('barcodeScanModal').style.display = 'none';
+        barcodeTargetRowId = null;
+    }
+    window.closeBarcodeScanner = closeBarcodeScanner;
+
+    /**
+     * Bulk scan: opens scanner to create a NEW item row with the scanned barcode.
+     * Useful for quick data entry — scan a barcode, and a new empty row appears with it.
+     */
+    document.getElementById('scanBarcodeBulkBtn').addEventListener('click', () => {
+        // Create a new blank row and target it
+        addItemRow();
+        const rows = document.querySelectorAll('.item-row');
+        const lastRow = rows[rows.length - 1];
+        if (lastRow) {
+            openBarcodeScannerForRow(lastRow.dataset.rowId);
+        }
+    });
+
     // ==================== Items Management (Main) ====================
-    function addItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
+    function addItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0, barcode = '') {
         const rowId = ++itemRowCounter;
         const div = document.createElement('div');
         div.className = 'item-row';
@@ -698,6 +933,8 @@
         div.innerHTML = `
             <input type="checkbox" class="item-checkbox" data-row-id="${rowId}" style="width:auto; margin:0 4px;">
             <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:2;" required>
+            <input type="text" placeholder="Barcode" class="itemBarcode" value="${escapeHtml(barcode)}" title="Optional barcode">
+            <button type="button" class="scanBarcodeBtn" onclick="openBarcodeScannerForRow('${rowId}')" title="Scan barcode">📷 Scan</button>
             <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" style="flex:0.8;" min="0" step="1">
             <input type="number" placeholder="Unit Price" class="itemPrice" value="${Math.max(0, price)}" style="flex:1;" min="0" step="0.01">
             <div class="item-tax-fields">
@@ -739,6 +976,7 @@
 
         document.querySelectorAll(`#${containerId} .item-row`).forEach(row => {
             const name = row.querySelector('.itemName').value.trim();
+            const barcode = (row.querySelector('.itemBarcode')?.value || '').trim();
             const qty = validateNumber(row.querySelector('.itemQty').value, 0) || 0;
             const price = validateNumber(row.querySelector('.itemPrice').value, 0) || 0;
             const discPct = validateNumber(row.querySelector('.itemDiscPct').value, 0, 100) || 0;
@@ -761,6 +999,7 @@
                 grandTotal += itemTotal;
                 items.push({
                     name: name,
+                    barcode: barcode,
                     qty: qty,
                     originalPrice: price,
                     updatedPrice: updatedPrice,
@@ -782,14 +1021,14 @@
 
     function updateCostPreview() {
         const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal, multiplier } = calculateItemTotals('invoiceItemsContainer');
-        document.getElementById('invoiceCostPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('invoiceCostPreview').textContent = `Total: ₦${formatCurrency(grandTotal)}`;
         document.getElementById('taxBreakdown').innerHTML = `
-            Subtotal: ₦${subtotal.toLocaleString()} | 
-            Discount: ₦${totalDisc.toLocaleString()} | 
-            VAT: ₦${totalVAT.toLocaleString()} | 
-            WHT: ₦${totalWHT.toLocaleString()} | 
+            Subtotal: ₦${formatCurrency(subtotal)} | 
+            Discount: ₦${formatCurrency(totalDisc)} | 
+            VAT: ₦${formatCurrency(totalVAT)} | 
+            WHT: ₦${formatCurrency(totalWHT)} | 
             Transport Multiplier: ${multiplier.toFixed(2)} |
-            <strong>Grand Total: ₦${grandTotal.toLocaleString()}</strong>
+            <strong>Grand Total: ₦${formatCurrency(grandTotal)}</strong>
         `;
     }
 
@@ -1025,10 +1264,12 @@
                     const itemVariations = ['item', 'product', 'product name', 'item name', 'description', 'description of goods', 'goods', 'name', 'particulars', 'details'];
                     const qtyVariations = ['quantity', 'qty', 'count', 'units', 'number', 'unit', 'qty ordered'];
                     const priceVariations = ['unit price', 'price', 'rate', 'cost', 'unit cost', 'price per unit', 'unit rate', 'cost per unit'];
+                    const barcodeVariations = ['barcode', 'bar code', 'ean', 'upc', 'sku'];
 
                     let itemCol = findColumnExact(itemVariations) || findColumnFuzzy(itemVariations);
                     let qtyCol = findColumnExact(qtyVariations) || findColumnFuzzy(qtyVariations);
                     let priceCol = findColumnExact(priceVariations) || findColumnFuzzy(priceVariations);
+                    let barcodeCol = findColumnExact(barcodeVariations) || findColumnFuzzy(barcodeVariations);
 
                     if (!itemCol || !qtyCol || !priceCol) {
                         formMessage.textContent = `⚠️ Could not detect required columns. Found: ${headers.join(', ')}. Expected: 'Item', 'Quantity', 'Price' (or similar).`;
@@ -1042,7 +1283,8 @@
                         const name = String(row[itemCol] || '').trim();
                         const qty = parseFloat(clean(row[qtyCol])) || 0;
                         const price = parseFloat(clean(row[priceCol])) || 0;
-                        return { itemName: name, quantity: qty, unitPrice: price };
+                        const barcode = barcodeCol ? String(row[barcodeCol] || '').trim() : '';
+                        return { itemName: name, quantity: qty, unitPrice: price, barcode: barcode };
                     }).filter(it => it.itemName && it.quantity > 0);
                 }
 
@@ -1053,9 +1295,9 @@
 
                 importedItems = rows;
                 let previewHtml = `<p><strong>✅ Imported ${rows.length} items:</strong></p>
-                    <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>`;
+                    <div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Barcode</th></tr>`;
                 rows.forEach(it => {
-                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${it.unitPrice.toFixed(2)}</td></tr>`;
+                    previewHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${formatQuantity(it.quantity)}</td><td>₦${formatCurrency(it.unitPrice)}</td><td>${it.barcode ? `<span class="barcode-badge">${escapeHtml(it.barcode)}</span>` : '—'}</td></tr>`;
                 });
                 previewHtml += `</table></div>
                     <div style="display:flex; gap:8px; margin-top:8px;">
@@ -1081,7 +1323,7 @@
         invoiceItemsContainer.innerHTML = '';
         itemRowCounter = 0;
         importedItems.forEach(it => {
-            addItemRow(it.itemName, it.quantity, it.unitPrice);
+            addItemRow(it.itemName, it.quantity, it.unitPrice, 0, 0, 0, 0, it.barcode || '');
         });
         importPreviewContainer.style.display = 'none';
         importPreviewContainer.innerHTML = '';
@@ -1138,6 +1380,7 @@
                     grand += total;
                     itemsArr.push({
                         name: it.itemName,
+                        barcode: it.barcode || '',
                         qty: it.quantity,
                         originalPrice: it.originalPrice || it.unitPrice || 0,
                         updatedPrice: it.updatedPrice || it.unitPrice || 0,
@@ -1190,24 +1433,24 @@
         let itemsHtml = '';
         items.forEach(it => {
             itemsHtml += `<tr>
-                <td>${escapeHtml(it.name)}</td>
-                <td>${it.qty}</td>
-                <td>₦${it.originalPrice.toFixed(2)}</td>
-                <td>₦${it.updatedPrice.toFixed(2)}</td>
+                <td>${escapeHtml(it.name)}${it.barcode ? `<br><span class="barcode-cell">📊 ${escapeHtml(it.barcode)}</span>` : ''}</td>
+                <td>${formatQuantity(it.qty)}</td>
+                <td>₦${formatCurrency(it.originalPrice)}</td>
+                <td>₦${formatCurrency(it.updatedPrice)}</td>
                 <td>${it.discPct}%</td>
-                <td>₦${it.discAmt.toFixed(2)}</td>
+                <td>₦${formatCurrency(it.discAmt)}</td>
                 <td>${it.vatPct}%</td>
-                <td>₦${it.itemVAT.toFixed(2)}</td>
-                <td>₦${it.total.toFixed(2)}</td>
+                <td>₦${formatCurrency(it.itemVAT)}</td>
+                <td>₦${formatCurrency(it.total)}</td>
             </tr>`;
         });
 
         const totalsHtml = `
-            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${subtotal.toFixed(2)}</strong></td></tr>
-            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${totalDisc.toFixed(2)}</strong></td></tr>
-            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${totalVAT.toFixed(2)}</strong></td></tr>
-            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${totalWHT.toFixed(2)}</strong></td></tr>
-            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${grandTotal.toFixed(2)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Subtotal</strong></td><td><strong>₦${formatCurrency(subtotal)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total Discount</strong></td><td><strong>-₦${formatCurrency(totalDisc)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total VAT</strong></td><td><strong>₦${formatCurrency(totalVAT)}</strong></td></tr>
+            <tr class="totals"><td colspan="8"><strong>Total WHT</strong></td><td><strong>-₦${formatCurrency(totalWHT)}</strong></td></tr>
+            <tr class="grand-total"><td colspan="8"><strong>Grand Total</strong></td><td><strong>₦${formatCurrency(grandTotal)}</strong></td></tr>
         `;
 
         let ackFootnote = '';
@@ -1257,6 +1500,12 @@
                     font-weight: bold;
                     font-size: 1.1rem;
                     background-color: #d4e2f0;
+                }
+                .invoice-table .barcode-cell {
+                    font-family: monospace;
+                    font-size: 0.75rem;
+                    color: #16a085;
+                    font-weight: 600;
                 }
                 .invoice-header {
                     text-align: center;
@@ -1389,6 +1638,7 @@
 
             const savedItems = items.map(it => ({
                 itemName: it.name,
+                barcode: it.barcode || '',
                 quantity: it.qty,
                 originalPrice: it.originalPrice,
                 updatedPrice: it.updatedPrice,
@@ -1505,16 +1755,16 @@
         }
         try {
             const rows = [
-                ['Item', 'Qty', 'Original Price', 'Adjusted Price', 'Disc %', 'Disc ₦', 'VAT %', 'VAT ₦', 'Total']
+                ['Item', 'Barcode', 'Qty', 'Original Price', 'Adjusted Price', 'Disc %', 'Disc ₦', 'VAT %', 'VAT ₦', 'Total']
             ];
             items.forEach(it => {
-                rows.push([it.name, it.qty, it.originalPrice, it.updatedPrice, it.discPct, it.discAmt, it.vatPct, it.itemVAT, it.total]);
+                rows.push([it.name, it.barcode || '', it.qty, it.originalPrice, it.updatedPrice, it.discPct, it.discAmt, it.vatPct, it.itemVAT, it.total]);
             });
-            rows.push(['Subtotal', '', '', '', '', '', '', '', subtotal]);
-            rows.push(['Total Discount', '', '', '', '', '', '', '', totalDisc]);
-            rows.push(['Total VAT', '', '', '', '', '', '', '', totalVAT]);
-            rows.push(['Total WHT', '', '', '', '', '', '', '', totalWHT]);
-            rows.push(['Grand Total', '', '', '', '', '', '', '', grandTotal]);
+            rows.push(['Subtotal', '', '', '', '', '', '', '', '', subtotal]);
+            rows.push(['Total Discount', '', '', '', '', '', '', '', '', totalDisc]);
+            rows.push(['Total VAT', '', '', '', '', '', '', '', '', totalVAT]);
+            rows.push(['Total WHT', '', '', '', '', '', '', '', '', totalWHT]);
+            rows.push(['Grand Total', '', '', '', '', '', '', '', '', grandTotal]);
 
             const csvContent = rows.map(row => row.join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1648,6 +1898,10 @@
                             match = true;
                             break;
                         }
+                        if (item.barcode && item.barcode.toLowerCase().includes(search)) {
+                            match = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -1659,14 +1913,17 @@
             const ackStatus = d.acknowledged ? `<span class="ack-badge">✅ Acknowledged</span>` : `<span class="badge">⏳ Pending</span>`;
             let receivedStatus = '<span class="badge">Not Received</span>';
 
+            // Count items with barcodes
+            const barcodeCount = d.items ? d.items.filter(i => i.barcode).length : 0;
+
             html += `<tr>
                 <td><strong>${escapeHtml(d.invoiceNumber || 'N/A')}</strong></td>
                 <td>${escapeHtml(d.date || '')}</td>
                 <td>${escapeHtml(d.customer || 'N/A')}</td>
                 <td>${escapeHtml(d.vendor || '')}</td>
                 <td>${escapeHtml(d.branch || 'N/A')}</td>
-                <td class="items-cell">${escapeHtml(itemsShort)}</td>
-                <td class="cost-cell">₦${total.toLocaleString()}</td>
+                <td class="items-cell">${escapeHtml(itemsShort)}${barcodeCount > 0 ? `<br><span class="barcode-badge">📊 ${barcodeCount} barcode(s)</span>` : ''}</td>
+                <td class="cost-cell">₦${formatCurrency(total)}</td>
                 <td>
                     ${moved ? '<span class="moved-badge">✅ Moved to WH</span>' : '<span class="badge">Pending</span>'}
                     ${ackStatus}
@@ -1776,7 +2033,7 @@
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             const d = doc.data();
             const rows = [
-                ['Item','Qty','Original Price','Adjusted Price','Disc %','Disc ₦','VAT %','VAT ₦','Total'],
+                ['Item','Barcode','Qty','Original Price','Adjusted Price','Disc %','Disc ₦','VAT %','VAT ₦','Total'],
                 ['Acknowledged','Acknowledged By','Signature','Timestamp']
             ];
             let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
@@ -1792,6 +2049,7 @@
                     const adjPrice = it.updatedPrice || origPrice;
                     rows.push([
                         it.itemName,
+                        it.barcode || '',
                         it.quantity,
                         origPrice,
                         adjPrice,
@@ -1803,11 +2061,11 @@
                     ]);
                 });
             }
-            rows.push(['Subtotal','','','','','','','',subtotal]);
-            rows.push(['Total Discount','','','','','','','',totalDisc]);
-            rows.push(['Total VAT','','','','','','','',totalVAT]);
-            rows.push(['Total WHT','','','','','','','',totalWHT]);
-            rows.push(['Grand Total','','','','','','','',d.total || grandTotal]);
+            rows.push(['Subtotal','','','','','','','','',subtotal]);
+            rows.push(['Total Discount','','','','','','','','',totalDisc]);
+            rows.push(['Total VAT','','','','','','','','',totalVAT]);
+            rows.push(['Total WHT','','','','','','','','',totalWHT]);
+            rows.push(['Grand Total','','','','','','','','',d.total || grandTotal]);
             const ackStatus = d.acknowledged ? 'Yes' : 'No';
             const ackBy = d.acknowledgedBy || '';
             const ackSig = d.ackSignature || '';
@@ -1890,7 +2148,7 @@
             currentInvoiceData = d;
             document.getElementById('ackLoginInvoiceNumber').textContent = d.invoiceNumber;
             document.getElementById('ackLoginCustomer').textContent = d.customer || 'N/A';
-            document.getElementById('ackLoginTotal').textContent = (d.total || 0).toLocaleString();
+            document.getElementById('ackLoginTotal').textContent = formatCurrency(d.total || 0);
             document.getElementById('ackLoginStep1').style.display = 'block';
             document.getElementById('ackLoginStep2').style.display = 'none';
             document.getElementById('ackCurrentPassword').value = '';
@@ -1919,8 +2177,8 @@
             <tr><th style="text-align:left;">Item</th><th style="text-align:center;">Ordered</th><th style="text-align:center;">Received</th></tr>`;
         invoiceData.items.forEach((item, index) => {
             html += `<tr>
-                <td>${escapeHtml(item.itemName)}</td>
-                <td style="text-align:center;">${item.quantity}</td>
+                <td>${escapeHtml(item.itemName)}${item.barcode ? `<br><span class="barcode-badge">📊 ${escapeHtml(item.barcode)}</span>` : ''}</td>
+                <td style="text-align:center;">${formatQuantity(item.quantity)}</td>
                 <td style="text-align:center;">
                     <input type="number" class="received-qty" data-index="${index}" value="${item.quantity}" min="0" max="${item.quantity}" style="width:60px; padding:4px; border-radius:20px; border:1px solid #ccc; text-align:center;">
                 </td>
@@ -1993,6 +2251,7 @@
                 if (receivedQty > 0) allZero = false;
                 receivedItems.push({
                     itemName: item.itemName,
+                    barcode: item.barcode || '',
                     orderedQty: item.quantity,
                     receivedQty: receivedQty,
                     unitPrice: item.unitPrice || 0,
@@ -2126,8 +2385,8 @@
                             <td>${escapeHtml(d.receivingOfficer || '')}</td>
                             <td>${date}</td>
                             <td>${itemsCount} item(s)</td>
-                            <td>₦${originalTotal.toLocaleString()}</td>
-                            <td>₦${receivedTotal.toLocaleString()}</td>
+                            <td>₦${formatCurrency(originalTotal)}</td>
+                            <td>₦${formatCurrency(receivedTotal)}</td>
                             <td>${status}</td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="viewReceivedClaim('${doc.id}')">👁️</button>
@@ -2153,15 +2412,16 @@
             const doc = await db.collection('goodsReceived').doc(id).get();
             if (!doc.exists) { showToast('Claim not found.', 'error'); return; }
             const d = doc.data();
-            let itemsHtml = '<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;"><tr><th>Item</th><th>Ordered</th><th>Received</th><th>Unit Price</th><th>Total</th></tr>';
+            let itemsHtml = '<table style="width:100%; border-collapse:collapse; border:1px solid #ddd;"><tr><th>Item</th><th>Barcode</th><th>Ordered</th><th>Received</th><th>Unit Price</th><th>Total</th></tr>';
             if (d.receivedItems) {
                 d.receivedItems.forEach(it => {
                     itemsHtml += `<tr>
                         <td>${escapeHtml(it.itemName)}</td>
-                        <td>${it.orderedQty}</td>
-                        <td>${it.receivedQty}</td>
-                        <td>₦${(it.unitPrice||0).toFixed(2)}</td>
-                        <td>₦${(it.total||0).toFixed(2)}</td>
+                        <td>${it.barcode ? `<span class="barcode-badge">${escapeHtml(it.barcode)}</span>` : '—'}</td>
+                        <td>${formatQuantity(it.orderedQty)}</td>
+                        <td>${formatQuantity(it.receivedQty)}</td>
+                        <td>₦${formatCurrency(it.unitPrice || 0)}</td>
+                        <td>₦${formatCurrency(it.total || 0)}</td>
                     </tr>`;
                 });
             }
@@ -2179,9 +2439,9 @@
                 <p><strong>Signature:</strong> ${escapeHtml(d.officerSignature)}</p>
                 <p><strong>Date:</strong> ${d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : ''}</p>
                 ${d.receivedNotes ? `<p><strong>Notes:</strong> ${escapeHtml(d.receivedNotes)}</p>` : ''}
-                <p><strong>Original Invoice Total:</strong> ₦${originalTotal.toLocaleString()}</p>
-                <p><strong>Total Ordered Value:</strong> ₦${totalOrdered.toLocaleString()}</p>
-                <p><strong>Total Received Value:</strong> ₦${totalReceived.toLocaleString()}</p>
+                <p><strong>Original Invoice Total:</strong> ₦${formatCurrency(originalTotal)}</p>
+                <p><strong>Total Ordered Value:</strong> ₦${formatCurrency(totalOrdered)}</p>
+                <p><strong>Total Received Value:</strong> ₦${formatCurrency(totalReceived)}</p>
                 <h5>Items</h5>
                 ${itemsHtml}
             `;
@@ -2210,7 +2470,7 @@
             document.getElementById('reconcileBranch').textContent = d.branch || 'N/A';
             document.getElementById('reconcileReceivedBy').textContent = d.receivingOfficer || '';
             document.getElementById('reconcileDate').textContent = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
-            document.getElementById('reconcileOriginalTotal').textContent = (d.originalTotal || 0).toLocaleString();
+            document.getElementById('reconcileOriginalTotal').textContent = formatCurrency(d.originalTotal || 0);
 
             // Build editable items table
             const container = document.getElementById('reconcileItemsContainer');
@@ -2237,8 +2497,8 @@
                     const status = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
                     if (shortage > 0) allFullyReceived = false;
                     html += `<tr>
-                        <td>${escapeHtml(item.itemName)}</td>
-                        <td style="text-align:center;">${ordered}</td>
+                        <td>${escapeHtml(item.itemName)}${item.barcode ? `<br><span class="barcode-badge">📊 ${escapeHtml(item.barcode)}</span>` : ''}</td>
+                        <td style="text-align:center;">${formatQuantity(ordered)}</td>
                         <td style="text-align:center;">
                             <input type="number" class="reconcile-received-qty" data-index="${idx}" value="${received}" min="0" max="${ordered}" style="width:80px; padding:4px; border-radius:20px; border:1px solid #ccc; text-align:center;">
                         </td>
@@ -2279,7 +2539,7 @@
             const priceInput = row.querySelector('.reconcile-unit-price');
             const orderedCell = row.cells[1]; // assumes structure: item, ordered, received, price, status
             if (qtyInput && orderedCell) {
-                const ordered = parseFloat(orderedCell.textContent) || 0;
+                const ordered = parseFloat(orderedCell.textContent.replace(/,/g, '')) || 0;
                 const received = parseFloat(qtyInput.value) || 0;
                 const price = parseFloat(priceInput ? priceInput.value : 0) || 0;
                 totalOrdered += ordered * price;
@@ -2295,9 +2555,9 @@
             }
         });
         document.getElementById('reconcileSummary').innerHTML = `
-            Total Ordered: ₦${totalOrdered.toLocaleString()} | 
-            Total Received: ₦${totalReceived.toLocaleString()} | 
-            Shortage: ₦${totalShortage.toLocaleString()}
+            Total Ordered: ₦${formatCurrency(totalOrdered)} | 
+            Total Received: ₦${formatCurrency(totalReceived)} | 
+            Shortage: ₦${formatCurrency(totalShortage)}
         `;
         // Enable/disable buttons
         const completeBtn = document.getElementById('reconcileCompleteBtn');
@@ -2336,7 +2596,7 @@
                 const qtyInput = row.querySelector('.reconcile-received-qty');
                 const priceInput = row.querySelector('.reconcile-unit-price');
                 const itemName = row.cells[0] ? row.cells[0].textContent.trim() : '';
-                const ordered = parseFloat(row.cells[1] ? row.cells[1].textContent : 0) || 0;
+                const ordered = parseFloat(row.cells[1] ? row.cells[1].textContent.replace(/,/g, '') : 0) || 0;
                 let received = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
                 let price = parseFloat(priceInput ? priceInput.value : 0) || 0;
                 // If price is 0, fallback to the original unit price from the claim data
@@ -2347,8 +2607,11 @@
                     }
                 }
                 if (itemName && received > 0 && price > 0) {
+                    // Try to preserve barcode from claim
+                    const originalItem = claimData.receivedItems ? claimData.receivedItems.find(it => it.itemName === itemName) : null;
                     receivedItems.push({
                         itemName: itemName,
+                        barcode: (originalItem && originalItem.barcode) ? originalItem.barcode : '',
                         orderedQty: ordered,
                         receivedQty: received,
                         unitPrice: price,
@@ -2367,6 +2630,7 @@
             // Build new invoice items
             const newItems = receivedItems.map(item => ({
                 itemName: item.itemName,
+                barcode: item.barcode || '',
                 quantity: item.receivedQty,
                 originalPrice: item.unitPrice,
                 updatedPrice: item.unitPrice,
@@ -2517,7 +2781,7 @@
                             <td>${escapeHtml(d.customer || 'N/A')}</td>
                             <td>${escapeHtml(d.destinationBranch || 'N/A')}</td>
                             <td>${escapeHtml(d.date || '')}</td>
-                            <td class="cost-cell">₦${total.toLocaleString()}</td>
+                            <td class="cost-cell">₦${formatCurrency(total)}</td>
                             <td><span class="${statusClass}">${escapeHtml(d.status)}</span></td>
                             <td>
                                 <button class="btn-sm btn-primary" onclick="openApproveModal('${doc.id}')">👁️ View/Edit</button>
@@ -2560,10 +2824,10 @@
             approveItemRowCounter = 0;
             if (d.items && d.items.length > 0) {
                 d.items.forEach(item => {
-                    addApproveItemRow(item.itemName, item.orderedQty, item.unitPrice, item.discountPercent || 0, item.discountAmount || 0, item.vatPercent || 0, item.whtPercent || 0);
+                    addApproveItemRow(item.itemName, item.orderedQty, item.unitPrice, item.discountPercent || 0, item.discountAmount || 0, item.vatPercent || 0, item.whtPercent || 0, item.barcode || '');
                 });
             } else {
-                addApproveItemRow('', 1, 0, 0, 0, 0, 0);
+                addApproveItemRow('', 1, 0, 0, 0, 0, 0, '');
             }
             updateApprovePreview();
             document.getElementById('approveMessage').textContent = '';
@@ -2573,13 +2837,14 @@
         }
     };
 
-    function addApproveItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0) {
+    function addApproveItemRow(itemName = '', qty = 1, price = 0, discPct = 0, discAmt = 0, vatPct = 0, whtPct = 0, barcode = '') {
         const rowId = ++approveItemRowCounter;
         const div = document.createElement('div');
         div.className = 'item-row';
         div.dataset.rowId = rowId;
         div.innerHTML = `
             <input type="text" placeholder="Item name" class="itemName" value="${escapeHtml(itemName)}" style="flex:2;">
+            <input type="text" placeholder="Barcode" class="itemBarcode" value="${escapeHtml(barcode)}" style="flex:1; font-family:monospace; font-size:0.8rem;">
             <input type="number" placeholder="Qty" class="itemQty" value="${Math.max(0, qty)}" style="flex:0.8;" min="0" step="1">
             <input type="number" placeholder="Unit Price" class="itemPrice" value="${Math.max(0, price)}" style="flex:1;" min="0" step="0.01">
             <div class="item-tax-fields">
@@ -2610,6 +2875,7 @@
         let subtotal = 0, totalDisc = 0, totalVAT = 0, totalWHT = 0, grandTotal = 0;
         document.querySelectorAll('#approveItemsContainer .item-row').forEach(row => {
             const name = row.querySelector('.itemName').value.trim();
+            const barcode = (row.querySelector('.itemBarcode')?.value || '').trim();
             const qty = validateNumber(row.querySelector('.itemQty').value, 0) || 0;
             const price = validateNumber(row.querySelector('.itemPrice').value, 0) || 0;
             const discPct = validateNumber(row.querySelector('.itemDiscPct').value, 0, 100) || 0;
@@ -2631,6 +2897,7 @@
                 grandTotal += itemTotal;
                 items.push({
                     name: name,
+                    barcode: barcode,
                     qty: qty,
                     originalPrice: price,
                     updatedPrice: price,
@@ -2651,7 +2918,7 @@
 
     function updateApprovePreview() {
         const { subtotal, totalDisc, totalVAT, totalWHT, grandTotal } = calculateApproveTotals();
-        document.getElementById('approveCostPreview').textContent = `Total: ₦${grandTotal.toLocaleString()}`;
+        document.getElementById('approveCostPreview').textContent = `Total: ₦${formatCurrency(grandTotal)}`;
     }
 
     document.getElementById('approveConfirmBtn').addEventListener('click', async function() {
@@ -2695,6 +2962,7 @@
                 notes: notes,
                 items: items.map(it => ({
                     itemName: it.name,
+                    barcode: it.barcode || '',
                     orderedQty: it.qty,
                     unitPrice: it.originalPrice,
                     discountPercent: it.discPct,
@@ -2719,6 +2987,7 @@
 
             const savedItems = items.map(it => ({
                 itemName: it.name,
+                barcode: it.barcode || '',
                 quantity: it.qty,
                 originalPrice: it.originalPrice,
                 updatedPrice: it.updatedPrice,
@@ -2789,7 +3058,7 @@
             sendInvoiceData = doc.data();
             document.getElementById('sendInvoiceNumber').textContent = sendInvoiceData.invoiceNumber;
             document.getElementById('sendInvoiceCustomer').textContent = sendInvoiceData.customer || 'N/A';
-            document.getElementById('sendInvoiceTotal').textContent = sendInvoiceData.total.toLocaleString();
+            document.getElementById('sendInvoiceTotal').textContent = formatCurrency(sendInvoiceData.total || 0);
             document.getElementById('sendMessage').textContent = '';
             document.getElementById('sendModal').style.display = 'flex';
         } catch (err) {
@@ -2824,12 +3093,12 @@
         let itemsList = '';
         if (sendInvoiceData.items && sendInvoiceData.items.length > 0) {
             itemsList = sendInvoiceData.items.map(item => 
-                `  - ${item.itemName} (${item.quantity} x ₦${(item.updatedPrice || item.unitPrice || 0).toFixed(2)}) = ₦${(item.total || 0).toFixed(2)}`
+                `  - ${item.itemName}${item.barcode ? ' [📊 ' + item.barcode + ']' : ''} (${item.quantity} x ₦${formatCurrency(item.updatedPrice || item.unitPrice || 0)}) = ₦${formatCurrency(item.total || 0)}`
             ).join('\n');
         }
 
         const body = `Dear ${sendInvoiceData.customer || 'Customer'},\n\n` +
-            `Please find attached invoice ${sendInvoiceData.invoiceNumber} for ₦${(sendInvoiceData.total || 0).toFixed(2)}.\n\n` +
+            `Please find attached invoice ${sendInvoiceData.invoiceNumber} for ₦${formatCurrency(sendInvoiceData.total || 0)}.\n\n` +
             `Invoice Details:\n` +
             `- Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `- Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
@@ -2862,7 +3131,7 @@
 
         const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}*\n` +
             `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
-            `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
+            `💰 Total: ₦${formatCurrency(sendInvoiceData.total || 0)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
             `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
@@ -2883,7 +3152,7 @@
         }
         const message = `📄 *Invoice ${sendInvoiceData.invoiceNumber}* from ${companyName}\n\n` +
             `👤 Customer: ${sendInvoiceData.customer || 'N/A'}\n` +
-            `💰 Total: ₦${(sendInvoiceData.total || 0).toFixed(2)}\n` +
+            `💰 Total: ₦${formatCurrency(sendInvoiceData.total || 0)}\n` +
             `📅 Date: ${sendInvoiceData.date || 'N/A'}\n` +
             `🏢 Branch: ${sendInvoiceData.branch || 'N/A'}\n` +
             `📦 Vendor: ${sendInvoiceData.vendor || 'N/A'}\n` +
@@ -2910,7 +3179,7 @@
             if (!doc.exists) { showToast('Invoice not found.', 'error'); return; }
             shareInvoiceData = { id, data: doc.data() };
             document.getElementById('shareInvoiceNumber').textContent = shareInvoiceData.data.invoiceNumber;
-            document.getElementById('shareInvoiceTotal').textContent = shareInvoiceData.data.total.toLocaleString();
+            document.getElementById('shareInvoiceTotal').textContent = formatCurrency(shareInvoiceData.data.total || 0);
             document.getElementById('shareRecipientType').value = '';
             document.getElementById('shareVendorSelect').style.display = 'none';
             document.getElementById('shareRecipientInfo').innerHTML = '';
@@ -3083,7 +3352,7 @@
                         const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
                         if (invDoc.exists) {
                             const invData = invDoc.data();
-                            invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                            invoiceTotal = invData.total ? `₦${formatCurrency(invData.total)}` : 'N/A';
                             invoiceDate = invData.date || '';
                         }
                     } catch (e) { /* ignore */ }
@@ -3174,7 +3443,7 @@
                 const invDoc = await db.collection('invoices').doc(d.invoiceId).get();
                 if (invDoc.exists) {
                     const invData = invDoc.data();
-                    invoiceTotal = invData.total ? `₦${invData.total.toLocaleString()}` : 'N/A';
+                    invoiceTotal = invData.total ? `₦${formatCurrency(invData.total)}` : 'N/A';
                     invoiceDate = invData.date || '';
                 }
             } catch (e) { /* ignore */ }
@@ -3241,13 +3510,13 @@
                 moveBranchSelect.disabled = false;
             }
 
-            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Qty</th><th>Unit Price</th></tr>';
+            let itemsHtml = '<div class="scroll"><table><tr><th>Item</th><th>Barcode</th><th>Qty</th><th>Unit Price</th></tr>';
             if (d.items && d.items.length > 0) {
                 d.items.forEach(it => {
-                    itemsHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.quantity}</td><td>₦${(it.updatedPrice || it.unitPrice || 0).toFixed(2)}</td></tr>`;
+                    itemsHtml += `<tr><td>${escapeHtml(it.itemName)}</td><td>${it.barcode ? `<span class="barcode-badge">${escapeHtml(it.barcode)}</span>` : '—'}</td><td>${formatQuantity(it.quantity)}</td><td>₦${formatCurrency(it.updatedPrice || it.unitPrice || 0)}</td></tr>`;
                 });
             } else {
-                itemsHtml += '<tr><td colspan="3">No items</td></tr>';
+                itemsHtml += '<tr><td colspan="4">No items</td></tr>';
             }
             itemsHtml += '</table></div>';
             document.getElementById('moveItemsList').innerHTML = itemsHtml;
@@ -3287,6 +3556,7 @@
                 if (snap.empty) {
                     await db.collection('inventory').add({
                         itemName: item.itemName,
+                        barcode: item.barcode || '',
                         branch: targetBranch,
                         stock: item.quantity,
                         unitPrice: item.updatedPrice || item.unitPrice || 0,
@@ -3332,7 +3602,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with editable reconciliation modal and original invoice price fallback.');
+    console.log('NEVAMAK Invoice Repository loaded with barcode scanning (optional) and digit grouping enabled.');
 </script>
 </body>
 </html>
