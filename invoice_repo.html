@@ -177,10 +177,47 @@
         .reconcile-actions button { flex: 1; }
         #loadMoreBtn { margin: 16px auto; display: block; width: 200px; }
         /* Barcode scanner styles */
-        #barcodeReader { width: 100%; max-width: 500px; margin: 0 auto; border-radius: 16px; overflow: hidden; background: #000; }
+        #barcodeReader { width: 100%; max-width: 600px; margin: 0 auto; border-radius: 16px; overflow: hidden; background: #000; min-height: 260px; }
         .barcode-scanner-hint { font-size: 0.85rem; color: #555; text-align: center; margin: 8px 0; }
         .barcode-result-box { background: #f0fdf9; padding: 12px; border-radius: 12px; text-align: center; font-family: monospace; font-size: 1.1rem; color: #0a3d62; border: 2px dashed #16a085; margin-top: 12px; }
         .barcode-target-label { font-size: 0.8rem; color: #16a085; font-weight: 600; text-align: center; margin-bottom: 8px; }
+        /* Barcode search results */
+        .barcode-search-result-card {
+            background: #f0fdf9; border: 1px solid #16a085; border-radius: 16px;
+            padding: 14px 16px; margin-bottom: 12px;
+            transition: 0.15s;
+        }
+        .barcode-search-result-card:hover { box-shadow: 0 4px 12px rgba(22,160,133,0.15); }
+        .barcode-search-result-card .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+        .barcode-search-result-card .title { font-weight: 700; color: #0a3d62; font-size: 1rem; }
+        .barcode-search-result-card .sub { font-size: 0.8rem; color: #6b7f96; }
+        .barcode-search-result-card .meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; color: #2c3e50; }
+        .barcode-search-result-card .meta strong { color: #0a3d62; }
+        .barcode-search-result-card .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+        .barcode-highlight {
+            background: #d4f7e8;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-weight: 700;
+            color: #0a6b4f;
+        }
+        .scan-action-btn {
+            background: linear-gradient(135deg, #16a085, #1abc9c);
+            color: white; padding: 10px 22px; border-radius: 40px;
+            font-weight: 600; border: none; cursor: pointer; font-size: 0.9rem;
+            display: inline-flex; align-items: center; gap: 8px;
+            box-shadow: 0 4px 12px rgba(22,160,133,0.25);
+        }
+        .scan-action-btn:hover { transform: translateY(-1px); }
+        .search-mode-toggle {
+            display: inline-flex; background: #eef2f7; border-radius: 40px; padding: 4px; margin-right: 8px;
+        }
+        .search-mode-toggle button {
+            background: transparent; border: none; padding: 6px 16px; border-radius: 40px;
+            font-size: 0.8rem; font-weight: 500; cursor: pointer; margin: 0; color: #3a4e66;
+        }
+        .search-mode-toggle button.active { background: #0a3d62; color: white; }
         @media (max-width: 600px) { .item-row { flex-direction: column; align-items: stretch; } .item-tax-fields { flex-direction: column; } .transport-field { flex-direction: column; align-items: stretch; } .vendor-field { flex-direction: column; } }
     </style>
 </head>
@@ -207,6 +244,7 @@
     <div class="tabs">
         <button class="tab-btn active" data-tab="create">✏️ Create Invoice</button>
         <button class="tab-btn" data-tab="list">📋 Saved Invoices</button>
+        <button class="tab-btn" data-tab="barcodesearch">📷 Barcode Search</button>
         <button class="tab-btn" data-tab="shared">📨 Shared with Me</button>
         <button class="tab-btn" data-tab="goodsreceived">📦 Goods Received</button>
         <button class="tab-btn" data-tab="submissions">🔄 Vendor Submissions</button>
@@ -282,10 +320,33 @@
         <div class="card">
             <h2>Saved Invoices</h2>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                <input type="text" id="searchInvoices" placeholder="🔍 Search by #, customer, or item..." style="flex:1;">
+                <input type="text" id="searchInvoices" placeholder="🔍 Search by #, customer, item, or barcode..." style="flex:1;">
+                <button id="scanInvoiceSearchBtn" class="btn-barcode" title="Scan a barcode to search invoices">📷 Scan to Search</button>
                 <button id="refreshInvoicesBtn" class="btn-primary">🔄 Refresh</button>
             </div>
             <div class="scroll" id="invoicesList"><div class="loading-spinner"></div> Loading...</div>
+        </div>
+    </div>
+
+    <!-- Barcode Search Tab -->
+    <div id="tab-barcodesearch" class="tab-content">
+        <div class="card">
+            <h2>📷 Barcode Search <small class="search-hint">Scan a barcode to find any item across invoices, shipments, and inventory</small></h2>
+
+            <div style="background:#f0fdf9;border:1px solid #16a085;border-radius:16px;padding:16px;margin-bottom:16px;">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                    <button class="scan-action-btn" id="scanBarcodeSearchBtn">📷 Scan Barcode to Search</button>
+                    <span style="font-size:0.85rem;color:#6b7f96;">or</span>
+                    <input type="text" id="barcodeSearchInput" placeholder="Type a barcode to search…" style="flex:1;min-width:200px;font-family:monospace;" autocomplete="off">
+                    <button class="btn-primary" id="barcodeSearchBtn">🔍 Search</button>
+                </div>
+                <div style="font-size:0.78rem;color:#6b7f96;margin-top:8px;">
+                    Searches across: <strong>Invoices</strong> · <strong>Shipments</strong> · <strong>Inventory</strong> · <strong>Goods Received</strong>
+                </div>
+            </div>
+
+            <div id="barcodeSearchStatus" style="font-size:0.9rem;color:#6b7f96;text-align:center;padding:8px;"></div>
+            <div id="barcodeSearchResults"></div>
         </div>
     </div>
 
@@ -302,7 +363,7 @@
         <div class="card">
             <h2>📦 Goods Received (Claims)</h2>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                <input type="text" id="searchReceived" placeholder="🔍 Search by invoice # or customer..." style="flex:1;">
+                <input type="text" id="searchReceived" placeholder="🔍 Search by invoice #, customer, or barcode..." style="flex:1;">
                 <button id="refreshReceivedBtn" class="btn-primary">🔄 Refresh</button>
             </div>
             <div class="scroll" id="receivedList"><div class="loading-spinner"></div> Loading...</div>
@@ -314,7 +375,7 @@
         <div class="card">
             <h2>🔄 Vendor Submissions (Pending Approval)</h2>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-                <input type="text" id="searchSubmissions" placeholder="🔍 Search by invoice #, vendor, or customer..." style="flex:1;">
+                <input type="text" id="searchSubmissions" placeholder="🔍 Search by invoice #, vendor, or barcode..." style="flex:1;">
                 <button id="refreshSubmissionsBtn" class="btn-primary">🔄 Refresh</button>
             </div>
             <div class="scroll" id="submissionsList"><div class="loading-spinner"></div> Loading...</div>
@@ -433,20 +494,26 @@
 
 <!-- ========== BARCODE SCANNER MODAL ========== -->
 <div id="barcodeScanModal" class="modal">
-    <div class="modal-content" style="max-width: 560px;">
+    <div class="modal-content" style="max-width: 620px;">
         <span class="close" onclick="closeBarcodeScanner()">&times;</span>
-        <h3>📷 Scan Product Barcode</h3>
+        <h3 id="barcodeModalTitle">📷 Scan Product Barcode</h3>
         <p class="barcode-target-label" id="barcodeTargetLabel">Scanning will attach barcode to item row</p>
-        <div id="barcodeReader"></div>
-        <div class="barcode-scanner-hint">
-            Point the camera at a barcode (EAN-13, UPC, Code-128, etc.). Scanning is optional — you can also type the barcode manually below.
+        <div id="barcodeReader" style="width:100%; max-width:600px; margin:0 auto; border-radius:16px; overflow:hidden; background:#000; min-height:260px;"></div>
+        <div class="barcode-scanner-hint" id="barcodeHintText">
+            Point the camera at a barcode (EAN-13, UPC-A, Code-128, Code-39, ITF, QR…).
+            Hold the barcode <strong>horizontally inside the wide green box</strong> and about 10–20 cm from the lens.
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; align-items:center;">
+            <button type="button" class="btn-info btn-sm" onclick="toggleBarcodeCamera()" id="switchCameraBtn" title="Switch between front/rear camera">🔄 Switch Camera</button>
+            <button type="button" class="btn-warning btn-sm" onclick="toggleBarcodeTorch()" id="torchBtn" title="Toggle flashlight">🔦 Torch</button>
+            <span style="font-size:0.75rem;color:#888;" id="activeCameraLabel">rear camera</span>
         </div>
         <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
-            <input type="text" id="manualBarcodeInput" placeholder="Or type barcode manually…" style="flex:2; font-family:monospace;">
+            <input type="text" id="manualBarcodeInput" placeholder="Or type barcode manually…" style="flex:2; font-family:monospace;" autocomplete="off">
             <button type="button" class="btn-success" onclick="applyManualBarcode()" style="flex:1;">Apply</button>
         </div>
         <div class="barcode-result-box" id="barcodeResultBox" style="display:none;"></div>
-        <div id="barcodeScannerMessage" style="color:red; margin-top:8px; text-align:center;"></div>
+        <div id="barcodeScannerMessage" style="color:#c0392b; margin-top:8px; text-align:center; font-size:0.85rem;"></div>
         <div style="display:flex; gap:12px; margin-top:12px;">
             <button type="button" class="btn-danger" onclick="closeBarcodeScanner()" style="flex:1;">Cancel</button>
         </div>
@@ -629,9 +696,15 @@
     let invoiceDocsCache = [];
 
     // Barcode scanner state
-    let html5QrCode = null;          // active Html5Qrcode instance
-    let barcodeTargetRowId = null;   // which item row will receive the scan
+    let html5QrCode = null;
+    let barcodeTargetRowId = null;
     let barcodeScannerActive = false;
+    let barcodeScanLocked = false;
+    let currentCameraIndex = 0;
+    let availableCameras = [];
+    let torchActive = false;
+    // Barcode scan mode: 'form' (attach to row) or 'search' (find items)
+    let barcodeScanMode = 'form';
 
     // ==================== DOM ====================
     const invoiceItemsContainer = document.getElementById('invoiceItemsContainer');
@@ -667,11 +740,6 @@
         return div.innerHTML;
     }
 
-    /**
-     * Format a numeric value with digit grouping (thousands separators)
-     * and exactly 2 decimal places.
-     * e.g. 1234567.5 -> "1,234,567.50"
-     */
     function formatCurrency(num) {
         const n = parseFloat(num);
         if (isNaN(n)) return '0.00';
@@ -681,10 +749,6 @@
         });
     }
 
-    /**
-     * Format an integer quantity with digit grouping.
-     * e.g. 12345 -> "12,345"
-     */
     function formatQuantity(num) {
         const n = parseFloat(num);
         if (isNaN(n)) return '0';
@@ -764,92 +828,182 @@
         }
     };
 
-    // ==================== Barcode Scanner ====================
+    // ==================== Barcode Scanner (FIXED) ====================
     /**
-     * Open the barcode scanner for a specific item row.
-     * Barcode scanning is entirely OPTIONAL — the user may simply close the modal.
+     * Open the barcode scanner.
+     * @param {string} mode - 'form' (attach to row) or 'search' (find items/invoices)
+     * @param {string} targetRowId - the row ID to fill (only for 'form' mode)
      */
-    function openBarcodeScannerForRow(rowId) {
-        barcodeTargetRowId = rowId;
-        const row = document.querySelector(`.item-row[data-row-id="${rowId}"]`);
-        const itemName = row ? (row.querySelector('.itemName')?.value || '(unnamed item)') : '(unknown)';
-        document.getElementById('barcodeTargetLabel').textContent = 'Scanning for: ' + itemName;
+    function openBarcodeScanner(mode, targetRowId) {
+        barcodeScanMode = mode || 'form';
+        barcodeTargetRowId = targetRowId || null;
+        barcodeScanLocked = false;
+
+        const modalTitle = document.getElementById('barcodeModalTitle');
+        const targetLabel = document.getElementById('barcodeTargetLabel');
+        const hintText = document.getElementById('barcodeHintText');
+
+        if (barcodeScanMode === 'search') {
+            modalTitle.textContent = '📷 Scan Barcode to Search';
+            targetLabel.textContent = 'Scan a barcode to find all matching items & invoices';
+            hintText.innerHTML = 'Hold the barcode <strong>horizontally inside the wide green box</strong> and about 10–20 cm from the lens.';
+        } else {
+            const row = document.querySelector(`.item-row[data-row-id="${targetRowId}"]`);
+            const itemName = row ? (row.querySelector('.itemName')?.value || '(unnamed item)') : '(unknown)';
+            modalTitle.textContent = '📷 Scan Product Barcode';
+            targetLabel.textContent = 'Scanning for: ' + itemName;
+            hintText.innerHTML = 'Point the camera at a barcode (EAN-13, UPC-A, Code-128, Code-39, ITF, QR…). Hold it <strong>horizontally inside the wide green box</strong>.';
+        }
+
         document.getElementById('barcodeScannerMessage').textContent = '';
         document.getElementById('barcodeResultBox').style.display = 'none';
         document.getElementById('barcodeResultBox').textContent = '';
         document.getElementById('manualBarcodeInput').value = '';
         document.getElementById('barcodeScanModal').style.display = 'flex';
 
-        // Start the scanner
-        startBarcodeScanner();
+        // Wait for the modal to fully lay out before starting the camera
+        setTimeout(() => {
+            startBarcodeScanner();
+        }, 250);
+    }
+
+    // Legacy wrapper — keeps existing per-row scan buttons working
+    function openBarcodeScannerForRow(rowId) {
+        openBarcodeScanner('form', rowId);
     }
     window.openBarcodeScannerForRow = openBarcodeScannerForRow;
 
     /**
-     * Start html5-qrcode scanner targeting the #barcodeReader element.
-     * Falls back gracefully if the library or camera is unavailable.
+     * Start the html5-qrcode scanner with 1D formats and a wide scan box.
      */
-    function startBarcodeScanner() {
+    async function startBarcodeScanner() {
         if (typeof Html5Qrcode === 'undefined') {
             document.getElementById('barcodeScannerMessage').textContent =
-                '⚠️ Barcode library not loaded. You can still type the barcode manually below.';
+                '⚠️ Barcode library failed to load. You can type the barcode manually below.';
             return;
         }
 
-        // If an instance already exists, clear it
         if (html5QrCode) {
-            try { html5QrCode.clear(); } catch (e) { /* ignore */ }
-            html5QrCode = null;
+            await stopBarcodeScanner();
         }
 
-        html5QrCode = new Html5Qrcode("barcodeReader", { verbose: false });
+        // Explicitly register 1D barcode formats
+        const formatsToSupport = [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.CODABAR,
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.DATA_MATRIX
+        ];
 
-        const config = {
-            fps: 12,
-            qrbox: { width: 260, height: 160 },
-            aspectRatio: 1.5,
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+        html5QrCode = new Html5Qrcode("barcodeReader", {
+            formatsToSupport: formatsToSupport,
+            verbose: false,
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            }
+        });
+
+        try {
+            availableCameras = await Html5Qrcode.getCameras();
+        } catch (e) {
+            availableCameras = [];
+        }
+
+        // Wide scan box — essential for horizontal 1D barcodes
+        const scanConfig = {
+            fps: 15,
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+                const width = Math.floor(viewfinderWidth * 0.92);
+                const height = Math.floor(Math.min(viewfinderHeight * 0.55, width * 0.45));
+                return { width: width, height: height };
+            },
+            aspectRatio: 1.777,
+            disableFlip: false,
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            }
         };
 
-        html5QrCode.start(
-            { facingMode: "environment" },
-            config,
-            (decodedText, decodedResult) => {
-                // Successful scan
-                onBarcodeScanned(decodedText, decodedResult);
-            },
-            (errorMessage) => {
-                // Per-frame decode errors are normal — do not spam the UI
-            }
-        ).then(() => {
+        let cameraConfig;
+        if (availableCameras.length > 1 && currentCameraIndex < availableCameras.length) {
+            cameraConfig = availableCameras[currentCameraIndex].id;
+            document.getElementById('activeCameraLabel').textContent =
+                availableCameras[currentCameraIndex].label || ('camera ' + (currentCameraIndex + 1));
+        } else {
+            cameraConfig = { facingMode: "environment" };
+            document.getElementById('activeCameraLabel').textContent = 'rear camera';
+        }
+
+        try {
+            await html5QrCode.start(
+                cameraConfig,
+                scanConfig,
+                (decodedText, decodedResult) => {
+                    onBarcodeScanned(decodedText, decodedResult);
+                },
+                (errorMessage) => { /* per-frame errors are normal */ }
+            );
             barcodeScannerActive = true;
-        }).catch(err => {
+            torchActive = false;
+            document.getElementById('torchBtn').textContent = '🔦 Torch';
+        } catch (err) {
             console.warn('Camera start failed:', err);
-            document.getElementById('barcodeScannerMessage').textContent =
-                '⚠️ Camera unavailable: ' + (err.message || err) + '. You can type the barcode manually below.';
+            let friendly = err && err.message ? err.message : String(err);
+            const low = friendly.toLowerCase();
+            if (low.includes('permission') || low.includes('notallowed') || low.includes('denied')) {
+                friendly = 'Camera permission was denied. Please allow camera access in your browser settings and reload.';
+            } else if (low.includes('notfound') || low.includes('no camera') || low.includes('devicesnotfound')) {
+                friendly = 'No camera was detected on this device. Please use manual entry below.';
+            } else if (low.includes('notreadable') || low.includes('trackstarterror')) {
+                friendly = 'The camera is already in use by another app. Close other tabs/apps and try again.';
+            } else if (low.includes('securecontext') || low.includes('https')) {
+                friendly = 'Camera access requires HTTPS. Open this page over a secure connection.';
+            }
+            document.getElementById('barcodeScannerMessage').textContent = '⚠️ ' + friendly;
             barcodeScannerActive = false;
-        });
+        }
     }
 
     /**
-     * Called when a barcode is successfully decoded.
+     * Handle a successful barcode decode. Routes to form-fill or search.
      */
     function onBarcodeScanned(code, result) {
+        if (barcodeScanLocked) return;
+        barcodeScanLocked = true;
+
         const resultBox = document.getElementById('barcodeResultBox');
         resultBox.textContent = '✅ Detected: ' + code;
         resultBox.style.display = 'block';
 
-        // Auto-apply and close after a short delay so the user sees confirmation
-        setTimeout(() => {
-            applyBarcodeToTargetRow(code);
-            stopBarcodeScanner();
-            closeBarcodeScanner();
-            showToast('✅ Barcode applied: ' + code, 'success');
-        }, 500);
+        try { if (navigator.vibrate) navigator.vibrate(80); } catch (e) { /* ignore */ }
+
+        setTimeout(async () => {
+            if (barcodeScanMode === 'search') {
+                await stopBarcodeScanner();
+                closeBarcodeScanner();
+                showToast('✅ Barcode detected: ' + code, 'success');
+                // Fill the search input and run the search
+                document.getElementById('barcodeSearchInput').value = code;
+                runBarcodeSearch(code);
+            } else {
+                applyBarcodeToTargetRow(code);
+                await stopBarcodeScanner();
+                closeBarcodeScanner();
+                showToast('✅ Barcode applied: ' + code, 'success');
+            }
+        }, 400);
     }
 
     /**
-     * Apply a barcode to the target row's input field.
+     * Write a barcode into the targeted row's input.
      */
     function applyBarcodeToTargetRow(code) {
         if (!barcodeTargetRowId) return;
@@ -858,69 +1012,356 @@
         const input = row.querySelector('.itemBarcode');
         if (input) {
             input.value = code;
-            // Trigger any change listeners (for potential future features)
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.style.transition = 'background 0.3s';
+            input.style.background = '#d4f7e8';
+            setTimeout(() => { input.style.background = '#f0fdf9'; }, 800);
         }
     }
 
     /**
      * Apply the manually typed barcode.
      */
-    window.applyManualBarcode = function() {
+    window.applyManualBarcode = async function() {
         const code = document.getElementById('manualBarcodeInput').value.trim();
         if (!code) {
             document.getElementById('barcodeScannerMessage').textContent = 'Please type a barcode first.';
             return;
         }
-        applyBarcodeToTargetRow(code);
-        stopBarcodeScanner();
+        await stopBarcodeScanner();
         closeBarcodeScanner();
-        showToast('✅ Barcode applied: ' + code, 'success');
+        if (barcodeScanMode === 'search') {
+            document.getElementById('barcodeSearchInput').value = code;
+            runBarcodeSearch(code);
+            showToast('🔍 Searching for: ' + code, 'info');
+        } else {
+            applyBarcodeToTargetRow(code);
+            showToast('✅ Barcode applied: ' + code, 'success');
+        }
     };
 
-    /**
-     * Stop the underlying scanner if active. Safe to call multiple times.
-     */
-    function stopBarcodeScanner() {
+    async function stopBarcodeScanner() {
         if (!html5QrCode) return;
         const instance = html5QrCode;
         html5QrCode = null;
-        try {
-            if (barcodeScannerActive) {
-                instance.stop().then(() => {
-                    try { instance.clear(); } catch (e) { /* ignore */ }
-                }).catch(err => {
-                    console.warn('Scanner stop error:', err);
-                });
-            } else {
-                try { instance.clear(); } catch (e) { /* ignore */ }
-            }
-        } catch (e) { /* ignore */ }
         barcodeScannerActive = false;
+        torchActive = false;
+        try {
+            await instance.stop();
+        } catch (e) {
+            console.warn('Scanner stop warning:', e);
+        }
+        try { instance.clear(); } catch (e) { /* ignore */ }
     }
 
-    /**
-     * Close the barcode modal and stop the scanner.
-     */
-    function closeBarcodeScanner() {
-        stopBarcodeScanner();
+    async function closeBarcodeScanner() {
+        await stopBarcodeScanner();
         document.getElementById('barcodeScanModal').style.display = 'none';
         barcodeTargetRowId = null;
+        barcodeScanLocked = false;
     }
     window.closeBarcodeScanner = closeBarcodeScanner;
 
-    /**
-     * Bulk scan: opens scanner to create a NEW item row with the scanned barcode.
-     * Useful for quick data entry — scan a barcode, and a new empty row appears with it.
-     */
+    window.toggleBarcodeCamera = async function() {
+        if (!availableCameras || availableCameras.length < 2) {
+            document.getElementById('barcodeScannerMessage').textContent =
+                'Only one camera is available on this device.';
+            return;
+        }
+        currentCameraIndex = (currentCameraIndex + 1) % availableCameras.length;
+        await stopBarcodeScanner();
+        barcodeScanLocked = false;
+        await startBarcodeScanner();
+    };
+
+    window.toggleBarcodeTorch = async function() {
+        if (!html5QrCode || !barcodeScannerActive) {
+            document.getElementById('barcodeScannerMessage').textContent =
+                'Torch is only available while the camera is active.';
+            return;
+        }
+        try {
+            torchActive = !torchActive;
+            await html5QrCode.applyVideoConstraints({
+                advanced: [{ torch: torchActive }]
+            });
+            document.getElementById('torchBtn').textContent = torchActive ? '🔦 Torch ON' : '🔦 Torch';
+        } catch (err) {
+            console.warn('Torch toggle failed:', err);
+            document.getElementById('barcodeScannerMessage').textContent =
+                'Torch is not supported on this device/browser.';
+            torchActive = false;
+        }
+    };
+
+    // Bulk scan: open scanner and target a NEW blank row
     document.getElementById('scanBarcodeBulkBtn').addEventListener('click', () => {
-        // Create a new blank row and target it
         addItemRow();
         const rows = document.querySelectorAll('.item-row');
         const lastRow = rows[rows.length - 1];
         if (lastRow) {
             openBarcodeScannerForRow(lastRow.dataset.rowId);
+        }
+    });
+
+    // ==================== Barcode Search ====================
+    /**
+     * Search across invoices, shipments, inventory, and goods received
+     * for any item whose barcode matches (case-insensitive, trimmed).
+     */
+    async function runBarcodeSearch(rawCode) {
+        const code = String(rawCode || '').trim();
+        const statusEl = document.getElementById('barcodeSearchStatus');
+        const resultsEl = document.getElementById('barcodeSearchResults');
+
+        if (!code) {
+            statusEl.textContent = 'Please enter or scan a barcode first.';
+            resultsEl.innerHTML = '';
+            return;
+        }
+
+        statusEl.innerHTML = '<span class="loading-spinner"></span> Searching for barcode <span class="barcode-highlight">' + escapeHtml(code) + '</span>…';
+        resultsEl.innerHTML = '';
+
+        const matches = {
+            invoices: [],
+            shipments: [],
+            inventory: [],
+            goodsReceived: []
+        };
+
+        try {
+            // 1) Invoices — filter client-side because Firestore can't index array-of-objects reliably
+            const invSnap = await db.collection('invoices').orderBy('createdAt', 'desc').limit(400).get();
+            invSnap.forEach(doc => {
+                const d = doc.data();
+                if (!d.items || !Array.isArray(d.items)) return;
+                const hits = d.items.filter(it => it && it.barcode && String(it.barcode).trim().toLowerCase() === code.toLowerCase());
+                if (hits.length) {
+                    matches.invoices.push({ id: doc.id, data: d, hits: hits });
+                }
+            });
+
+            // 2) Shipments
+            const shipSnap = await db.collection('shipments').orderBy('createdAt', 'desc').limit(400).get();
+            shipSnap.forEach(doc => {
+                const d = doc.data();
+                if (!d.items || !Array.isArray(d.items)) return;
+                const hits = d.items.filter(it => it && it.barcode && String(it.barcode).trim().toLowerCase() === code.toLowerCase());
+                if (hits.length) {
+                    matches.shipments.push({ id: doc.id, data: d, hits: hits });
+                }
+            });
+
+            // 3) Inventory
+            const invtrySnap = await db.collection('inventory').get();
+            invtrySnap.forEach(doc => {
+                const d = doc.data();
+                if (d.barcode && String(d.barcode).trim().toLowerCase() === code.toLowerCase()) {
+                    matches.inventory.push({ id: doc.id, data: d });
+                }
+            });
+
+            // 4) Goods Received
+            const grSnap = await db.collection('goodsReceived').orderBy('receivedAt', 'desc').limit(400).get();
+            grSnap.forEach(doc => {
+                const d = doc.data();
+                if (!d.receivedItems || !Array.isArray(d.receivedItems)) return;
+                const hits = d.receivedItems.filter(it => it && it.barcode && String(it.barcode).trim().toLowerCase() === code.toLowerCase());
+                if (hits.length) {
+                    matches.goodsReceived.push({ id: doc.id, data: d, hits: hits });
+                }
+            });
+
+            renderBarcodeSearchResults(code, matches);
+        } catch (err) {
+            console.error('Barcode search error:', err);
+            statusEl.innerHTML = '⚠️ Error: ' + escapeHtml(err.message);
+        }
+    }
+    window.runBarcodeSearch = runBarcodeSearch;
+
+    function renderBarcodeSearchResults(code, matches) {
+        const statusEl = document.getElementById('barcodeSearchStatus');
+        const resultsEl = document.getElementById('barcodeSearchResults');
+
+        const totalMatches =
+            matches.invoices.length +
+            matches.shipments.length +
+            matches.inventory.length +
+            matches.goodsReceived.length;
+
+        if (totalMatches === 0) {
+            statusEl.innerHTML = `No results found for <span class="barcode-highlight">${escapeHtml(code)}</span>.`;
+            resultsEl.innerHTML = `
+                <div style="text-align:center;padding:32px 16px;color:#7a8a9e;">
+                    <div style="font-size:2.4rem;opacity:0.5;">🔍</div>
+                    <div>No invoices, shipments, inventory items, or received goods reference this barcode.</div>
+                </div>`;
+            return;
+        }
+
+        statusEl.innerHTML = `Found <strong>${totalMatches}</strong> match${totalMatches !== 1 ? 'es' : ''} for <span class="barcode-highlight">${escapeHtml(code)}</span>`;
+
+        let html = '';
+
+        // Invoices
+        if (matches.invoices.length) {
+            html += `<h3 style="margin-top:16px;">🧾 Invoices (${matches.invoices.length})</h3>`;
+            matches.invoices.forEach(m => {
+                const d = m.data;
+                const matchedItems = m.hits.map(it => `
+                    <div style="margin-top:6px;padding:8px;background:white;border-radius:10px;border-left:3px solid #16a085;">
+                        <strong>${escapeHtml(it.itemName || '')}</strong>
+                        <span class="barcode-highlight">📊 ${escapeHtml(it.barcode || '')}</span>
+                        <div style="font-size:0.78rem;color:#6b7f96;margin-top:4px;">
+                            Qty: ${formatQuantity(it.quantity || 0)}
+                            · Unit Price: ₦${formatCurrency(it.updatedPrice || it.unitPrice || 0)}
+                            · Total: ₦${formatCurrency(it.total || 0)}
+                        </div>
+                    </div>
+                `).join('');
+
+                html += `
+                    <div class="barcode-search-result-card">
+                        <div class="header">
+                            <div>
+                                <div class="title">📄 ${escapeHtml(d.invoiceNumber || 'N/A')}</div>
+                                <div class="sub">${escapeHtml(d.date || '')} · Branch: ${escapeHtml(d.branch || 'N/A')} · Customer: ${escapeHtml(d.customer || 'N/A')}</div>
+                            </div>
+                            <span class="badge">${d.items ? d.items.length : 0} items</span>
+                        </div>
+                        <div class="meta">
+                            <span><strong>Total:</strong> ₦${formatCurrency(d.total || 0)}</span>
+                            <span><strong>Vendor:</strong> ${escapeHtml(d.vendor || '—')}</span>
+                            ${d.movedToWarehouse ? '<span><strong>✅ Moved to Warehouse</strong></span>' : ''}
+                            ${d.acknowledged ? '<span><strong>✅ Acknowledged</strong></span>' : ''}
+                        </div>
+                        ${matchedItems}
+                        <div class="actions">
+                            <button class="btn-sm btn-primary" onclick="viewInvoice('${m.id}')">👁️ View Invoice</button>
+                            <button class="btn-sm btn-success" onclick="downloadPDF('${m.id}')">📄 PDF</button>
+                            <button class="btn-sm btn-warning" onclick="downloadCSV('${m.id}')">📊 CSV</button>
+                            <button class="btn-sm btn-info" onclick="openSendModal('${m.id}')">📤 Send</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        // Shipments
+        if (matches.shipments.length) {
+            html += `<h3 style="margin-top:20px;">🚛 Shipments (${matches.shipments.length})</h3>`;
+            matches.shipments.forEach(m => {
+                const d = m.data;
+                const matchedItems = m.hits.map(it => `
+                    <div style="margin-top:6px;padding:8px;background:white;border-radius:10px;border-left:3px solid #16a085;">
+                        <strong>${escapeHtml(it.itemName || '')}</strong>
+                        <span class="barcode-highlight">📊 ${escapeHtml(it.barcode || '')}</span>
+                        <div style="font-size:0.78rem;color:#6b7f96;margin-top:4px;">
+                            Qty: ${formatQuantity(it.orderedQty || it.quantity || 0)}
+                            · Unit Price: ₦${formatCurrency(it.unitPrice || 0)}
+                        </div>
+                    </div>
+                `).join('');
+
+                html += `
+                    <div class="barcode-search-result-card">
+                        <div class="header">
+                            <div>
+                                <div class="title">🚛 ${escapeHtml(d.invoiceNumber || d.reference || 'Shipment')}</div>
+                                <div class="sub">${escapeHtml(d.date || '')} · Destination: ${escapeHtml(d.destinationBranch || 'N/A')} · Vendor: ${escapeHtml(d.vendorName || 'N/A')}</div>
+                            </div>
+                            <span class="badge">${escapeHtml(d.status || 'Draft')}</span>
+                        </div>
+                        <div class="meta">
+                            <span><strong>Total:</strong> ₦${formatCurrency(d.total || 0)}</span>
+                            <span><strong>Sender:</strong> ${escapeHtml(d.senderName || d.submittedBy || '—')}</span>
+                        </div>
+                        ${matchedItems}
+                    </div>`;
+            });
+        }
+
+        // Inventory
+        if (matches.inventory.length) {
+            html += `<h3 style="margin-top:20px;">📦 Inventory (${matches.inventory.length})</h3>`;
+            matches.inventory.forEach(m => {
+                const d = m.data;
+                html += `
+                    <div class="barcode-search-result-card">
+                        <div class="header">
+                            <div>
+                                <div class="title">📦 ${escapeHtml(d.itemName || '')}</div>
+                                <div class="sub">Branch: ${escapeHtml(d.branch || 'N/A')} · Location: ${escapeHtml(d.location || '—')}</div>
+                            </div>
+                            <span class="barcode-highlight">📊 ${escapeHtml(d.barcode || '')}</span>
+                        </div>
+                        <div class="meta">
+                            <span><strong>In Stock:</strong> ${formatQuantity(d.stock || 0)}</span>
+                            <span><strong>Unit Price:</strong> ₦${formatCurrency(d.unitPrice || 0)}</span>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        // Goods Received
+        if (matches.goodsReceived.length) {
+            html += `<h3 style="margin-top:20px;">📥 Goods Received (${matches.goodsReceived.length})</h3>`;
+            matches.goodsReceived.forEach(m => {
+                const d = m.data;
+                const matchedItems = m.hits.map(it => `
+                    <div style="margin-top:6px;padding:8px;background:white;border-radius:10px;border-left:3px solid #16a085;">
+                        <strong>${escapeHtml(it.itemName || '')}</strong>
+                        <span class="barcode-highlight">📊 ${escapeHtml(it.barcode || '')}</span>
+                        <div style="font-size:0.78rem;color:#6b7f96;margin-top:4px;">
+                            Ordered: ${formatQuantity(it.orderedQty || 0)}
+                            · Received: ${formatQuantity(it.receivedQty || 0)}
+                            · Unit Price: ₦${formatCurrency(it.unitPrice || 0)}
+                        </div>
+                    </div>
+                `).join('');
+
+                html += `
+                    <div class="barcode-search-result-card">
+                        <div class="header">
+                            <div>
+                                <div class="title">📥 ${escapeHtml(d.invoiceNumber || 'Claim')}</div>
+                                <div class="sub">Received By: ${escapeHtml(d.receivingOfficer || '—')} · Branch: ${escapeHtml(d.branch || 'N/A')}</div>
+                            </div>
+                            <span class="badge">${d.resolved ? 'Resolved' : 'Open'}</span>
+                        </div>
+                        ${matchedItems}
+                        <div class="actions">
+                            <button class="btn-sm btn-primary" onclick="viewReceivedClaim('${m.id}')">👁️ View Claim</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        resultsEl.innerHTML = html;
+    }
+
+    // Wire up search buttons and inputs
+    document.getElementById('scanBarcodeSearchBtn').addEventListener('click', () => {
+        openBarcodeScanner('search', null);
+    });
+    document.getElementById('scanInvoiceSearchBtn').addEventListener('click', () => {
+        // Jump to barcode search tab and open scanner
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('.tab-btn[data-tab="barcodesearch"]').classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-barcodesearch').classList.add('active');
+        setTimeout(() => openBarcodeScanner('search', null), 200);
+    });
+    document.getElementById('barcodeSearchBtn').addEventListener('click', () => {
+        const code = document.getElementById('barcodeSearchInput').value.trim();
+        runBarcodeSearch(code);
+    });
+    document.getElementById('barcodeSearchInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('barcodeSearchBtn').click();
         }
     });
 
@@ -1912,8 +2353,6 @@
             const isShareable = (currentUserRole === 'admin' || currentUserRole === 'lagos_sender');
             const ackStatus = d.acknowledged ? `<span class="ack-badge">✅ Acknowledged</span>` : `<span class="badge">⏳ Pending</span>`;
             let receivedStatus = '<span class="badge">Not Received</span>';
-
-            // Count items with barcodes
             const barcodeCount = d.items ? d.items.filter(i => i.barcode).length : 0;
 
             html += `<tr>
@@ -1949,7 +2388,6 @@
         invoicesList.innerHTML = html;
     }
 
-    // Search listener – client-side filtering
     searchInvoices.addEventListener('input', function() {
         const search = this.value.toLowerCase().trim();
         renderInvoiceList(invoiceDocsCache, search);
@@ -2295,7 +2733,6 @@
                 ackTimestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Store original total
             const originalTotal = invDoc.data().total || 0;
 
             await secondaryDb.collection('goodsReceived').add({
@@ -2305,7 +2742,7 @@
                 branch: invDoc.data().branch || '',
                 vendor: invDoc.data().vendor || '',
                 originalItems: invDoc.data().items || [],
-                originalTotal: originalTotal, // capture original invoice total
+                originalTotal: originalTotal,
                 receivedItems: receivedItems,
                 receivingOfficer: officerUser.email,
                 officerSignature: signature,
@@ -2371,6 +2808,14 @@
                         else {
                             if ((d.invoiceNumber || '').toLowerCase().includes(search)) match = true;
                             if (!match && (d.customer || '').toLowerCase().includes(search)) match = true;
+                            if (!match && d.receivedItems && d.receivedItems.length > 0) {
+                                for (const it of d.receivedItems) {
+                                    if (it.barcode && String(it.barcode).toLowerCase().includes(search)) {
+                                        match = true;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                         if (!match) return;
                         const itemsCount = d.receivedItems ? d.receivedItems.filter(i => i.receivedQty > 0).length : 0;
@@ -2472,12 +2917,10 @@
             document.getElementById('reconcileDate').textContent = d.receivedAt ? new Date(d.receivedAt.toDate()).toLocaleString() : '';
             document.getElementById('reconcileOriginalTotal').textContent = formatCurrency(d.originalTotal || 0);
 
-            // Build editable items table
             const container = document.getElementById('reconcileItemsContainer');
             container.innerHTML = '';
             let allFullyReceived = true;
 
-            // Create a map of original item prices from originalItems (if available)
             const originalPrices = {};
             if (d.originalItems && Array.isArray(d.originalItems)) {
                 d.originalItems.forEach(orig => {
@@ -2491,7 +2934,6 @@
                 d.receivedItems.forEach((item, idx) => {
                     const ordered = item.orderedQty || 0;
                     let received = item.receivedQty || 0;
-                    // Use original price if available, fallback to item.unitPrice, then 0
                     let price = originalPrices[item.itemName] !== undefined ? originalPrices[item.itemName] : (item.unitPrice || 0);
                     const shortage = ordered - received;
                     const status = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
@@ -2511,7 +2953,6 @@
                 html += '</table>';
                 container.innerHTML = html;
 
-                // Attach event listeners to update summary and buttons
                 const qtyInputs = container.querySelectorAll('.reconcile-received-qty');
                 const priceInputs = container.querySelectorAll('.reconcile-unit-price');
                 const inputs = [...qtyInputs, ...priceInputs];
@@ -2537,7 +2978,7 @@
         rows.forEach(row => {
             const qtyInput = row.querySelector('.reconcile-received-qty');
             const priceInput = row.querySelector('.reconcile-unit-price');
-            const orderedCell = row.cells[1]; // assumes structure: item, ordered, received, price, status
+            const orderedCell = row.cells[1];
             if (qtyInput && orderedCell) {
                 const ordered = parseFloat(orderedCell.textContent.replace(/,/g, '')) || 0;
                 const received = parseFloat(qtyInput.value) || 0;
@@ -2547,7 +2988,6 @@
                 const shortage = ordered - received;
                 if (shortage > 0) allComplete = false;
                 totalShortage += shortage * price;
-                // Update status cell
                 const statusCell = row.cells[4];
                 if (statusCell) {
                     statusCell.innerHTML = shortage === 0 ? '✅ Complete' : `<span class="shortage-highlight">Short ${shortage}</span>`;
@@ -2559,7 +2999,6 @@
             Total Received: ₦${formatCurrency(totalReceived)} | 
             Shortage: ₦${formatCurrency(totalShortage)}
         `;
-        // Enable/disable buttons
         const completeBtn = document.getElementById('reconcileCompleteBtn');
         const updateBtn = document.getElementById('reconcileUpdateBtn');
         completeBtn.disabled = !allComplete;
@@ -2568,7 +3007,6 @@
         updateBtn.style.opacity = allComplete ? '0.6' : '1';
     }
 
-    // Reconciliation actions
     document.getElementById('reconcileCompleteBtn').addEventListener('click', async function() {
         const claimId = reconcileTargetId;
         await performReconciliation(claimId, 'complete');
@@ -2589,17 +3027,15 @@
             if (!claimDoc.exists) { throw new Error('Claim not found.'); }
             const claimData = claimDoc.data();
 
-            // Get edited received quantities and prices from the table
             const rows = document.querySelectorAll('#reconcileItemsContainer table tr');
             let receivedItems = [];
             rows.forEach(row => {
                 const qtyInput = row.querySelector('.reconcile-received-qty');
                 const priceInput = row.querySelector('.reconcile-unit-price');
-                const itemName = row.cells[0] ? row.cells[0].textContent.trim() : '';
+                const itemName = row.cells[0] ? row.cells[0].textContent.trim().split('\n')[0].trim() : '';
                 const ordered = parseFloat(row.cells[1] ? row.cells[1].textContent.replace(/,/g, '') : 0) || 0;
                 let received = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
                 let price = parseFloat(priceInput ? priceInput.value : 0) || 0;
-                // If price is 0, fallback to the original unit price from the claim data
                 if (price === 0 && claimData.receivedItems) {
                     const originalItem = claimData.receivedItems.find(it => it.itemName === itemName);
                     if (originalItem) {
@@ -2607,7 +3043,6 @@
                     }
                 }
                 if (itemName && received > 0 && price > 0) {
-                    // Try to preserve barcode from claim
                     const originalItem = claimData.receivedItems ? claimData.receivedItems.find(it => it.itemName === itemName) : null;
                     receivedItems.push({
                         itemName: itemName,
@@ -2624,10 +3059,8 @@
                 throw new Error('No items with valid received quantity and unit price > 0.');
             }
 
-            // Get invoice notes
             const notes = document.getElementById('reconcileNotes').value.trim();
 
-            // Build new invoice items
             const newItems = receivedItems.map(item => ({
                 itemName: item.itemName,
                 barcode: item.barcode || '',
@@ -2651,14 +3084,12 @@
             }
             const newInvNum = claimData.invoiceNumber + '-REC-' + Date.now().toString(36).toUpperCase();
 
-            // Get original invoice
             const invoiceId = claimData.invoiceId;
             if (!invoiceId) { throw new Error('Original invoice not referenced.'); }
             const invDoc = await db.collection('invoices').doc(invoiceId).get();
             if (!invDoc.exists) { throw new Error('Original invoice not found.'); }
             const invData = invDoc.data();
 
-            // Create new invoice
             await db.collection('invoices').add({
                 invoiceNumber: newInvNum,
                 date: new Date().toISOString().slice(0,10),
@@ -2683,7 +3114,6 @@
                 originalInvoice: invoiceId
             });
 
-            // Update original invoice
             await db.collection('invoices').doc(invoiceId).update({
                 reconciled: true,
                 reconciledAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2699,7 +3129,7 @@
                     resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
                     resolvedBy: currentUserEmail,
                     reconciliationInvoice: newInvNum,
-                    receivedItems: receivedItems // update with edited values
+                    receivedItems: receivedItems
                 });
                 showToast('✅ Invoice items completed and new invoice generated.', 'success');
             } else {
@@ -2707,7 +3137,7 @@
                     lastReconciledAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastReconciledBy: currentUserEmail,
                     partialInvoice: newInvNum,
-                    receivedItems: receivedItems, // update with edited values
+                    receivedItems: receivedItems,
                     notes: (claimData.notes || '') + `\nPartial reconciliation ${new Date().toISOString()} - new invoice ${newInvNum}`
                 });
                 showToast('📝 Expected goods updated, partial invoice generated.', 'success');
@@ -2765,6 +3195,10 @@
                             if (!match && d.items && d.items.length > 0) {
                                 for (const item of d.items) {
                                     if (item.itemName && item.itemName.toLowerCase().includes(search)) {
+                                        match = true;
+                                        break;
+                                    }
+                                    if (item.barcode && String(item.barcode).toLowerCase().includes(search)) {
                                         match = true;
                                         break;
                                     }
@@ -3602,7 +4036,7 @@
     });
 
     // ==================== Init ====================
-    console.log('NEVAMAK Invoice Repository loaded with barcode scanning (optional) and digit grouping enabled.');
+    console.log('NEVAMAK Invoice Repository loaded with fixed barcode scanning and barcode search.');
 </script>
 </body>
 </html>
