@@ -225,6 +225,45 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
+
+        /* ===== Price History expandable rows ===== */
+        .history-summary-row { cursor: pointer; }
+        .history-summary-row:hover td { background: #f0f7ff !important; }
+        .history-summary-row td:first-child::before {
+            content: '▶'; display: inline-block; margin-right: 6px;
+            font-size: 0.7rem; color: #16a085; transition: transform 0.2s;
+        }
+        .history-summary-row.expanded td:first-child::before {
+            transform: rotate(90deg);
+        }
+        .history-detail-row td {
+            background: #f0f7ff !important;
+            border-bottom: 2px solid #d4e2f0;
+        }
+        .history-detail-inner {
+            border-radius: 12px; overflow: hidden;
+            box-shadow: 0 2px 6px rgba(10,61,98,0.06);
+        }
+        .history-detail-inner table {
+            min-width: 0; margin: 0; font-size: 0.78rem;
+        }
+        .history-detail-inner thead th {
+            background: #0a3d62; color: white;
+            position: static; font-size: 0.68rem;
+            padding: 8px 10px;
+        }
+        .history-detail-inner tbody td { padding: 7px 10px; }
+        .history-detail-inner tbody tr:nth-child(even) td { background: #f8faff; }
+        .history-detail-inner tbody tr:hover td { background: #eef4ff; }
+        .unit-badge {
+            background: #e8f0fe; color: #0a3d62; padding: 2px 8px;
+            border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .pack-badge {
+            background: #fff3cd; color: #8a6d00; padding: 2px 8px;
+            border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -344,9 +383,14 @@
     <div class="tab-content" id="tab-history">
         <div class="card">
             <h2>📜 Price History Database <small id="historyCount"></small></h2>
-            <p class="help-text">All known items and their most recent prices, gathered from shipments, invoices, received goods, and online sources.</p>
+            <p class="help-text">
+                All known items and their most recent prices, gathered from shipments, invoices, received goods, and online sources.
+                <br>👉 <strong>Click any row</strong> to expand and view the full purchase timeline (most recent first), including pack size, pack quantity, and total units.
+            </p>
             <div class="flex-row" style="margin-bottom:10px;">
                 <input type="text" id="historySearch" placeholder="🔍 Search history…" class="grow">
+                <button class="btn-primary btn-sm" id="expandAllHistoryBtn">⊞ Expand All</button>
+                <button class="btn-warning btn-sm" id="collapseAllHistoryBtn">⊟ Collapse All</button>
                 <button class="btn-primary btn-sm" id="reloadHistoryBtn">🔄 Reload</button>
                 <button class="btn-warning btn-sm" id="rebuildHistoryBtn">♻️ Rebuild from All Sources</button>
             </div>
@@ -411,11 +455,6 @@
 
     /* =========================================================
        ONLINE SOURCE REGISTRY
-       =========================================================
-       Each entry describes a source we can query. In production these
-       would be server-side proxies (to avoid CORS / API key leaks).
-       The `fetch` function returns an array of { store, price, packSize,
-       url, inStock, note }.
     ========================================================= */
     const ONLINE_SOURCES = [
         {
@@ -424,9 +463,6 @@
             icon: '🛒',
             type: 'retail',
             async fetch(query) {
-                // In production: call your backend proxy → Jumia Scraper API
-                // (Apify actor "Jumia Scraper — Africa E-commerce Prices & Products")
-                // For now, return a deterministic mock based on a hash of the query.
                 return mockStorePrices(query, 'Jumia', 0.92, 1.18);
             }
         },
@@ -436,8 +472,6 @@
             icon: '🏬',
             type: 'retail',
             async fetch(query) {
-                // In production: call your backend proxy → Konga Scraper API
-                // (Apify actor "Konga Scraper — Nigeria Marketplace Products & Prices")
                 return mockStorePrices(query, 'Konga', 0.88, 1.25);
             }
         },
@@ -447,7 +481,6 @@
             icon: '📊',
             type: 'intelligence',
             async fetch(query) {
-                // In production: call ArketData's price intelligence endpoint.
                 return mockStorePrices(query, 'ArketData', 0.95, 1.10);
             }
         },
@@ -457,7 +490,6 @@
             icon: '🏦',
             type: 'wholesale',
             async fetch(query) {
-                // In production: call PriceSense.ng wholesale/retail endpoint.
                 return mockStorePrices(query, 'PriceSense', 0.78, 1.05);
             }
         },
@@ -467,21 +499,16 @@
             icon: '🌾',
             type: 'intelligence',
             async fetch(query) {
-                // In production: call FoodPrices.ng API.
                 return mockStorePrices(query, 'FoodPrices.ng', 0.82, 1.12);
             }
         }
     ];
 
-    /**
-     * Deterministic mock generator so the same query always returns
-     * the same prices. Replace body with real API calls when ready.
-     */
     function mockStorePrices(query, storeName, minFactor, maxFactor) {
         const seed = hashString(query + storeName);
         const rng = mulberry32(seed);
 
-        const base = 500 + Math.floor(rng() * 49500); // 500 – 50,000 NGN
+        const base = 500 + Math.floor(rng() * 49500);
         const factor = minFactor + rng() * (maxFactor - minFactor);
         const price = Math.round(base * factor * 100) / 100;
 
@@ -536,6 +563,19 @@
         const n = parseFloat(num);
         if (isNaN(n)) return '—';
         return n.toLocaleString('en-NG');
+    }
+
+    /**
+     * Stable, deterministic ID generator for a price-history key.
+     * Used for the DOM id of the expandable detail row.
+     */
+    function historyKeyId(key) {
+        let h = 0;
+        for (let i = 0; i < key.length; i++) {
+            h = ((h << 5) - h) + key.charCodeAt(i);
+            h |= 0;
+        }
+        return 'h_' + Math.abs(h).toString(36);
     }
 
     function showToast(msg, type = 'info', duration = 2800) {
@@ -779,6 +819,14 @@
 
     /* =========================================================
        PRICE HISTORY BUILDER
+       =========================================================
+       For each recorded purchase we store:
+         - price      : price per pack as recorded
+         - packSize   : units per pack
+         - packQty    : number of packs purchased/ordered/received
+         - totalUnits : packQty × packSize
+         - source     : Invoice | Shipment | Received | Online ...
+         - date       : purchase timestamp (used for ordering)
     ========================================================= */
     async function rebuildPriceHistory(silent = false) {
         if (!silent) showToast('Building price history from all sources…', 'info', 1500);
@@ -786,6 +834,7 @@
         let totalFound = 0;
 
         try {
+            // ---------- SHIPMENTS ----------
             const shipSnap = await db.collection('shipments').limit(500).get();
             shipSnap.forEach(doc => {
                 const d = doc.data();
@@ -793,19 +842,24 @@
                     const name = it.itemName || it.name;
                     const price = it.unitPrice || it.updatedPrice || it.originalPrice || 0;
                     if (name && price > 0) {
+                        const packSize = parseFloat(it.packSize) || 1;
+                        const packQty = parseFloat(it.orderedQty ?? it.quantity ?? 0) || 0;
                         addToHistory(name, {
                             price,
                             source: 'Shipment',
                             sourceId: doc.id,
                             date: d.createdAt ? safeDate(d.createdAt) : null,
                             brand: it.brand || d.vendorName || '',
-                            packSize: it.packSize || 1
+                            packSize,
+                            packQty,
+                            totalUnits: packQty * packSize
                         });
                         totalFound++;
                     }
                 });
             });
 
+            // ---------- INVOICES ----------
             const invSnap = await db.collection('invoices').limit(500).get();
             invSnap.forEach(doc => {
                 const d = doc.data();
@@ -813,19 +867,24 @@
                     const name = it.itemName;
                     const price = it.updatedPrice || it.unitPrice || it.originalPrice || 0;
                     if (name && price > 0) {
+                        const packSize = parseFloat(it.packSize) || 1;
+                        const packQty = parseFloat(it.quantity ?? 0) || 0;
                         addToHistory(name, {
                             price,
                             source: 'Invoice',
                             sourceId: doc.id,
                             date: d.createdAt ? safeDate(d.createdAt) : null,
                             brand: it.brand || d.vendor || '',
-                            packSize: it.packSize || 1
+                            packSize,
+                            packQty,
+                            totalUnits: packQty * packSize
                         });
                         totalFound++;
                     }
                 });
             });
 
+            // ---------- GOODS RECEIVED ----------
             const grSnap = await db.collection('goodsReceived').limit(500).get();
             grSnap.forEach(doc => {
                 const d = doc.data();
@@ -833,31 +892,41 @@
                     const name = it.itemName;
                     const price = it.unitPrice || 0;
                     if (name && price > 0) {
+                        const packSize = parseFloat(it.packSize) || 1;
+                        // Prefer receivedQty, fall back to orderedQty
+                        const packQty = parseFloat(it.receivedQty ?? it.orderedQty ?? 0) || 0;
                         addToHistory(name, {
                             price,
                             source: 'Received',
                             sourceId: doc.id,
                             date: d.receivedAt ? safeDate(d.receivedAt) : null,
                             brand: '',
-                            packSize: it.packSize || 1
+                            packSize,
+                            packQty,
+                            totalUnits: packQty * packSize
                         });
                         totalFound++;
                     }
                 });
             });
 
-            // Add any cached online results
+            // ---------- ONLINE CACHE ----------
             for (const key in onlineCache) {
                 const cached = onlineCache[key];
                 cached.sources.forEach(src => {
                     if (src.price > 0) {
+                        const packSize = parseFloat(src.packSize) || 1;
+                        // Online listings typically represent a single pack
+                        const packQty = 1;
                         addToHistory(cached.displayName, {
                             price: src.price,
                             source: 'Online · ' + src.store,
                             sourceId: src.url || '',
                             date: src.fetchedAt ? new Date(src.fetchedAt) : null,
                             brand: '',
-                            packSize: src.packSize || 1
+                            packSize,
+                            packQty,
+                            totalUnits: packQty * packSize
                         });
                         totalFound++;
                     }
@@ -1244,11 +1313,6 @@
     /* =========================================================
        ONLINE PRICE COMPARISON
     ========================================================= */
-
-    /**
-     * Query all registered online sources for a given item name.
-     * Results are cached so repeated lookups don't re-hit sources.
-     */
     async function fetchOnlinePrices(query) {
         const key = normalizeName(query);
         if (onlineCache[key]) {
@@ -1281,9 +1345,6 @@
         return results;
     }
 
-    /**
-     * Find the best internal price for a given item (if any).
-     */
     function findInternalPrice(item) {
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
         let best = null;
@@ -1303,9 +1364,6 @@
         return best;
     }
 
-    /**
-     * Build the comparison HTML block for an item.
-     */
     function buildComparisonHtml(item, onlineRows) {
         const internal = findInternalPrice(item);
         const internalPrice = internal ? internal.price : 0;
@@ -1325,7 +1383,6 @@
             return html;
         }
 
-        // Sort by price ascending
         const sorted = [...onlineRows].sort((a, b) => a.price - b.price);
         const cheapest = sorted[0];
         const mostExpensive = sorted[sorted.length - 1];
@@ -1386,9 +1443,6 @@
         return html;
     }
 
-    /**
-     * Search for a free-text query and display the comparison.
-     */
     document.getElementById('onlineSearchBtn').addEventListener('click', async function() {
         const query = document.getElementById('onlineSearchInput').value.trim();
         if (!query) { showToast('Enter an item name to search.', 'error'); return; }
@@ -1415,9 +1469,6 @@
         if (e.key === 'Enter') document.getElementById('onlineSearchBtn').click();
     });
 
-    /**
-     * Compare every matched item online (batch mode).
-     */
     document.getElementById('compareAllBtn').addEventListener('click', async function() {
         const matched = uploadedItems.filter(i => i.status === 'matched' || i.status === 'partial');
         if (!matched.length) { showToast('No matched items to compare.', 'error'); return; }
@@ -1451,9 +1502,6 @@
         }
     });
 
-    /**
-     * Per-row online compare button.
-     */
     window.compareItemOnline = async function(itemId) {
         const item = uploadedItems.find(i => i.id === itemId);
         if (!item) return;
@@ -1642,10 +1690,44 @@
     });
 
     /* =========================================================
-       PRICE HISTORY TAB
+       PRICE HISTORY TAB — expandable purchase timeline
     ========================================================= */
     document.getElementById('reloadHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
     document.getElementById('rebuildHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
+
+    /**
+     * Toggle an individual price-history detail row.
+     */
+    window.toggleHistoryDetail = function(key) {
+        const id = 'history-detail-' + historyKeyId(key);
+        const row = document.getElementById(id);
+        if (!row) return;
+        const isHidden = row.style.display === 'none';
+        row.style.display = isHidden ? '' : 'none';
+
+        // Also toggle the "expanded" class on the summary row for the arrow rotation
+        const summaryRow = row.previousElementSibling;
+        if (summaryRow) summaryRow.classList.toggle('expanded', isHidden);
+    };
+
+    /**
+     * Expand every detail row.
+     */
+    window.expandAllHistory = function() {
+        document.querySelectorAll('.history-detail-row').forEach(r => { r.style.display = ''; });
+        document.querySelectorAll('.history-summary-row').forEach(r => r.classList.add('expanded'));
+    };
+
+    /**
+     * Collapse every detail row.
+     */
+    window.collapseAllHistory = function() {
+        document.querySelectorAll('.history-detail-row').forEach(r => { r.style.display = 'none'; });
+        document.querySelectorAll('.history-summary-row').forEach(r => r.classList.remove('expanded'));
+    };
+
+    document.getElementById('expandAllHistoryBtn').addEventListener('click', window.expandAllHistory);
+    document.getElementById('collapseAllHistoryBtn').addEventListener('click', window.collapseAllHistory);
 
     function renderHistory() {
         const wrap = document.getElementById('historyWrap');
@@ -1655,31 +1737,110 @@
             wrap.innerHTML = '<div class="empty-state"><div class="icon">🗄️</div>No price history yet. Click "Rebuild from All Sources".</div>';
             return;
         }
+
         let html = `<table>
-            <thead><tr><th>Item</th><th>Most Recent Price</th><th>Source</th><th># Price Points</th><th>Last Updated</th><th>Action</th></tr></thead><tbody>`;
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Most Recent Price</th>
+                    <th>Pack Size</th>
+                    <th>Pack Qty</th>
+                    <th>Total Units</th>
+                    <th>Source</th>
+                    <th># Points</th>
+                    <th>Last Updated</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
         let count = 0;
         keys.forEach(k => {
             const entry = priceHistory[k];
             if (search && !k.includes(search)) return;
-            const latest = entry.points.reduce((a, b) => {
+
+            // Order points by date descending (most recent first)
+            const sortedPoints = [...entry.points].sort((a, b) => {
                 const da = a.date ? a.date.getTime() : 0;
                 const db_ = b.date ? b.date.getTime() : 0;
-                return db_ > da ? b : a;
-            }, entry.points[0]);
+                return db_ - da;
+            });
+            const latest = sortedPoints[0];
             count++;
+
             const srcCls = latest.source.startsWith('Online') ? 'source-online' :
                            latest.source === 'Invoice' ? 'source-invoice' :
                            latest.source === 'Shipment' ? 'source-shipment' :
                            latest.source === 'Received' ? 'source-received' : '';
-            html += `<tr>
+
+            // Build the detail rows for the expandable section
+            let detailRows = '';
+            sortedPoints.forEach((pt, idx) => {
+                const dateStr = pt.date
+                    ? pt.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) +
+                      ' · ' +
+                      pt.date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
+                    : '—';
+                const packSize = pt.packSize || 1;
+                const packQty = pt.packQty || 0;
+                const totalUnits = pt.totalUnits != null ? pt.totalUnits : (packQty * packSize);
+                const ptSrcCls = pt.source.startsWith('Online') ? 'source-online' :
+                                 pt.source === 'Invoice' ? 'source-invoice' :
+                                 pt.source === 'Shipment' ? 'source-shipment' :
+                                 pt.source === 'Received' ? 'source-received' : '';
+
+                detailRows += `<tr>
+                    <td style="white-space:nowrap;">${idx === 0 ? '🟢 ' : ''}${dateStr}</td>
+                    <td><span class="source-badge ${ptSrcCls}">${escapeHtml(pt.source)}</span></td>
+                    <td class="price-cell">₦${formatCurrency(pt.price)}</td>
+                    <td><span class="pack-badge">${formatQuantity(packSize)}</span></td>
+                    <td><span class="pack-badge">${formatQuantity(packQty)}</span></td>
+                    <td><span class="unit-badge">${formatQuantity(totalUnits)}</span></td>
+                    <td>${pt.brand ? escapeHtml(pt.brand) : '—'}</td>
+                </tr>`;
+            });
+
+            const detailId = 'history-detail-' + historyKeyId(k);
+
+            html += `<tr class="history-summary-row" onclick="toggleHistoryDetail('${escapeHtml(k).replace(/'/g, "\\'")}')">
                 <td><strong>${escapeHtml(entry.displayName)}</strong></td>
                 <td class="price-cell">₦${formatCurrency(latest.price)}</td>
+                <td>${formatQuantity(latest.packSize || 1)}</td>
+                <td>${formatQuantity(latest.packQty || 0)}</td>
+                <td><span class="unit-badge">${formatQuantity(latest.totalUnits || 0)}</span></td>
                 <td><span class="source-badge ${srcCls}">${escapeHtml(latest.source)}</span></td>
                 <td>${entry.points.length}</td>
-                <td style="font-size:0.75rem;">${latest.date ? latest.date.toLocaleDateString() : '—'}</td>
-                <td><button class="btn-info btn-sm" onclick="quickAddToMatch('${escapeHtml(k).replace(/'/g, "\\'")}')">➕ Add to List</button></td>
+                <td style="font-size:0.75rem;">${latest.date ? latest.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                <td>
+                    <button class="btn-info btn-sm" onclick="event.stopPropagation(); quickAddToMatch('${escapeHtml(k).replace(/'/g, "\\'")}')" title="Add to matched list">➕</button>
+                    <button class="btn-primary btn-sm" onclick="event.stopPropagation(); toggleHistoryDetail('${escapeHtml(k).replace(/'/g, "\\'")}')" title="Toggle detail">📋</button>
+                </td>
+            </tr>
+            <tr class="history-detail-row" id="${detailId}" style="display:none;">
+                <td colspan="9">
+                    <div class="history-detail-inner">
+                        <div style="padding:8px 12px;background:#0a3d62;color:white;font-size:0.78rem;font-weight:600;">
+                            📋 Purchase timeline for "${escapeHtml(entry.displayName)}" — <strong>${entry.points.length}</strong> purchase${entry.points.length !== 1 ? 's' : ''}, most recent first
+                        </div>
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Source</th>
+                                    <th>Price (₦)</th>
+                                    <th>Pack Size</th>
+                                    <th>Pack Qty</th>
+                                    <th>Total Units</th>
+                                    <th>Brand</th>
+                                </tr>
+                            </thead>
+                            <tbody>${detailRows}</tbody>
+                        </table>
+                    </div>
+                </td>
             </tr>`;
         });
+
         html += '</tbody></table>';
         if (!count) html = `<div class="empty-state"><div class="icon">🔍</div>No matches.</div>`;
         wrap.innerHTML = html;
@@ -1688,14 +1849,22 @@
     window.quickAddToMatch = function(key) {
         const entry = priceHistory[key];
         if (!entry) return;
+        // Use the most recent purchase
+        const sortedPoints = [...entry.points].sort((a, b) => {
+            const da = a.date ? a.date.getTime() : 0;
+            const db_ = b.date ? b.date.getTime() : 0;
+            return db_ - da;
+        });
+        const latest = sortedPoints[0];
+
         uploadedItems.push({
             id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            brand: entry.points[0]?.brand || '',
+            brand: latest?.brand || '',
             itemName: entry.displayName,
-            qty: 1,
-            packSize: entry.points[0]?.packSize || 1,
-            unitPrice: entry.points[0]?.price || 0,
-            matchedSource: entry.points[0]?.source || 'History',
+            qty: latest?.packQty || 1,
+            packSize: latest?.packSize || 1,
+            unitPrice: latest?.price || 0,
+            matchedSource: latest?.source || 'History',
             matchedFrom: entry.displayName,
             confidence: 1,
             status: 'matched'
@@ -1713,7 +1882,7 @@
     addManualRow();
     addManualRow();
 
-    console.log('💰 Price Room loaded with online comparison.');
+    console.log('💰 Price Room loaded with expandable purchase-history timeline.');
 </script>
 </body>
 </html>
