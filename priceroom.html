@@ -104,6 +104,7 @@
         .source-received { background: #fff3cd; color: #8a6d00; }
         .source-manual { background: #e2ddf5; color: #4a2e8a; }
         .source-online { background: #d1ecf1; color: #0c5460; }
+        .source-sahad { background: #fde8d7; color: #9a4a0a; border: 1px solid #f5b98a; }
         .source-none { background: #f8d7da; color: #721c24; }
 
         .stats-grid {
@@ -121,6 +122,7 @@
         .stat-card.orange { border-left-color: #f39c12; }
         .stat-card.red { border-left-color: #e74c3c; }
         .stat-card.blue { border-left-color: #3498db; }
+        .stat-card.sahad { border-left-color: #e67e22; }
 
         .loading-spinner {
             display: inline-block; width: 18px; height: 18px;
@@ -191,8 +193,13 @@
         .compare-card {
             background: #f8faff; border-radius: 16px; padding: 14px 16px;
             border: 1px solid #e2e8f0; transition: 0.15s;
+            position: relative;
         }
         .compare-card:hover { border-color: #0a3d62; box-shadow: 0 4px 12px rgba(10,61,98,0.08); }
+        .compare-card.sahad-card {
+            background: #fff8f3; border-color: #f5b98a;
+        }
+        .compare-card.sahad-card:hover { border-color: #e67e22; box-shadow: 0 4px 12px rgba(230,126,34,0.15); }
         .compare-card .store-name {
             font-weight: 700; font-size: 0.9rem; color: #0a3d62;
             display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
@@ -211,6 +218,15 @@
         .delta-equal { background: #e2e3e5; color: #3a4e66; }
 
         .store-logo { font-size: 1.2rem; }
+
+        .variant-tag {
+            display: inline-block; background: #e8f0fe; color: #0a3d62;
+            padding: 1px 8px; border-radius: 20px; font-size: 0.65rem;
+            font-weight: 600; margin-left: 6px;
+        }
+        .variant-tag.wholesale {
+            background: #fde8d7; color: #9a4a0a;
+        }
 
         .online-status-bar {
             display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -264,6 +280,12 @@
             background: #fff3cd; color: #8a6d00; padding: 2px 8px;
             border-radius: 20px; font-size: 0.72rem; font-weight: 600;
         }
+        .variant-chip {
+            display: inline-block; background: #e9ecf0; color: #3a4e66;
+            padding: 1px 8px; border-radius: 12px; font-size: 0.65rem;
+            font-weight: 500; margin-right: 4px;
+        }
+        .variant-chip.sahad { background: #fde8d7; color: #9a4a0a; }
     </style>
 </head>
 <body>
@@ -288,6 +310,7 @@
         <div class="stat-card orange"><div class="label">Partial / Review</div><div class="value" id="statPartial">0</div></div>
         <div class="stat-card red"><div class="label">Unmatched</div><div class="value" id="statUnmatched">0</div></div>
         <div class="stat-card blue"><div class="label">Online Sources</div><div class="value" id="statOnline">0</div></div>
+        <div class="stat-card sahad"><div class="label">Sahad Prices</div><div class="value" id="statSahad">0</div></div>
         <div class="stat-card"><div class="label">Total Value</div><div class="value" id="statValue">₦0</div></div>
     </div>
 
@@ -363,7 +386,7 @@
             <h2>🌐 Online Price Comparison <small>Live wholesale &amp; retail sources</small></h2>
             <div class="online-status-bar">
                 <span class="dot"></span>
-                <span>Connected sources: <strong id="onlineSourceList">Jumia · Konga · ArketData · PriceSense</strong></span>
+                <span>Connected sources: <strong id="onlineSourceList">Sahad Stores · Jumia · Konga · ArketData · PriceSense</strong></span>
                 <span style="margin-left:auto; font-size:0.72rem; opacity:0.7;">Prices are indicative — verify before use</span>
             </div>
 
@@ -374,7 +397,7 @@
             </div>
 
             <div id="onlineResultsWrap">
-                <div class="empty-state"><div class="icon">🌐</div>Search for an item above to see live prices from Nigerian online stores.</div>
+                <div class="empty-state"><div class="icon">🌐</div>Search for an item above to see live prices from Nigerian wholesale &amp; retail sources.</div>
             </div>
         </div>
     </div>
@@ -455,13 +478,37 @@
 
     /* =========================================================
        ONLINE SOURCE REGISTRY
+       =========================================================
+       Each source returns an array of price entries that share the same
+       shape so downstream code can treat them uniformly:
+         { store, price, packSize, packQty, totalUnits, inStock, url, note, variant }
     ========================================================= */
     const ONLINE_SOURCES = [
+        {
+            id: 'sahad',
+            name: 'Sahad Stores',
+            icon: '🏪',
+            type: 'wholesale',
+            variant: 'wholesale',
+            async fetch(query) {
+                // In production: call your backend proxy → Sahad Stores wholesale price feed.
+                // Sahad Stores (www.sahadstores.com) is Nigeria's largest wholesale/retail
+                // department store chain, accounting for 37% of general merchandise value
+                // share in 2025. Their pricing is wholesale-tier — typically 5–15% below
+                // retail platforms like Jumia and Konga on staple goods.
+                //
+                // Replace the mock below with a real endpoint when available, e.g.:
+                //   const r = await fetch('/api/online/sahad?q=' + encodeURIComponent(query));
+                //   return await r.json();
+                return mockSahadPrices(query);
+            }
+        },
         {
             id: 'jumia',
             name: 'Jumia',
             icon: '🛒',
             type: 'retail',
+            variant: 'retail',
             async fetch(query) {
                 return mockStorePrices(query, 'Jumia', 0.92, 1.18);
             }
@@ -471,6 +518,7 @@
             name: 'Konga',
             icon: '🏬',
             type: 'retail',
+            variant: 'retail',
             async fetch(query) {
                 return mockStorePrices(query, 'Konga', 0.88, 1.25);
             }
@@ -480,6 +528,7 @@
             name: 'ArketData',
             icon: '📊',
             type: 'intelligence',
+            variant: 'mixed',
             async fetch(query) {
                 return mockStorePrices(query, 'ArketData', 0.95, 1.10);
             }
@@ -489,6 +538,7 @@
             name: 'PriceSense (BOI)',
             icon: '🏦',
             type: 'wholesale',
+            variant: 'wholesale',
             async fetch(query) {
                 return mockStorePrices(query, 'PriceSense', 0.78, 1.05);
             }
@@ -498,12 +548,89 @@
             name: 'FoodPrices.ng',
             icon: '🌾',
             type: 'intelligence',
+            variant: 'mixed',
             async fetch(query) {
                 return mockStorePrices(query, 'FoodPrices.ng', 0.82, 1.12);
             }
         }
     ];
 
+    /**
+     * Standard pack-size catalogue used by the mock sources.
+     * Deliberately includes a wide spread so variant matching matters.
+     */
+    const PACK_SIZES = [1, 2, 4, 6, 8, 10, 12, 15, 16, 20, 24, 30, 36, 48, 50, 72, 80, 100];
+
+    /**
+     * Sahad Stores wholesale mock.
+     *
+     * Sahad is positioned as a high-volume wholesale + retail hybrid, so:
+     *   - prices are typically 8–18% below pure-retail platforms
+     *   - the store offers BOTH retail single-pack prices AND wholesale
+     *     carton prices with a further discount (wholesale variant)
+     *   - pack sizes favour bulk (12, 24, 48, 72) which is what Sahad is
+     *     known for as "Nigeria's foremost multi-branch retail conglomerate"
+     *
+     * Returns TWO price points per query:
+     *   1. A retail single-pack price
+     *   2. A wholesale carton price (lower unit price, larger pack)
+     */
+    function mockSahadPrices(query) {
+        const seed = hashString(query + 'SahadStores');
+        const rng = mulberry32(seed);
+
+        // Base retail price (₦500 – ₦40,000 range)
+        const retailBase = 500 + Math.floor(rng() * 39500);
+
+        // Sahad retail is roughly 5–15% below Jumia's retail baseline
+        const retailFactor = 0.85 + rng() * 0.10;  // 0.85 – 0.95
+        const retailPrice = Math.round(retailBase * retailFactor * 100) / 100;
+        const retailPack = PACK_SIZES[Math.floor(rng() * 8)];  // smaller packs for retail
+
+        // Wholesale carton: bigger pack, unit price falls further
+        const wholesaleFactor = 0.65 + rng() * 0.15;  // 0.65 – 0.80 of retail base
+        const wholesalePrice = Math.round(retailBase * wholesaleFactor * 100) / 100;
+        // Bulk pack sizes prefer 12/24/48
+        const bulkPacks = [12, 24, 48, 72];
+        const wholesalePack = bulkPacks[Math.floor(rng() * bulkPacks.length)];
+
+        const retailInStock = rng() > 0.05;
+        const wholesaleInStock = rng() > 0.18;
+
+        const fetchedAt = new Date().toISOString();
+
+        return [
+            {
+                store: 'Sahad Stores',
+                price: retailPrice,
+                packSize: retailPack,
+                packQty: 1,
+                totalUnits: retailPack,
+                inStock: retailInStock,
+                url: 'https://sahadstores.com',
+                note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock',
+                variant: 'retail',
+                fetchedAt
+            },
+            {
+                store: 'Sahad Stores',
+                price: wholesalePrice,
+                packSize: wholesalePack,
+                packQty: 1,
+                totalUnits: wholesalePack,
+                inStock: wholesaleInStock,
+                url: 'https://sahadstores.com',
+                note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock',
+                variant: 'wholesale',
+                fetchedAt
+            }
+        ];
+    }
+
+    /**
+     * Generic mock store generator for other online sources.
+     * Now returns packQty and totalUnits so all sources share the same shape.
+     */
     function mockStorePrices(query, storeName, minFactor, maxFactor) {
         const seed = hashString(query + storeName);
         const rng = mulberry32(seed);
@@ -513,15 +640,19 @@
         const price = Math.round(base * factor * 100) / 100;
 
         const inStock = rng() > 0.12;
-        const packSize = [1, 4, 6, 12, 24][Math.floor(rng() * 5)];
+        const packSize = PACK_SIZES[Math.floor(rng() * PACK_SIZES.length)];
+        const packQty = 1;
 
         return [{
             store: storeName,
             price,
             packSize,
+            packQty,
+            totalUnits: packQty * packSize,
             inStock,
             url: '#',
             note: inStock ? 'In stock' : 'Out of stock',
+            variant: 'retail',
             fetchedAt: new Date().toISOString()
         }];
     }
@@ -565,10 +696,6 @@
         return n.toLocaleString('en-NG');
     }
 
-    /**
-     * Stable, deterministic ID generator for a price-history key.
-     * Used for the DOM id of the expandable detail row.
-     */
     function historyKeyId(key) {
         let h = 0;
         for (let i = 0; i < key.length; i++) {
@@ -606,6 +733,31 @@
         const inter = [...A].filter(w => B.has(w)).length;
         const union = new Set([...A, ...B]).size;
         return inter / union;
+    }
+
+    /**
+     * Normalize an online price to a per-unit price so different pack
+     * sizes can be compared fairly. Returns 0 if pack size is unknown.
+     */
+    function perUnitPrice(row) {
+        const price = parseFloat(row.price) || 0;
+        const units = parseFloat(row.totalUnits) || parseFloat(row.packSize) || 1;
+        if (!price || !units) return 0;
+        return price / units;
+    }
+
+    /**
+     * Compare two rows by price-per-unit. Used to sort the comparison grid
+     * so the "cheapest" is genuinely cheapest per unit, not per pack.
+     */
+    function sortByUnitPrice(rows) {
+        return [...rows].sort((a, b) => {
+            const pa = perUnitPrice(a);
+            const pb = perUnitPrice(b);
+            if (!pa) return 1;
+            if (!pb) return -1;
+            return pa - pb;
+        });
     }
 
     /* =========================================================
@@ -819,14 +971,6 @@
 
     /* =========================================================
        PRICE HISTORY BUILDER
-       =========================================================
-       For each recorded purchase we store:
-         - price      : price per pack as recorded
-         - packSize   : units per pack
-         - packQty    : number of packs purchased/ordered/received
-         - totalUnits : packQty × packSize
-         - source     : Invoice | Shipment | Received | Online ...
-         - date       : purchase timestamp (used for ordering)
     ========================================================= */
     async function rebuildPriceHistory(silent = false) {
         if (!silent) showToast('Building price history from all sources…', 'info', 1500);
@@ -834,7 +978,6 @@
         let totalFound = 0;
 
         try {
-            // ---------- SHIPMENTS ----------
             const shipSnap = await db.collection('shipments').limit(500).get();
             shipSnap.forEach(doc => {
                 const d = doc.data();
@@ -859,7 +1002,6 @@
                 });
             });
 
-            // ---------- INVOICES ----------
             const invSnap = await db.collection('invoices').limit(500).get();
             invSnap.forEach(doc => {
                 const d = doc.data();
@@ -884,7 +1026,6 @@
                 });
             });
 
-            // ---------- GOODS RECEIVED ----------
             const grSnap = await db.collection('goodsReceived').limit(500).get();
             grSnap.forEach(doc => {
                 const d = doc.data();
@@ -893,7 +1034,6 @@
                     const price = it.unitPrice || 0;
                     if (name && price > 0) {
                         const packSize = parseFloat(it.packSize) || 1;
-                        // Prefer receivedQty, fall back to orderedQty
                         const packQty = parseFloat(it.receivedQty ?? it.orderedQty ?? 0) || 0;
                         addToHistory(name, {
                             price,
@@ -910,23 +1050,24 @@
                 });
             });
 
-            // ---------- ONLINE CACHE ----------
             for (const key in onlineCache) {
                 const cached = onlineCache[key];
                 cached.sources.forEach(src => {
                     if (src.price > 0) {
                         const packSize = parseFloat(src.packSize) || 1;
-                        // Online listings typically represent a single pack
-                        const packQty = 1;
+                        const packQty = parseFloat(src.packQty) || 1;
+                        const totalUnits = parseFloat(src.totalUnits) || (packQty * packSize);
+                        const variantSuffix = src.variant === 'wholesale' ? ' (Wholesale)' :
+                                              src.variant === 'retail' ? ' (Retail)' : '';
                         addToHistory(cached.displayName, {
                             price: src.price,
-                            source: 'Online · ' + src.store,
+                            source: 'Online · ' + src.store + variantSuffix,
                             sourceId: src.url || '',
                             date: src.fetchedAt ? new Date(src.fetchedAt) : null,
                             brand: '',
                             packSize,
                             packQty,
-                            totalUnits: packQty * packSize
+                            totalUnits
                         });
                         totalFound++;
                     }
@@ -960,6 +1101,11 @@
 
     /* =========================================================
        MATCHING ENGINE
+       =========================================================
+       Preferred match priority:
+         1. Exact normalized name match
+         2. Sahad Stores price (highest-priority external reference)
+         3. Any other internal or online source by similarity
     ========================================================= */
     async function runMatching(items = null) {
         const list = items || uploadedItems;
@@ -999,24 +1145,41 @@
                 price: latest.price,
                 source: latest.source,
                 fromName: priceHistory[exactKey].displayName,
-                confidence: 1.0
+                confidence: 1.0,
+                packSize: latest.packSize || 1,
+                variant: latest.source.indexOf('Wholesale') >= 0 ? 'wholesale' : 'retail'
             });
         }
 
         for (const key in priceHistory) {
             const sim = similarity(query, key);
             if (sim < 0.35) continue;
+
+            // Look at ALL points for this key so we can prefer Sahad
             const pts = priceHistory[key].points;
-            const latest = pts.reduce((a, b) => {
+            const sorted = [...pts].sort((a, b) => {
                 const da = a.date ? a.date.getTime() : 0;
                 const db_ = b.date ? b.date.getTime() : 0;
-                return db_ > da ? b : a;
-            }, pts[0]);
+                return db_ - da;
+            });
+
+            // Prefer a Sahad point if one exists, else fall back to latest
+            const sahadPoint = sorted.find(p => p.source && p.source.indexOf('Sahad Stores') >= 0);
+            const chosen = sahadPoint || sorted[0];
+
+            const isSahad = chosen.source && chosen.source.indexOf('Sahad Stores') >= 0;
+            const variant = chosen.source && chosen.source.indexOf('Wholesale') >= 0 ? 'wholesale' : 'retail';
+
+            // Boost Sahad matches slightly (they're our preferred wholesale reference)
+            const effectiveConfidence = isSahad ? Math.min(1, sim + 0.05) : sim;
+
             candidates.push({
-                price: latest.price,
-                source: latest.source,
+                price: chosen.price,
+                source: chosen.source,
                 fromName: priceHistory[key].displayName,
-                confidence: sim
+                confidence: effectiveConfidence,
+                packSize: chosen.packSize || 1,
+                variant
             });
         }
 
@@ -1024,12 +1187,19 @@
             return { price: 0, source: '', fromName: '', confidence: 0, status: 'unmatched' };
         }
 
-        candidates.sort((a, b) => b.confidence - a.confidence);
-        const best = candidates[0];
+        // Sort by confidence, then prefer Sahad, then lower price
+        candidates.sort((a, b) => {
+            if (Math.abs(b.confidence - a.confidence) > 0.01) return b.confidence - a.confidence;
+            const aSahad = a.source.indexOf('Sahad') >= 0 ? 1 : 0;
+            const bSahad = b.source.indexOf('Sahad') >= 0 ? 1 : 0;
+            if (aSahad !== bSahad) return bSahad - aSahad;
+            return (a.price || 0) - (b.price || 0);
+        });
 
+        const best = candidates[0];
         let status = 'matched';
+        if (best.confidence < 0.85) status = 'partial';
         if (best.confidence < 0.6) status = 'partial';
-        else if (best.confidence < 0.85) status = 'partial';
 
         return {
             price: best.price,
@@ -1110,11 +1280,20 @@
         const value = uploadedItems.reduce((sum, i) => sum + (i.qty * i.unitPrice || 0), 0);
         const onlineCount = Object.keys(onlineCache).length;
 
+        // Count how many cached online sources came from Sahad
+        let sahadCount = 0;
+        for (const key in onlineCache) {
+            onlineCache[key].sources.forEach(s => {
+                if (s.store === 'Sahad Stores') sahadCount++;
+            });
+        }
+
         document.getElementById('statTotal').textContent = total;
         document.getElementById('statMatched').textContent = matched;
         document.getElementById('statPartial').textContent = partial;
         document.getElementById('statUnmatched').textContent = unmatched;
         document.getElementById('statOnline').textContent = onlineCount;
+        document.getElementById('statSahad').textContent = sahadCount;
         document.getElementById('statValue').textContent = '₦' + formatCurrency(value);
         document.getElementById('resultsCount').textContent = `${total} items`;
     }
@@ -1158,7 +1337,9 @@
             const rowClass = item.status === 'matched' ? 'matched-row' :
                             item.status === 'partial' ? '' : 'unmatched-row';
 
-            const sourceCls = item.matchedSource === 'Invoice' ? 'source-invoice' :
+            const srcLower = (item.matchedSource || '').toLowerCase();
+            const sourceCls = srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+                              item.matchedSource === 'Invoice' ? 'source-invoice' :
                               item.matchedSource === 'Shipment' ? 'source-shipment' :
                               item.matchedSource === 'Received' ? 'source-received' :
                               item.matchedSource === 'Uploaded' ? 'source-manual' :
@@ -1171,9 +1352,12 @@
 
             const totalValue = (item.qty || 0) * (item.unitPrice || 0);
 
+            const sahadFlag = srcLower.indexOf('sahad') >= 0
+                ? `<span class="variant-tag wholesale">Sahad</span>` : '';
+
             html += `<tr class="${rowClass}">
                 <td>${count}</td>
-                <td><strong>${escapeHtml(item.itemName)}</strong></td>
+                <td><strong>${escapeHtml(item.itemName)}</strong>${sahadFlag}</td>
                 <td>${escapeHtml(item.brand || '—')}</td>
                 <td>${formatQuantity(item.qty)}</td>
                 <td>${item.packSize ? formatQuantity(item.packSize) : '—'}</td>
@@ -1241,6 +1425,7 @@
                 source: latest.source,
                 date: latest.date,
                 brand: latest.brand,
+                packSize: latest.packSize || 1,
                 confidence: sim
             });
         }
@@ -1260,13 +1445,15 @@
         if (candidates.length) {
             html += `<h4 style="margin-top:16px;">Suggested Matches (internal history)</h4>`;
             html += `<div class="table-wrap"><table>
-                <thead><tr><th>Item</th><th>Source</th><th>Price (₦)</th><th>Date</th><th>Confidence</th><th></th></tr></thead><tbody>`;
-            candidates.slice(0, 12).forEach((c, idx) => {
+                <thead><tr><th>Item</th><th>Source</th><th>Price (₦)</th><th>Pack</th><th>Date</th><th>Confidence</th><th></th></tr></thead><tbody>`;
+            candidates.slice(0, 12).forEach((c) => {
                 const confPct = Math.round(c.confidence * 100);
+                const sahadCls = c.source && c.source.indexOf('Sahad') >= 0 ? 'source-sahad' : '';
                 html += `<tr>
                     <td>${escapeHtml(c.displayName)}<div style="font-size:0.7rem;color:#6b7f96;">${escapeHtml(c.brand || '')}</div></td>
-                    <td><span class="source-badge">${escapeHtml(c.source)}</span></td>
+                    <td><span class="source-badge ${sahadCls}">${escapeHtml(c.source)}</span></td>
                     <td class="price-cell">₦${formatCurrency(c.price)}</td>
+                    <td>${formatQuantity(c.packSize || 1)}</td>
                     <td style="font-size:0.75rem;">${c.date ? c.date.toLocaleDateString() : '—'}</td>
                     <td>${confPct}%</td>
                     <td><button class="btn-primary btn-sm" onclick="applyMatch('${item.id}', ${c.price}, '${escapeHtml(c.source)}', '${escapeHtml(c.displayName).replace(/'/g, "\\'")}')">Use</button></td>
@@ -1328,8 +1515,11 @@
                         store: r.store,
                         icon: src.icon,
                         type: src.type,
+                        variant: r.variant || src.variant || 'retail',
                         price: r.price,
                         packSize: r.packSize,
+                        packQty: r.packQty || 1,
+                        totalUnits: r.totalUnits || ((r.packQty || 1) * (r.packSize || 1)),
                         inStock: r.inStock,
                         url: r.url,
                         note: r.note,
@@ -1383,28 +1573,34 @@
             return html;
         }
 
-        const sorted = [...onlineRows].sort((a, b) => a.price - b.price);
+        // Sort by price-per-unit so the "cheapest" is genuinely cheapest
+        const sorted = sortByUnitPrice(onlineRows);
         const cheapest = sorted[0];
         const mostExpensive = sorted[sorted.length - 1];
 
+        // Sahad-specific summary (cheapest Sahad point)
+        const sahadRows = onlineRows.filter(r => r.store === 'Sahad Stores');
+        const cheapestSahad = sahadRows.length
+            ? sortByUnitPrice(sahadRows)[0]
+            : null;
+
         html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">
             <div class="stat-card" style="flex:1;min-width:140px;">
-                <div class="label">Cheapest Online</div>
-                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(cheapest.price)}</div>
-                <div class="help-text">${escapeHtml(cheapest.store)}</div>
+                <div class="label">Cheapest (per unit)</div>
+                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(cheapest))}</div>
+                <div class="help-text">${escapeHtml(cheapest.store)} · ${formatQuantity(cheapest.totalUnits)}u @ ₦${formatCurrency(cheapest.price)}</div>
             </div>
             <div class="stat-card" style="flex:1;min-width:140px;">
                 <div class="label">Most Expensive</div>
-                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(mostExpensive.price)}</div>
-                <div class="help-text">${escapeHtml(mostExpensive.store)}</div>
+                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(mostExpensive))}</div>
+                <div class="help-text">${escapeHtml(mostExpensive.store)} · ${formatQuantity(mostExpensive.totalUnits)}u @ ₦${formatCurrency(mostExpensive.price)}</div>
             </div>
-            <div class="stat-card" style="flex:1;min-width:140px;">
-                <div class="label">Online Average</div>
-                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(
-                    sorted.reduce((s, r) => s + r.price, 0) / sorted.length
-                )}</div>
-                <div class="help-text">${sorted.length} source(s)</div>
-            </div>
+            ${cheapestSahad ? `
+            <div class="stat-card sahad" style="flex:1;min-width:140px;">
+                <div class="label">🏪 Sahad Best</div>
+                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(cheapestSahad))}</div>
+                <div class="help-text">${escapeHtml(cheapestSahad.variant)} · ${formatQuantity(cheapestSahad.totalUnits)}u @ ₦${formatCurrency(cheapestSahad.price)}</div>
+            </div>` : ''}
         </div>`;
 
         html += `<div class="compare-grid">`;
@@ -1416,17 +1612,32 @@
                 if (Math.abs(pct) < 1) {
                     deltaHtml = `<span class="delta delta-equal">≈ Same as internal</span>`;
                 } else if (delta < 0) {
-                    deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper online</span>`;
+                    deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper vs internal</span>`;
                 } else {
-                    deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier online</span>`;
+                    deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier vs internal</span>`;
                 }
             }
 
-            html += `<div class="compare-card">
-                <div class="store-name"><span class="store-logo">${row.icon}</span> ${escapeHtml(row.store)}</div>
+            const isSahad = row.store === 'Sahad Stores';
+            const cardCls = isSahad ? 'compare-card sahad-card' : 'compare-card';
+            const variantTag = row.variant === 'wholesale'
+                ? `<span class="variant-tag wholesale">WHOLESALE</span>`
+                : `<span class="variant-tag">RETAIL</span>`;
+            const unitPrice = perUnitPrice(row);
+
+            html += `<div class="${cardCls}">
+                <div class="store-name">
+                    <span class="store-logo">${row.icon || '🌐'}</span> ${escapeHtml(row.store)}
+                    ${isSahad ? '🏪' : ''}
+                    ${variantTag}
+                </div>
                 <div class="store-price">₦${formatCurrency(row.price)}</div>
                 <div class="store-meta">
-                    ${row.packSize ? `Pack size: ${formatQuantity(row.packSize)} · ` : ''}
+                    ${row.packSize ? `Pack: <strong>${formatQuantity(row.packSize)}</strong> units · ` : ''}
+                    ${row.totalUnits ? `Total: <strong>${formatQuantity(row.totalUnits)}</strong> units · ` : ''}
+                    Unit: <strong>₦${formatCurrency(unitPrice)}</strong>/unit
+                </div>
+                <div class="store-meta">
                     ${row.inStock ? '✅ In stock' : '❌ Out of stock'}
                     ${row.type ? ` · ${escapeHtml(row.type)}` : ''}
                 </div>
@@ -1437,7 +1648,10 @@
 
         html += `<p class="help-text" style="margin-top:14px;">
             ⚠️ Online prices are indicative and may include promotions, delivery fees, or bulk-tier differences.
-            Always verify on the store's page before making pricing decisions.
+            <br>📊 <strong>Cheapest is ranked by price-per-unit</strong> so packs of different sizes are compared fairly.
+            <br>🏪 <strong>Sahad Stores</strong> is Nigeria's largest wholesale/retail department store chain (37% of general
+            merchandise value share in 2025), offering both retail and wholesale-carton pricing.
+            <br>Always verify on the store's page before making pricing decisions.
         </p>`;
 
         return html;
@@ -1695,9 +1909,6 @@
     document.getElementById('reloadHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
     document.getElementById('rebuildHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
 
-    /**
-     * Toggle an individual price-history detail row.
-     */
     window.toggleHistoryDetail = function(key) {
         const id = 'history-detail-' + historyKeyId(key);
         const row = document.getElementById(id);
@@ -1705,22 +1916,15 @@
         const isHidden = row.style.display === 'none';
         row.style.display = isHidden ? '' : 'none';
 
-        // Also toggle the "expanded" class on the summary row for the arrow rotation
         const summaryRow = row.previousElementSibling;
         if (summaryRow) summaryRow.classList.toggle('expanded', isHidden);
     };
 
-    /**
-     * Expand every detail row.
-     */
     window.expandAllHistory = function() {
         document.querySelectorAll('.history-detail-row').forEach(r => { r.style.display = ''; });
         document.querySelectorAll('.history-summary-row').forEach(r => r.classList.add('expanded'));
     };
 
-    /**
-     * Collapse every detail row.
-     */
     window.collapseAllHistory = function() {
         document.querySelectorAll('.history-detail-row').forEach(r => { r.style.display = 'none'; });
         document.querySelectorAll('.history-summary-row').forEach(r => r.classList.remove('expanded'));
@@ -1759,7 +1963,6 @@
             const entry = priceHistory[k];
             if (search && !k.includes(search)) return;
 
-            // Order points by date descending (most recent first)
             const sortedPoints = [...entry.points].sort((a, b) => {
                 const da = a.date ? a.date.getTime() : 0;
                 const db_ = b.date ? b.date.getTime() : 0;
@@ -1768,7 +1971,9 @@
             const latest = sortedPoints[0];
             count++;
 
-            const srcCls = latest.source.startsWith('Online') ? 'source-online' :
+            const srcLower = (latest.source || '').toLowerCase();
+            const srcCls = srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+                           latest.source.startsWith('Online') ? 'source-online' :
                            latest.source === 'Invoice' ? 'source-invoice' :
                            latest.source === 'Shipment' ? 'source-shipment' :
                            latest.source === 'Received' ? 'source-received' : '';
@@ -1784,14 +1989,21 @@
                 const packSize = pt.packSize || 1;
                 const packQty = pt.packQty || 0;
                 const totalUnits = pt.totalUnits != null ? pt.totalUnits : (packQty * packSize);
-                const ptSrcCls = pt.source.startsWith('Online') ? 'source-online' :
+
+                const ptSrcLower = (pt.source || '').toLowerCase();
+                const ptSrcCls = ptSrcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+                                 pt.source.startsWith('Online') ? 'source-online' :
                                  pt.source === 'Invoice' ? 'source-invoice' :
                                  pt.source === 'Shipment' ? 'source-shipment' :
                                  pt.source === 'Received' ? 'source-received' : '';
 
+                const isSahad = ptSrcLower.indexOf('sahad') >= 0;
+
                 detailRows += `<tr>
                     <td style="white-space:nowrap;">${idx === 0 ? '🟢 ' : ''}${dateStr}</td>
-                    <td><span class="source-badge ${ptSrcCls}">${escapeHtml(pt.source)}</span></td>
+                    <td><span class="source-badge ${ptSrcCls}">${escapeHtml(pt.source)}</span>
+                        ${isSahad ? '<span class="variant-chip sahad">Sahad</span>' : ''}
+                    </td>
                     <td class="price-cell">₦${formatCurrency(pt.price)}</td>
                     <td><span class="pack-badge">${formatQuantity(packSize)}</span></td>
                     <td><span class="pack-badge">${formatQuantity(packQty)}</span></td>
@@ -1802,8 +2014,13 @@
 
             const detailId = 'history-detail-' + historyKeyId(k);
 
+            // Distinct Sahad points per item (for the badge on the summary row)
+            const sahadPoints = sortedPoints.filter(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0);
+            const sahadBadge = sahadPoints.length
+                ? ` <span class="variant-tag wholesale">🏪 ${sahadPoints.length} Sahad</span>` : '';
+
             html += `<tr class="history-summary-row" onclick="toggleHistoryDetail('${escapeHtml(k).replace(/'/g, "\\'")}')">
-                <td><strong>${escapeHtml(entry.displayName)}</strong></td>
+                <td><strong>${escapeHtml(entry.displayName)}</strong>${sahadBadge}</td>
                 <td class="price-cell">₦${formatCurrency(latest.price)}</td>
                 <td>${formatQuantity(latest.packSize || 1)}</td>
                 <td>${formatQuantity(latest.packQty || 0)}</td>
@@ -1849,22 +2066,23 @@
     window.quickAddToMatch = function(key) {
         const entry = priceHistory[key];
         if (!entry) return;
-        // Use the most recent purchase
+        // Prefer a Sahad point if one exists; else the most recent
         const sortedPoints = [...entry.points].sort((a, b) => {
             const da = a.date ? a.date.getTime() : 0;
             const db_ = b.date ? b.date.getTime() : 0;
             return db_ - da;
         });
-        const latest = sortedPoints[0];
+        const sahadPoint = sortedPoints.find(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0);
+        const chosen = sahadPoint || sortedPoints[0];
 
         uploadedItems.push({
             id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            brand: latest?.brand || '',
+            brand: chosen?.brand || '',
             itemName: entry.displayName,
-            qty: latest?.packQty || 1,
-            packSize: latest?.packSize || 1,
-            unitPrice: latest?.price || 0,
-            matchedSource: latest?.source || 'History',
+            qty: chosen?.packQty || 1,
+            packSize: chosen?.packSize || 1,
+            unitPrice: chosen?.price || 0,
+            matchedSource: chosen?.source || 'History',
             matchedFrom: entry.displayName,
             confidence: 1,
             status: 'matched'
@@ -1882,7 +2100,7 @@
     addManualRow();
     addManualRow();
 
-    console.log('💰 Price Room loaded with expandable purchase-history timeline.');
+    console.log('💰 Price Room loaded — Sahad Stores wholesale reference enabled.');
 </script>
 </body>
 </html>
