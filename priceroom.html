@@ -170,6 +170,8 @@
         .reliability-high { background: #d4edda; color: #0e5a2b; }
         .reliability-medium { background: #fff3cd; color: #8a6d00; }
         .reliability-low { background: #fdebd0; color: #9a4a0a; }
+        .reliability-manual { background: #e2ddf5; color: #4a2e8a; }
+        .reliability-user { background: #d4edda; color: #0e5a2b; }
         .reliability-none { background: #f8d7da; color: #721c24; }
 
         .online-status-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; background: #f0f7ff; border-radius: 40px; font-size: 0.8rem; color: #1a4a6a; margin-bottom: 12px; }
@@ -182,6 +184,7 @@
         .anchor-banner.medium { background: #fff3cd; color: #8a6d00; border-left: 4px solid #f39c12; }
         .anchor-banner.low { background: #fdebd0; color: #9a4a0a; border-left: 4px solid #e67e22; }
         .anchor-banner.none { background: #f8d7da; color: #721c24; border-left: 4px solid #e74c3c; }
+        .anchor-banner.manual { background: #e2ddf5; color: #4a2e8a; border-left: 4px solid #8e44ad; }
 
         .history-summary-row { cursor: pointer; }
         .history-summary-row:hover td { background: #f0f7ff !important; }
@@ -456,9 +459,6 @@
 
     /* =========================================================
        CATEGORY PRICE ESTIMATOR
-       Used only when NO internal anchor exists, so the user still
-       gets a plausible comparison (clearly marked as LOW reliability).
-       Values are conservative mid-2026 Nigerian market estimates.
     ========================================================= */
     const CATEGORY_ESTIMATES = [
         { re: /rice|sella|basmati|ofada|jollof/i, unitPrice: 3500, packSize: 5, category: 'Rice' },
@@ -494,17 +494,11 @@
 
     /* =========================================================
        INTERNAL ANCHOR LOOKUP
-       Priority:
-         1. Exact match in priceHistory
-         2. Fuzzy match in priceHistory (>= 0.5 similarity)
-         3. Category estimate from item name (flagged LOW)
-         4. null → no comparison possible
     ========================================================= */
     function getInternalAnchor(query) {
         const normalized = normalizeName(query);
         if (!normalized) return null;
 
-        // 1. Exact
         if (priceHistory[normalized] && priceHistory[normalized].points.length) {
             const points = priceHistory[normalized].points.map(enrichPoint);
             const latest = points.reduce((a, b) => {
@@ -524,7 +518,6 @@
             }
         }
 
-        // 2. Fuzzy
         let best = null, bestSim = 0;
         for (const k in priceHistory) {
             const sim = similarity(normalized, k);
@@ -551,7 +544,6 @@
             }
         }
 
-        // 3. Category estimate
         const cat = estimateCategoryFromName(query);
         if (cat) {
             return {
@@ -568,51 +560,93 @@
     }
 
     /* =========================================================
-       ONLINE SOURCES (all accept `context = { query, anchor }`)
-       Each source has its own realistic markup/discount band.
-       If no anchor is available, the source returns [] (no data).
+       MANUAL CSV MATCHER
+    ========================================================= */
+    function findManualMatch(which, query) {
+        const list = manualLists[which] || [];
+        if (!list.length) return [];
+        const qn = normalizeName(query);
+        if (!qn) return [];
+        return list.filter(m => {
+            const mn = normalizeName(m.itemName);
+            return mn.includes(qn) || qn.includes(mn) || similarity(m.itemName, query) >= 0.5;
+        });
+    }
+
+    function buildManualResult(m, storeName, url, variant, anchor) {
+        return {
+            store: storeName,
+            price: m.price,
+            packSize: m.packSize,
+            packQty: 1,
+            totalUnits: m.packSize,
+            inStock: true,
+            url,
+            note: 'From uploaded CSV',
+            variant,
+            fetchedAt: new Date().toISOString(),
+            live: false,
+            anchored: !!anchor,
+            anchorUnitPrice: anchor ? anchor.unitPrice : 0,
+            reliability: anchor ? anchor.confidence : 'manual',
+            sourceType: 'manual'
+        };
+    }
+
+    /* =========================================================
+       ONLINE SOURCES
+       Priority within each source:
+         1. Manual CSV uploaded by user (highest)
+         2. Mock generator (only if anchor exists)
+         3. No data (empty array)
     ========================================================= */
     const ONLINE_SOURCES = [
         {
             id: 'everyday', name: 'Everyday Group', icon: '🏬', type: 'wholesale', variant: 'wholesale', live: false,
-            async fetch(ctx) { return mockEverydayPrices(ctx); }
+            async fetch(ctx) {
+                const { query, anchor } = ctx;
+                const manual = findManualMatch('everyday', query);
+                if (manual.length) {
+                    return manual.map(m => buildManualResult(m, 'Everyday Group (Manual)', 'http://everydaygroup.com', 'wholesale', anchor));
+                }
+                if (!anchor) return [];
+                return mockEverydayPrices(ctx);
+            }
         },
         {
             id: 'sahad', name: 'Sahad Stores', icon: '🏪', type: 'wholesale', variant: 'wholesale', live: false,
-            async fetch(ctx) { return mockSahadPrices(ctx); }
+            async fetch(ctx) {
+                const { query, anchor } = ctx;
+                const manual = findManualMatch('sahad', query);
+                if (manual.length) {
+                    return manual.map(m => buildManualResult(m, 'Sahad Stores (Manual)', 'https://sahadstores.com', 'wholesale', anchor));
+                }
+                if (!anchor) return [];
+                return mockSahadPrices(ctx);
+            }
         },
         {
             id: 'pricesense', name: 'PriceSense (BOI)', icon: '🏦', type: 'wholesale', variant: 'wholesale', live: true,
-            // Wholesale intelligence — typically 5-15% BELOW internal
             async fetch(ctx) { return mockStorePrices(ctx, 'PriceSense (BOI)', 0.85, 0.95); }
         },
         {
             id: 'arketdata', name: 'ArketData', icon: '📊', type: 'intelligence', variant: 'mixed', live: true,
-            // Market intelligence — near-parity
             async fetch(ctx) { return mockStorePrices(ctx, 'ArketData', 0.96, 1.05); }
         },
         {
             id: 'foodprices', name: 'FoodPrices.ng', icon: '🌾', type: 'intelligence', variant: 'mixed', live: true,
-            // Market intelligence — near-parity
             async fetch(ctx) { return mockStorePrices(ctx, 'FoodPrices.ng', 0.94, 1.08); }
         },
         {
             id: 'konga', name: 'Konga', icon: '🛒', type: 'retail', variant: 'retail', live: true,
-            // Retail marketplace — typically 3-12% ABOVE internal
             async fetch(ctx) { return mockStorePrices(ctx, 'Konga', 1.03, 1.12); }
         },
         {
             id: 'jumia', name: 'Jumia', icon: '🛒', type: 'retail', variant: 'retail', live: true,
-            // Retail marketplace — typically 5-15% ABOVE internal
             async fetch(ctx) { return mockStorePrices(ctx, 'Jumia', 1.05, 1.15); }
         }
     ];
 
-    /**
-     * Sahad Stores dual-tier (retail + wholesale carton).
-     * Anchored to internal unit price. Wholesale tier is 15–22% below
-     * internal per-unit price on a bulk pack of 2–4× the anchor pack.
-     */
     function mockSahadPrices(ctx) {
         const { query, anchor } = ctx;
         if (!anchor || !anchor.unitPrice || anchor.unitPrice <= 0) return [];
@@ -622,42 +656,37 @@
         const basePack = anchor.packSize || 1;
         const unitPrice = anchor.unitPrice;
 
-        // Retail tier: -3% to +3% of internal
         const retailFactor = 0.97 + rng() * 0.06;
         const retailUnitPrice = unitPrice * retailFactor;
         const retailPrice = Math.round(retailUnitPrice * basePack * 100) / 100;
 
-        // Wholesale tier: 15–22% below internal, on 2× to 4× the base pack
         const bulkMultipliers = [2, 4];
         const bulkMult = bulkMultipliers[Math.floor(rng() * bulkMultipliers.length)];
         const wholesalePack = basePack * bulkMult;
-        const wholesaleFactor = 0.78 + rng() * 0.07; // 0.78 – 0.85
+        const wholesaleFactor = 0.78 + rng() * 0.07;
         const wholesaleUnitPrice = unitPrice * wholesaleFactor;
         const wholesalePrice = Math.round(wholesaleUnitPrice * wholesalePack * 100) / 100;
 
+        const retailInStock = rng() > 0.05;
+        const wholesaleInStock = rng() > 0.15;
         const fetchedAt = new Date().toISOString();
 
         return [
             {
                 store: 'Sahad Stores', price: retailPrice, packSize: basePack, packQty: 1, totalUnits: basePack,
-                inStock: rng() > 0.05, url: 'https://sahadstores.com',
-                note: 'Retail pack', variant: 'retail', fetchedAt,
-                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+                inStock: retailInStock, url: 'https://sahadstores.com',
+                note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock',
+                variant: 'retail', fetchedAt, anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
             },
             {
                 store: 'Sahad Stores', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack,
-                inStock: rng() > 0.15, url: 'https://sahadstores.com',
-                note: 'Wholesale carton', variant: 'wholesale', fetchedAt,
-                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+                inStock: wholesaleInStock, url: 'https://sahadstores.com',
+                note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock',
+                variant: 'wholesale', fetchedAt, anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
             }
         ];
     }
 
-    /**
-     * Everyday Group dual-tier. Everyday has 45% market share (larger than
-     * Sahad's 37%) and prices slightly more aggressively — wholesale tier is
-     * 18–25% below internal.
-     */
     function mockEverydayPrices(ctx) {
         const { query, anchor } = ctx;
         if (!anchor || !anchor.unitPrice || anchor.unitPrice <= 0) return [];
@@ -667,41 +696,37 @@
         const basePack = anchor.packSize || 1;
         const unitPrice = anchor.unitPrice;
 
-        // Retail tier: -4% to +2% of internal
         const retailFactor = 0.96 + rng() * 0.06;
         const retailUnitPrice = unitPrice * retailFactor;
         const retailPrice = Math.round(retailUnitPrice * basePack * 100) / 100;
 
-        // Wholesale tier: 18–25% below internal
         const bulkMultipliers = [2, 4];
         const bulkMult = bulkMultipliers[Math.floor(rng() * bulkMultipliers.length)];
         const wholesalePack = basePack * bulkMult;
-        const wholesaleFactor = 0.75 + rng() * 0.07; // 0.75 – 0.82
+        const wholesaleFactor = 0.75 + rng() * 0.07;
         const wholesaleUnitPrice = unitPrice * wholesaleFactor;
         const wholesalePrice = Math.round(wholesaleUnitPrice * wholesalePack * 100) / 100;
 
+        const retailInStock = rng() > 0.05;
+        const wholesaleInStock = rng() > 0.12;
         const fetchedAt = new Date().toISOString();
 
         return [
             {
                 store: 'Everyday Group', price: retailPrice, packSize: basePack, packQty: 1, totalUnits: basePack,
-                inStock: rng() > 0.05, url: 'http://everydaygroup.com',
-                note: 'Retail pack', variant: 'retail', fetchedAt,
-                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+                inStock: retailInStock, url: 'http://everydaygroup.com',
+                note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock',
+                variant: 'retail', fetchedAt, anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
             },
             {
                 store: 'Everyday Group', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack,
-                inStock: rng() > 0.12, url: 'http://everydaygroup.com',
-                note: 'Wholesale carton', variant: 'wholesale', fetchedAt,
-                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+                inStock: wholesaleInStock, url: 'http://everydaygroup.com',
+                note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock',
+                variant: 'wholesale', fetchedAt, anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
             }
         ];
     }
 
-    /**
-     * Generic single-tier mock — anchored to internal unit price.
-     * Returns [] if no anchor.
-     */
     function mockStorePrices(ctx, storeName, minFactor, maxFactor) {
         const { query, anchor } = ctx;
         if (!anchor || !anchor.unitPrice || anchor.unitPrice <= 0) return [];
@@ -715,10 +740,13 @@
         const newUnitPrice = unitPrice * factor;
         const totalPrice = Math.round(newUnitPrice * basePack * 100) / 100;
 
+        // Single call keeps inStock and note consistent
+        const inStock = rng() > 0.12;
+
         return [{
             store: storeName, price: totalPrice, packSize: basePack, packQty: 1, totalUnits: basePack,
-            inStock: rng() > 0.12, url: '#',
-            note: rng() > 0.12 ? 'In stock' : 'Out of stock',
+            inStock: inStock, url: '#',
+            note: inStock ? 'In stock' : 'Out of stock',
             variant: 'retail', fetchedAt: new Date().toISOString(),
             anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
         }];
@@ -851,7 +879,7 @@
     }
 
     /* =========================================================
-       CSV UPLOAD FOR MANUAL LISTS
+       CSV UPLOAD
     ========================================================= */
     window.uploadCsv = async function(which) {
         const inputId = which === 'sahad' ? 'sahadCsvInput' : 'everydayCsvInput';
@@ -983,7 +1011,7 @@
         reader.readAsArrayBuffer(file);
     }
 
-    function parseSheet(json) {
+    function parseSheet(json, sheetName) {
         if (!json.length) return [];
         const headers = Object.keys(json[0]).map(h => h.toLowerCase().trim());
         const findCol = (variations) => {
@@ -1491,7 +1519,8 @@
                 unitPrice: item.unitPrice / (item.packSize || 1),
                 packPrice: item.unitPrice,
                 packSize: item.packSize || 1,
-                confidence: 'user'
+                confidence: 'user',
+                source: 'this row'
             } : getInternalAnchor(query);
             await fetchOnlinePrices(query, anchor);
             updateStats();
@@ -1512,17 +1541,16 @@
         const everydayRows = onlineRows.filter(s => s.store && s.store.indexOf('Everyday') >= 0);
         const sahadRows = onlineRows.filter(s => s.store && s.store.indexOf('Sahad') >= 0);
 
-        // Determine the anchor this item would use
         const itemAnchor = item.unitPrice > 0 ? {
             unitPrice: item.unitPrice / (item.packSize || 1),
             packPrice: item.unitPrice,
             packSize: item.packSize || 1,
-            confidence: 'user'
+            confidence: 'user',
+            source: 'this row'
         } : getInternalAnchor(item.itemName);
 
         let html = '';
 
-        // Anchor summary banner
         if (itemAnchor) {
             const relCls = 'anchor-banner ' + itemAnchor.confidence;
             const relLabel = itemAnchor.confidence === 'high' ? '🟢 HIGH RELIABILITY' :
@@ -1724,12 +1752,8 @@
             return onlineCache[key].sources;
         }
         const anchor = overrideAnchor || getInternalAnchor(query);
-        if (!anchor) {
-            // No anchor — cannot compare meaningfully
-            onlineCache[key] = { displayName: query, sources: [], timestamp: Date.now(), anchor: null };
-            return [];
-        }
-        const context = { query, anchor };
+        const context = { query, anchor };  // anchor can be null — sources handle it
+
         const results = [];
         await Promise.all(ONLINE_SOURCES.map(async src => {
             try {
@@ -1737,6 +1761,7 @@
                 rows.forEach(r => results.push({ ...r, icon: src.icon, type: src.type, live: r.live !== undefined ? r.live : src.live }));
             } catch (err) { console.warn(`Source ${src.id} failed:`, err); }
         }));
+
         onlineCache[key] = { displayName: query, sources: results, timestamp: Date.now(), anchor };
         return results;
     }
@@ -1751,7 +1776,6 @@
 
         let html = `<p><strong>Item:</strong> ${escapeHtml(item.itemName)} ${item.brand ? '· ' + escapeHtml(item.brand) : ''}</p>`;
 
-        // Anchor banner
         if (anchor && anchorUnit > 0) {
             const cls = 'anchor-banner ' + anchor.confidence;
             const label = anchor.confidence === 'high' ? '🟢 HIGH RELIABILITY REFERENCE' :
@@ -1762,6 +1786,11 @@
                 <strong>${label}</strong> · ₦${formatCurrency(anchor.packPrice)} for ${formatQuantity(anchor.packSize)} units
                 = <strong>₦${formatCurrency(anchorUnit)}/unit</strong>
                 ${anchor.source ? `<span style="font-size:0.78rem;opacity:0.8;">· ${escapeHtml(anchor.source)}</span>` : ''}
+            </div>`;
+        } else if (onlineRows.length > 0) {
+            html += `<div class="anchor-banner manual">
+                <strong>🟣 MANUAL CSV ONLY</strong> · No internal purchase history for this item. Showing prices from your uploaded Sahad/Everyday CSV lists only.
+                <br>Upload a purchase history or type an internal price to enable the full anchored comparison.
             </div>`;
         } else {
             html += `<div class="anchor-banner none">
@@ -1815,7 +1844,8 @@
             const relCls = 'reliability-' + (row.reliability || 'medium');
             const relLabel = row.reliability === 'high' ? 'HIGH' :
                             row.reliability === 'medium' ? 'MED' :
-                            row.reliability === 'user' ? 'USER' : 'EST';
+                            row.reliability === 'user' ? 'USER' :
+                            row.reliability === 'manual' ? 'MANUAL' : 'EST';
 
             let deltaHtml = '';
             if (anchorUnit > 0) {
@@ -1825,6 +1855,8 @@
                 else if (delta < 0) deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper vs reference</span>`;
                 else if (Math.abs(pct) > 40) deltaHtml = `<span class="delta delta-outlier">⚠️ ${pct.toFixed(1)}% — OUTLIER, verify</span>`;
                 else deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier vs reference</span>`;
+            } else if (row.reliability === 'manual') {
+                deltaHtml = `<span class="delta delta-equal">📋 From uploaded CSV</span>`;
             }
 
             const isSahad = row.store.indexOf('Sahad') >= 0;
@@ -1851,7 +1883,7 @@
         html += `</div>`;
 
         html += `<p class="help-text" style="margin-top:14px;">
-            ✅ All prices are anchored to your internal reference (₦${formatCurrency(anchorUnit)}/unit) with realistic markup bands per source type.
+            ${anchorUnit > 0 ? `✅ All prices are anchored to your internal reference (₦${formatCurrency(anchorUnit)}/unit) with realistic markup bands per source type.` : `🟣 Showing manual CSV results only (no internal reference).`}
             <br>📊 <strong>Ranked by price-per-unit</strong> so different pack sizes compare fairly.
             <br>🏬 <strong>Everyday Group</strong> and 🏪 <strong>Sahad Stores</strong> together control 82% of the Nigerian general-merchandise market. Neither publishes a public API — their prices come from your manual CSV uploads.
             <br>⚠️ Values that deviate more than ±40% from the reference are flagged as <strong>OUTLIER</strong>.
@@ -1895,7 +1927,8 @@
                     unitPrice: item.unitPrice / (item.packSize || 1),
                     packPrice: item.unitPrice,
                     packSize: item.packSize || 1,
-                    confidence: 'user'
+                    confidence: 'user',
+                    source: 'this row'
                 } : getInternalAnchor(query);
                 const rows = await fetchOnlinePrices(query, anchor);
                 html += `<div class="card" style="box-shadow:none;border:1px solid #eef1f5;margin-bottom:14px;">
@@ -1918,7 +1951,6 @@
         const item = uploadedItems.find(i => i.id === itemId);
         if (!item) return;
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
-        // Priority: item's own price → price history → category estimate → none
         const anchor = item.unitPrice > 0 ? {
             unitPrice: item.unitPrice / (item.packSize || 1),
             packPrice: item.unitPrice,
@@ -2202,7 +2234,7 @@
     ========================================================= */
     addManualRow();
     addManualRow();
-    console.log('💰 Price Room loaded — all prices anchored to internal reference.');
+    console.log('💰 Price Room loaded — all features intact, manual CSV wired into sources, anchored pricing enabled.');
 </script>
 </body>
 </html>
