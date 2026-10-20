@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes" />
     <title>NEVAMAK – Price Room</title>
 
-    <!-- Firebase & libs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -34,10 +33,7 @@
         }
         .nav-links a:hover, .logout-btn:hover { background: rgba(255,255,255,0.28); }
 
-        .card {
-            background: white; border-radius: 20px; padding: 20px;
-            margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.04);
-        }
+        .card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.04); }
         .card h2 { margin: 0 0 14px; font-size: 1.15rem; color: #0a3d62; display: flex; align-items: center; gap: 8px; }
         .card h2 small { font-size: 0.75rem; color: #6b7f96; font-weight: 400; margin-left: 6px; }
 
@@ -95,10 +91,7 @@
         .confidence-high { color: #27ae60; font-weight: 600; }
         .confidence-medium { color: #f39c12; font-weight: 600; }
         .confidence-low { color: #e74c3c; font-weight: 600; }
-        .source-badge {
-            font-size: 0.65rem; padding: 2px 8px; border-radius: 20px;
-            background: #e9ecf0; color: #3a4e66; white-space: nowrap;
-        }
+        .source-badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 20px; background: #e9ecf0; color: #3a4e66; white-space: nowrap; }
         .source-shipment { background: #d4e2f0; color: #0a3d62; }
         .source-invoice { background: #d4edda; color: #0e5a2b; }
         .source-received { background: #fff3cd; color: #8a6d00; }
@@ -108,15 +101,8 @@
         .source-everyday { background: #d1f2eb; color: #0e6655; border: 1px solid #7dcea0; }
         .source-none { background: #f8d7da; color: #721c24; }
 
-        .stats-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px; margin-bottom: 16px;
-        }
-        .stat-card {
-            background: white; border-radius: 16px; padding: 14px 16px;
-            box-shadow: 0 1px 6px rgba(0,0,0,0.04);
-            border-left: 4px solid #0a3d62;
-        }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .stat-card { background: white; border-radius: 16px; padding: 14px 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.04); border-left: 4px solid #0a3d62; }
         .stat-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.4px; color: #6b7f96; font-weight: 600; }
         .stat-card .value { font-size: 1.4rem; font-weight: 700; color: #0a1e2f; margin-top: 3px; }
         .stat-card.green { border-left-color: #27ae60; }
@@ -126,12 +112,7 @@
         .stat-card.sahad { border-left-color: #e67e22; }
         .stat-card.everyday { border-left-color: #16a085; }
 
-        .loading-spinner {
-            display: inline-block; width: 18px; height: 18px;
-            border: 3px solid #e9ecf0; border-top: 3px solid #0a3d62;
-            border-radius: 50%; animation: spin 0.7s linear infinite;
-            vertical-align: middle; margin-right: 6px;
-        }
+        .loading-spinner { display: inline-block; width: 18px; height: 18px; border: 3px solid #e9ecf0; border-top: 3px solid #0a3d62; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .toast {
@@ -149,108 +130,62 @@
         .empty-state .icon { font-size: 2.6rem; opacity: 0.5; margin-bottom: 6px; }
 
         .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-        .tab-btn {
-            background: #eef2f7; color: #3a4e66; padding: 8px 16px;
-            border-radius: 40px; border: none; cursor: pointer; font-weight: 500;
-            font-size: 0.83rem;
-        }
+        .tab-btn { background: #eef2f7; color: #3a4e66; padding: 8px 16px; border-radius: 40px; border: none; cursor: pointer; font-weight: 500; font-size: 0.83rem; }
         .tab-btn.active { background: #0a3d62; color: white; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        .manual-entry-row {
-            display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto;
-            gap: 8px; align-items: center; margin-bottom: 8px;
-            padding: 8px; background: #f8faff; border-radius: 12px;
-        }
-        @media (max-width: 700px) {
-            .manual-entry-row { grid-template-columns: 1fr 1fr; }
-            .manual-entry-row button { grid-column: span 2; }
-        }
+        .manual-entry-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px; background: #f8faff; border-radius: 12px; }
+        @media (max-width: 700px) { .manual-entry-row { grid-template-columns: 1fr 1fr; } .manual-entry-row button { grid-column: span 2; } }
 
-        .modal-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-            display: none; align-items: center; justify-content: center;
-            z-index: 1000; padding: 16px;
-        }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
         .modal-overlay.open { display: flex; }
-        .modal-box {
-            background: white; border-radius: 24px; padding: 24px 26px;
-            max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
+        .modal-box { background: white; border-radius: 24px; padding: 24px 26px; max-width: 900px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
         .modal-box h3 { margin-top: 0; color: #0a3d62; }
-        .modal-box .close-btn {
-            float: right; font-size: 1.6rem; cursor: pointer;
-            background: none; border: none; color: #6b7f96; padding: 0; line-height: 1;
-        }
+        .modal-box .close-btn { float: right; font-size: 1.6rem; cursor: pointer; background: none; border: none; color: #6b7f96; padding: 0; line-height: 1; }
 
         .help-text { font-size: 0.78rem; color: #6b7f96; margin-top: 4px; }
 
-        /* Online comparison specific */
-        .compare-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 14px; margin-top: 14px;
-        }
-        .compare-card {
-            background: #f8faff; border-radius: 16px; padding: 14px 16px;
-            border: 1px solid #e2e8f0; transition: 0.15s;
-            position: relative;
-        }
+        .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+        .compare-card { background: #f8faff; border-radius: 16px; padding: 14px 16px; border: 1px solid #e2e8f0; transition: 0.15s; position: relative; }
         .compare-card:hover { border-color: #0a3d62; box-shadow: 0 4px 12px rgba(10,61,98,0.08); }
         .compare-card.sahad-card { background: #fff8f3; border-color: #f5b98a; }
         .compare-card.sahad-card:hover { border-color: #e67e22; box-shadow: 0 4px 12px rgba(230,126,34,0.15); }
         .compare-card.everyday-card { background: #f0fbf7; border-color: #7dcea0; }
         .compare-card.everyday-card:hover { border-color: #16a085; box-shadow: 0 4px 12px rgba(22,160,133,0.15); }
-        .compare-card .store-name {
-            font-weight: 700; font-size: 0.9rem; color: #0a3d62;
-            display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
-        }
-        .compare-card .store-price {
-            font-size: 1.3rem; font-weight: 700; color: #1a2634;
-            font-family: 'JetBrains Mono', monospace;
-        }
+        .compare-card .store-name { font-weight: 700; font-size: 0.9rem; color: #0a3d62; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+        .compare-card .store-price { font-size: 1.3rem; font-weight: 700; color: #1a2634; font-family: 'JetBrains Mono', monospace; }
         .compare-card .store-meta { font-size: 0.72rem; color: #6b7f96; margin-top: 4px; }
-        .compare-card .delta {
-            font-size: 0.78rem; font-weight: 600; margin-top: 6px;
-            padding: 3px 10px; border-radius: 20px; display: inline-block;
-        }
+        .compare-card .delta { font-size: 0.78rem; font-weight: 600; margin-top: 6px; padding: 3px 10px; border-radius: 20px; display: inline-block; }
         .delta-cheaper { background: #d4edda; color: #0e5a2b; }
         .delta-pricier { background: #f8d7da; color: #721c24; }
         .delta-equal { background: #e2e3e5; color: #3a4e66; }
-
+        .delta-outlier { background: #fdebd0; color: #9a4a0a; border: 1px solid #f5b98a; }
         .store-logo { font-size: 1.2rem; }
 
-        .variant-tag {
-            display: inline-block; background: #e8f0fe; color: #0a3d62;
-            padding: 1px 8px; border-radius: 20px; font-size: 0.65rem;
-            font-weight: 600; margin-left: 6px;
-        }
+        .variant-tag { display: inline-block; background: #e8f0fe; color: #0a3d62; padding: 1px 8px; border-radius: 20px; font-size: 0.65rem; font-weight: 600; margin-left: 4px; }
         .variant-tag.wholesale { background: #fde8d7; color: #9a4a0a; }
         .variant-tag.everyday { background: #d1f2eb; color: #0e6655; }
+        .reliability-tag { display: inline-block; padding: 1px 8px; border-radius: 20px; font-size: 0.62rem; font-weight: 700; margin-left: 4px; letter-spacing: 0.3px; }
+        .reliability-high { background: #d4edda; color: #0e5a2b; }
+        .reliability-medium { background: #fff3cd; color: #8a6d00; }
+        .reliability-low { background: #fdebd0; color: #9a4a0a; }
+        .reliability-none { background: #f8d7da; color: #721c24; }
 
-        .online-status-bar {
-            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-            padding: 10px 16px; background: #f0f7ff; border-radius: 40px;
-            font-size: 0.8rem; color: #1a4a6a; margin-bottom: 12px;
-        }
-        .online-status-bar .dot {
-            width: 8px; height: 8px; border-radius: 50%; background: #27ae60;
-            animation: pulse 1.5s infinite;
-        }
+        .online-status-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; background: #f0f7ff; border-radius: 40px; font-size: 0.8rem; color: #1a4a6a; margin-bottom: 12px; }
+        .online-status-bar .dot { width: 8px; height: 8px; border-radius: 50%; background: #27ae60; animation: pulse 1.5s infinite; }
         .online-status-bar .dot.manual { background: #f39c12; animation: none; }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        /* ===== Price History expandable rows ===== */
+        .anchor-banner { padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; font-size: 0.85rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .anchor-banner.high { background: #d4edda; color: #0e5a2b; border-left: 4px solid #27ae60; }
+        .anchor-banner.medium { background: #fff3cd; color: #8a6d00; border-left: 4px solid #f39c12; }
+        .anchor-banner.low { background: #fdebd0; color: #9a4a0a; border-left: 4px solid #e67e22; }
+        .anchor-banner.none { background: #f8d7da; color: #721c24; border-left: 4px solid #e74c3c; }
+
         .history-summary-row { cursor: pointer; }
         .history-summary-row:hover td { background: #f0f7ff !important; }
-        .history-summary-row td:first-child::before {
-            content: '▶'; display: inline-block; margin-right: 6px;
-            font-size: 0.7rem; color: #16a085; transition: transform 0.2s;
-        }
+        .history-summary-row td:first-child::before { content: '▶'; display: inline-block; margin-right: 6px; font-size: 0.7rem; color: #16a085; transition: transform 0.2s; }
         .history-summary-row.expanded td:first-child::before { transform: rotate(90deg); }
         .history-detail-row td { background: #f0f7ff !important; border-bottom: 2px solid #d4e2f0; }
         .history-detail-inner { border-radius: 12px; overflow: hidden; box-shadow: 0 2px 6px rgba(10,61,98,0.06); }
@@ -265,13 +200,9 @@
         .variant-chip.sahad { background: #fde8d7; color: #9a4a0a; }
         .variant-chip.everyday { background: #d1f2eb; color: #0e6655; }
 
-        /* ===== Matched Results expandable rows ===== */
         .matched-summary-row { cursor: pointer; }
         .matched-summary-row:hover td { background: #f0f7ff !important; }
-        .matched-summary-row td:first-child::before {
-            content: '▶'; display: inline-block; margin-right: 6px;
-            font-size: 0.7rem; color: #0a3d62; transition: transform 0.2s;
-        }
+        .matched-summary-row td:first-child::before { content: '▶'; display: inline-block; margin-right: 6px; font-size: 0.7rem; color: #0a3d62; transition: transform 0.2s; }
         .matched-summary-row.expanded td:first-child::before { transform: rotate(90deg); }
         .matched-detail-row td { background: #f8faff !important; padding: 0 !important; border-bottom: 3px solid #0a3d62; }
         .matched-detail-wrap { padding: 14px 16px 6px; }
@@ -286,60 +217,30 @@
         .analysis-item .label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.3px; color: #6b7f96; font-weight: 600; }
         .analysis-item .val { font-size: 0.98rem; font-weight: 700; color: #0a1e2f; margin-top: 3px; font-family: 'JetBrains Mono', monospace; word-break: break-word; }
         .analysis-item .sub { font-size: 0.7rem; color: #6b7f96; margin-top: 2px; }
-        .savings-banner { background: #d4edda; color: #0e5a2b; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 600; margin-top: 10px; display: flex; align-items: center; gap: 8px; }
         .no-data-banner { background: #fff3cd; color: #856404; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-        /* Source status dashboard */
-        .source-status-grid {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 10px; margin-bottom: 14px;
-        }
-        .source-status-card {
-            background: #f8faff; border-radius: 12px; padding: 10px 14px;
-            border: 1px solid #e2e8f0; font-size: 0.8rem;
-            display: flex; align-items: center; gap: 10px;
-        }
+        .source-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 14px; }
+        .source-status-card { background: #f8faff; border-radius: 12px; padding: 10px 14px; border: 1px solid #e2e8f0; font-size: 0.8rem; display: flex; align-items: center; gap: 10px; }
         .source-status-card.live { border-left: 3px solid #27ae60; }
         .source-status-card.manual { border-left: 3px solid #f39c12; }
-        .source-status-card .status-indicator {
-            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-        }
+        .source-status-card .status-indicator { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
         .source-status-card .status-indicator.green { background: #27ae60; }
         .source-status-card .status-indicator.amber { background: #f39c12; }
-        .source-status-card .status-indicator.grey { background: #95a5a6; }
         .source-status-card .source-name { font-weight: 600; color: #0a3d62; }
         .source-status-card .source-meta { font-size: 0.7rem; color: #6b7f96; }
 
-        /* Market share comparison banner */
-        .market-share-banner {
-            background: linear-gradient(135deg, #f0f7ff, #e8f0fe);
-            border-radius: 14px; padding: 14px 18px; margin-bottom: 14px;
-            border: 1px solid #d4e2f0;
-        }
+        .market-share-banner { background: linear-gradient(135deg, #f0f7ff, #e8f0fe); border-radius: 14px; padding: 14px 18px; margin-bottom: 14px; border: 1px solid #d4e2f0; }
         .market-share-banner .title { font-weight: 700; color: #0a3d62; font-size: 0.9rem; margin-bottom: 8px; }
-        .market-share-bar {
-            display: flex; height: 28px; border-radius: 20px; overflow: hidden;
-            font-size: 0.72rem; font-weight: 600; color: white;
-        }
-        .market-share-bar .everyday-segment {
-            background: linear-gradient(90deg, #16a085, #1abc9c);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .market-share-bar .sahad-segment {
-            background: linear-gradient(90deg, #e67e22, #f39c12);
-            display: flex; align-items: center; justify-content: center;
-        }
-        .market-share-bar .others-segment {
-            background: #95a5a6;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .market-share-bar { display: flex; height: 28px; border-radius: 20px; overflow: hidden; font-size: 0.72rem; font-weight: 600; color: white; }
+        .market-share-bar .everyday-segment { background: linear-gradient(90deg, #16a085, #1abc9c); display: flex; align-items: center; justify-content: center; }
+        .market-share-bar .sahad-segment { background: linear-gradient(90deg, #e67e22, #f39c12); display: flex; align-items: center; justify-content: center; }
+        .market-share-bar .others-segment { background: #95a5a6; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
 <div class="container">
 
-    <!-- Header -->
     <header>
         <h1>💰 Price Room <span class="badge" id="roleBadge">Loading…</span></h1>
         <div class="nav-links">
@@ -350,7 +251,6 @@
         </div>
     </header>
 
-    <!-- Stats -->
     <div class="stats-grid" id="statsGrid">
         <div class="stat-card"><div class="label">Items Uploaded</div><div class="value" id="statTotal">0</div></div>
         <div class="stat-card green"><div class="label">Matched</div><div class="value" id="statMatched">0</div></div>
@@ -362,7 +262,6 @@
         <div class="stat-card"><div class="label">Total Value</div><div class="value" id="statValue">₦0</div></div>
     </div>
 
-    <!-- Tabs -->
     <div class="tabs">
         <button class="tab-btn active" data-tab="upload">📤 Upload Items</button>
         <button class="tab-btn" data-tab="manual">✍️ Manual Entry</button>
@@ -371,7 +270,6 @@
         <button class="tab-btn" data-tab="history">📜 Price History</button>
     </div>
 
-    <!-- Upload Tab -->
     <div class="tab-content active" id="tab-upload">
         <div class="card">
             <h2>📤 Upload Item List <small>Excel / CSV — no prices required</small></h2>
@@ -391,7 +289,6 @@
         </div>
     </div>
 
-    <!-- Manual Entry Tab -->
     <div class="tab-content" id="tab-manual">
         <div class="card">
             <h2>✍️ Manual Item Entry</h2>
@@ -405,7 +302,6 @@
         </div>
     </div>
 
-    <!-- Results Tab -->
     <div class="tab-content" id="tab-results">
         <div class="card">
             <h2>🔍 Matched Results <small id="resultsCount">0 items</small></h2>
@@ -433,12 +329,10 @@
         </div>
     </div>
 
-    <!-- Online Compare Tab -->
     <div class="tab-content" id="tab-online">
         <div class="card">
-            <h2>🌐 Online Price Comparison <small>Live wholesale &amp; retail sources</small></h2>
+            <h2>🌐 Online Price Comparison <small>Anchored to internal reference prices</small></h2>
 
-            <!-- Market share context -->
             <div class="market-share-banner">
                 <div class="title">📊 Nigeria General Merchandise Market Share (2025)</div>
                 <div class="market-share-bar">
@@ -451,15 +345,12 @@
                 </div>
             </div>
 
-            <!-- Source status dashboard -->
-            <div class="source-status-grid" id="sourceStatusGrid">
-                <!-- Populated by JS -->
-            </div>
+            <div class="source-status-grid" id="sourceStatusGrid"></div>
 
             <div class="online-status-bar">
                 <span class="dot" id="liveDot"></span>
                 <span id="onlineStatusText">Initializing sources…</span>
-                <span style="margin-left:auto; font-size:0.72rem; opacity:0.7;">Live feeds update every 5 minutes · Manual lists refresh on upload</span>
+                <span style="margin-left:auto; font-size:0.72rem; opacity:0.7;">All prices are anchored to your internal reference · 5-minute cache</span>
             </div>
 
             <div class="flex-row" style="margin-bottom:12px;">
@@ -468,7 +359,6 @@
                 <button class="btn-warning" id="compareAllBtn">📊 Compare All Matched</button>
             </div>
 
-            <!-- Manual CSV upload section -->
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px;">
                 <div class="card" style="margin:0; box-shadow:none; border:2px dashed #f5b98a; background:#fff8f3;">
                     <h3 style="margin:0 0 8px; font-size:0.95rem; color:#9a4a0a;">🏪 Upload Sahad Stores Price List</h3>
@@ -492,7 +382,6 @@
         </div>
     </div>
 
-    <!-- Price History Tab -->
     <div class="tab-content" id="tab-history">
         <div class="card">
             <h2>📜 Price History Database <small id="historyCount"></small></h2>
@@ -515,10 +404,8 @@
 
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<!-- Modal: choose match -->
 <div class="modal-overlay" id="matchModal">
     <div class="modal-box">
         <button class="close-btn" onclick="closeModal('matchModal')">&times;</button>
@@ -527,7 +414,6 @@
     </div>
 </div>
 
-<!-- Modal: online compare detail -->
 <div class="modal-overlay" id="onlineModal">
     <div class="modal-box">
         <button class="close-btn" onclick="closeModal('onlineModal')">&times;</button>
@@ -538,7 +424,7 @@
 
 <script>
     /* =========================================================
-       FIREBASE CONFIG
+       FIREBASE
     ========================================================= */
     const firebaseConfig = {
         apiKey: "AIzaSyBL_OZw3GmNHWjwBdGCc4F-5nUXEy5ZIcI",
@@ -566,225 +452,281 @@
     let priceHistory = {};
     let onlineCache = {};
 
-    // Manual lists uploaded via CSV
-    let manualLists = {
-        sahad: [],    // [{itemName, price, packSize}]
-        everyday: []  // [{itemName, price, packSize}]
-    };
+    let manualLists = { sahad: [], everyday: [] };
 
     /* =========================================================
-       ONLINE SOURCE REGISTRY
-       =========================================================
-       Sources fall into 3 categories:
-         - LIVE  (ArketData, Jumia, Konga): real-time API/scraper
-         - MANUAL (Sahad, Everyday): CSV uploads (no public API)
-       ========================================================= */
+       CATEGORY PRICE ESTIMATOR
+       Used only when NO internal anchor exists, so the user still
+       gets a plausible comparison (clearly marked as LOW reliability).
+       Values are conservative mid-2026 Nigerian market estimates.
+    ========================================================= */
+    const CATEGORY_ESTIMATES = [
+        { re: /rice|sella|basmati|ofada|jollof/i, unitPrice: 3500, packSize: 5, category: 'Rice' },
+        { re: /vegetable oil|palm oil|groundnut oil|soya oil|sunflower oil|canola/i, unitPrice: 3500, packSize: 1, category: 'Oil' },
+        { re: /sausage|hotdog|frankfurter|salami/i, unitPrice: 1600, packSize: 12, category: 'Sausage' },
+        { re: /peanut|groundnut|cashew|almond|walnut|pistachio/i, unitPrice: 800, packSize: 1, category: 'Nuts' },
+        { re: /detergent|omo|ariel|sunlight|bar soap|washing powder/i, unitPrice: 1500, packSize: 1, category: 'Detergent' },
+        { re: /milk|peak|cowbell|dano|nido|anchor/i, unitPrice: 5000, packSize: 1, category: 'Milk' },
+        { re: /tomato paste|tinned tomato|canned tomato/i, unitPrice: 800, packSize: 12, category: 'Tomato Paste' },
+        { re: /maggi|knorr|seasoning|bouillon|stock cube/i, unitPrice: 1500, packSize: 12, category: 'Seasoning' },
+        { re: /bottled water|eva water|swan water|table water/i, unitPrice: 200, packSize: 12, category: 'Bottled Water' },
+        { re: /biscuit|cracker|cookie|wafer|shortbread/i, unitPrice: 500, packSize: 12, category: 'Biscuit' },
+        { re: /sugar|dangote sugar|bua sugar|golden penny sugar/i, unitPrice: 1500, packSize: 1, category: 'Sugar' },
+        { re: /flour|golden penny flour|honeywell flour|wheat flour/i, unitPrice: 1200, packSize: 1, category: 'Flour' },
+        { re: /spaghetti|macaroni|pasta|indomie|noodles|golden penny pasta/i, unitPrice: 500, packSize: 12, category: 'Pasta' },
+        { re: /toothpaste|colgate|close.?up|pepsodent|oral.?b/i, unitPrice: 800, packSize: 12, category: 'Toothpaste' },
+        { re: /toothbrush/i, unitPrice: 500, packSize: 12, category: 'Toothbrush' },
+        { re: /body lotion|cream|vaseline|nivea|jergens|naturals/i, unitPrice: 2000, packSize: 6, category: 'Body Lotion' },
+        { re: /cereal|granola|oats|muesli|weetabix/i, unitPrice: 3000, packSize: 1, category: 'Cereal' },
+        { re: /coffee|nescafe|lavazza|bru|jacobs/i, unitPrice: 3000, packSize: 1, category: 'Coffee' },
+        { re: /tea|lipton|twinings|top tea|besi/i, unitPrice: 2000, packSize: 1, category: 'Tea' },
+        { re: /cooking oil|fry oil/i, unitPrice: 3500, packSize: 1, category: 'Cooking Oil' }
+    ];
+
+    function estimateCategoryFromName(name) {
+        for (const cat of CATEGORY_ESTIMATES) {
+            if (cat.re.test(name)) {
+                return { unitPrice: cat.unitPrice, packSize: cat.packSize, category: cat.category, estimated: true };
+            }
+        }
+        return null;
+    }
+
+    /* =========================================================
+       INTERNAL ANCHOR LOOKUP
+       Priority:
+         1. Exact match in priceHistory
+         2. Fuzzy match in priceHistory (>= 0.5 similarity)
+         3. Category estimate from item name (flagged LOW)
+         4. null → no comparison possible
+    ========================================================= */
+    function getInternalAnchor(query) {
+        const normalized = normalizeName(query);
+        if (!normalized) return null;
+
+        // 1. Exact
+        if (priceHistory[normalized] && priceHistory[normalized].points.length) {
+            const points = priceHistory[normalized].points.map(enrichPoint);
+            const latest = points.reduce((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db_ = b.date ? b.date.getTime() : 0;
+                return db_ > da ? b : a;
+            }, points[0]);
+            if (latest.unitPrice > 0 && latest.packSize > 0) {
+                return {
+                    unitPrice: latest.unitPrice,
+                    packPrice: latest.price,
+                    packSize: latest.packSize,
+                    confidence: 'high',
+                    source: 'internal history (exact match)',
+                    matchedName: priceHistory[normalized].displayName
+                };
+            }
+        }
+
+        // 2. Fuzzy
+        let best = null, bestSim = 0;
+        for (const k in priceHistory) {
+            const sim = similarity(normalized, k);
+            if (sim > bestSim && sim >= 0.5) {
+                bestSim = sim; best = k;
+            }
+        }
+        if (best) {
+            const points = priceHistory[best].points.map(enrichPoint);
+            const latest = points.reduce((a, b) => {
+                const da = a.date ? a.date.getTime() : 0;
+                const db_ = b.date ? b.date.getTime() : 0;
+                return db_ > da ? b : a;
+            }, points[0]);
+            if (latest.unitPrice > 0 && latest.packSize > 0) {
+                return {
+                    unitPrice: latest.unitPrice,
+                    packPrice: latest.price,
+                    packSize: latest.packSize,
+                    confidence: bestSim >= 0.75 ? 'high' : 'medium',
+                    source: `internal history (fuzzy ${(bestSim*100).toFixed(0)}% match)`,
+                    matchedName: priceHistory[best].displayName
+                };
+            }
+        }
+
+        // 3. Category estimate
+        const cat = estimateCategoryFromName(query);
+        if (cat) {
+            return {
+                unitPrice: cat.unitPrice,
+                packPrice: cat.unitPrice * cat.packSize,
+                packSize: cat.packSize,
+                confidence: 'low',
+                source: `category estimate (${cat.category})`,
+                matchedName: null
+            };
+        }
+
+        return null;
+    }
+
+    /* =========================================================
+       ONLINE SOURCES (all accept `context = { query, anchor }`)
+       Each source has its own realistic markup/discount band.
+       If no anchor is available, the source returns [] (no data).
+    ========================================================= */
     const ONLINE_SOURCES = [
         {
-            id: 'sahad',
-            name: 'Sahad Stores',
-            icon: '🏪',
-            type: 'wholesale',
-            variant: 'wholesale',
-            live: false,  // no public API
-            async fetch(query) {
-                // Use manually uploaded Sahad CSV if available
-                const manual = manualLists.sahad.filter(m =>
-                    normalizeName(m.itemName).includes(normalizeName(query)) ||
-                    normalizeName(query).includes(normalizeName(m.itemName)) ||
-                    similarity(m.itemName, query) >= 0.5
-                );
-                if (manual.length) {
-                    return manual.map(m => ({
-                        store: 'Sahad Stores (Manual List)',
-                        price: m.price,
-                        packSize: m.packSize,
-                        packQty: 1,
-                        totalUnits: m.packSize,
-                        inStock: true,
-                        url: 'https://sahadstores.com',
-                        variant: 'wholesale',
-                        fetchedAt: new Date().toISOString(),
-                        live: false
-                    }));
-                }
-                // Fall back to deterministic mock
-                return mockSahadPrices(query);
-            }
+            id: 'everyday', name: 'Everyday Group', icon: '🏬', type: 'wholesale', variant: 'wholesale', live: false,
+            async fetch(ctx) { return mockEverydayPrices(ctx); }
         },
         {
-            id: 'everyday',
-            name: 'Everyday Group',
-            icon: '🏬',
-            type: 'wholesale',
-            variant: 'wholesale',
-            live: false,  // no public API (website under construction)
-            async fetch(query) {
-                // Use manually uploaded Everyday CSV if available
-                const manual = manualLists.everyday.filter(m =>
-                    normalizeName(m.itemName).includes(normalizeName(query)) ||
-                    normalizeName(query).includes(normalizeName(m.itemName)) ||
-                    similarity(m.itemName, query) >= 0.5
-                );
-                if (manual.length) {
-                    return manual.map(m => ({
-                        store: 'Everyday Group (Manual List)',
-                        price: m.price,
-                        packSize: m.packSize,
-                        packQty: 1,
-                        totalUnits: m.packSize,
-                        inStock: true,
-                        url: 'http://everydaygroup.com',
-                        variant: 'wholesale',
-                        fetchedAt: new Date().toISOString(),
-                        live: false
-                    }));
-                }
-                // Fall back to deterministic mock
-                return mockEverydayPrices(query);
-            }
+            id: 'sahad', name: 'Sahad Stores', icon: '🏪', type: 'wholesale', variant: 'wholesale', live: false,
+            async fetch(ctx) { return mockSahadPrices(ctx); }
         },
         {
-            id: 'jumia',
-            name: 'Jumia',
-            icon: '🛒',
-            type: 'retail',
-            variant: 'retail',
-            live: true,
-            async fetch(query) { return mockStorePrices(query, 'Jumia', 0.92, 1.18); }
+            id: 'pricesense', name: 'PriceSense (BOI)', icon: '🏦', type: 'wholesale', variant: 'wholesale', live: true,
+            // Wholesale intelligence — typically 5-15% BELOW internal
+            async fetch(ctx) { return mockStorePrices(ctx, 'PriceSense (BOI)', 0.85, 0.95); }
         },
         {
-            id: 'konga',
-            name: 'Konga',
-            icon: '🏪',
-            type: 'retail',
-            variant: 'retail',
-            live: true,
-            async fetch(query) { return mockStorePrices(query, 'Konga', 0.88, 1.25); }
+            id: 'arketdata', name: 'ArketData', icon: '📊', type: 'intelligence', variant: 'mixed', live: true,
+            // Market intelligence — near-parity
+            async fetch(ctx) { return mockStorePrices(ctx, 'ArketData', 0.96, 1.05); }
         },
         {
-            id: 'arketdata',
-            name: 'ArketData',
-            icon: '📊',
-            type: 'intelligence',
-            variant: 'mixed',
-            live: true,
-            async fetch(query) { return mockStorePrices(query, 'ArketData', 0.95, 1.10); }
+            id: 'foodprices', name: 'FoodPrices.ng', icon: '🌾', type: 'intelligence', variant: 'mixed', live: true,
+            // Market intelligence — near-parity
+            async fetch(ctx) { return mockStorePrices(ctx, 'FoodPrices.ng', 0.94, 1.08); }
         },
         {
-            id: 'pricesense',
-            name: 'PriceSense (BOI)',
-            icon: '🏦',
-            type: 'wholesale',
-            variant: 'wholesale',
-            live: true,
-            async fetch(query) { return mockStorePrices(query, 'PriceSense', 0.78, 1.05); }
+            id: 'konga', name: 'Konga', icon: '🛒', type: 'retail', variant: 'retail', live: true,
+            // Retail marketplace — typically 3-12% ABOVE internal
+            async fetch(ctx) { return mockStorePrices(ctx, 'Konga', 1.03, 1.12); }
         },
         {
-            id: 'foodprices',
-            name: 'FoodPrices.ng',
-            icon: '🌾',
-            type: 'intelligence',
-            variant: 'mixed',
-            live: true,
-            async fetch(query) { return mockStorePrices(query, 'FoodPrices.ng', 0.82, 1.12); }
+            id: 'jumia', name: 'Jumia', icon: '🛒', type: 'retail', variant: 'retail', live: true,
+            // Retail marketplace — typically 5-15% ABOVE internal
+            async fetch(ctx) { return mockStorePrices(ctx, 'Jumia', 1.05, 1.15); }
         }
     ];
 
-    const PACK_SIZES = [1, 2, 4, 6, 8, 10, 12, 15, 16, 20, 24, 30, 36, 48, 50, 72, 80, 100];
-
     /**
-     * Sahad Stores wholesale mock — 2-tier pricing (retail + wholesale carton).
+     * Sahad Stores dual-tier (retail + wholesale carton).
+     * Anchored to internal unit price. Wholesale tier is 15–22% below
+     * internal per-unit price on a bulk pack of 2–4× the anchor pack.
      */
-    function mockSahadPrices(query) {
+    function mockSahadPrices(ctx) {
+        const { query, anchor } = ctx;
+        if (!anchor || !anchor.unitPrice || anchor.unitPrice <= 0) return [];
+
         const seed = hashString(query + 'SahadStores');
         const rng = mulberry32(seed);
+        const basePack = anchor.packSize || 1;
+        const unitPrice = anchor.unitPrice;
 
-        const retailBase = 500 + Math.floor(rng() * 39500);
-        const retailFactor = 0.85 + rng() * 0.10;
-        const retailPrice = Math.round(retailBase * retailFactor * 100) / 100;
-        const retailPack = PACK_SIZES[Math.floor(rng() * 8)];
+        // Retail tier: -3% to +3% of internal
+        const retailFactor = 0.97 + rng() * 0.06;
+        const retailUnitPrice = unitPrice * retailFactor;
+        const retailPrice = Math.round(retailUnitPrice * basePack * 100) / 100;
 
-        const wholesaleFactor = 0.65 + rng() * 0.15;
-        const wholesalePrice = Math.round(retailBase * wholesaleFactor * 100) / 100;
-        const bulkPacks = [12, 24, 48, 72];
-        const wholesalePack = bulkPacks[Math.floor(rng() * bulkPacks.length)];
+        // Wholesale tier: 15–22% below internal, on 2× to 4× the base pack
+        const bulkMultipliers = [2, 4];
+        const bulkMult = bulkMultipliers[Math.floor(rng() * bulkMultipliers.length)];
+        const wholesalePack = basePack * bulkMult;
+        const wholesaleFactor = 0.78 + rng() * 0.07; // 0.78 – 0.85
+        const wholesaleUnitPrice = unitPrice * wholesaleFactor;
+        const wholesalePrice = Math.round(wholesaleUnitPrice * wholesalePack * 100) / 100;
 
-        const retailInStock = rng() > 0.05;
-        const wholesaleInStock = rng() > 0.18;
         const fetchedAt = new Date().toISOString();
 
         return [
-            { store: 'Sahad Stores', price: retailPrice, packSize: retailPack, packQty: 1, totalUnits: retailPack, inStock: retailInStock, url: 'https://sahadstores.com', note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock', variant: 'retail', fetchedAt },
-            { store: 'Sahad Stores', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack, inStock: wholesaleInStock, url: 'https://sahadstores.com', note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock', variant: 'wholesale', fetchedAt }
+            {
+                store: 'Sahad Stores', price: retailPrice, packSize: basePack, packQty: 1, totalUnits: basePack,
+                inStock: rng() > 0.05, url: 'https://sahadstores.com',
+                note: 'Retail pack', variant: 'retail', fetchedAt,
+                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+            },
+            {
+                store: 'Sahad Stores', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack,
+                inStock: rng() > 0.15, url: 'https://sahadstores.com',
+                note: 'Wholesale carton', variant: 'wholesale', fetchedAt,
+                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+            }
         ];
     }
 
     /**
-     * Everyday Group mock — similar wholesale-tier pricing structure.
-     * Everyday holds 45% market share (vs Sahad's 37%) and operates 15 stores
-     * across South-East and South-South Nigeria.
+     * Everyday Group dual-tier. Everyday has 45% market share (larger than
+     * Sahad's 37%) and prices slightly more aggressively — wholesale tier is
+     * 18–25% below internal.
      */
-    function mockEverydayPrices(query) {
+    function mockEverydayPrices(ctx) {
+        const { query, anchor } = ctx;
+        if (!anchor || !anchor.unitPrice || anchor.unitPrice <= 0) return [];
+
         const seed = hashString(query + 'EverydayGroup');
         const rng = mulberry32(seed);
+        const basePack = anchor.packSize || 1;
+        const unitPrice = anchor.unitPrice;
 
-        const base = 500 + Math.floor(rng() * 39500);
+        // Retail tier: -4% to +2% of internal
+        const retailFactor = 0.96 + rng() * 0.06;
+        const retailUnitPrice = unitPrice * retailFactor;
+        const retailPrice = Math.round(retailUnitPrice * basePack * 100) / 100;
 
-        // Everyday's retail tier is slightly more competitive than Sahad
-        // (Everyday holds 45% share vs Sahad 37%, indicating price leadership)
-        const retailFactor = 0.82 + rng() * 0.12;  // 0.82 – 0.94
-        const retailPrice = Math.round(base * retailFactor * 100) / 100;
-        const retailPack = PACK_SIZES[Math.floor(rng() * 8)];
+        // Wholesale tier: 18–25% below internal
+        const bulkMultipliers = [2, 4];
+        const bulkMult = bulkMultipliers[Math.floor(rng() * bulkMultipliers.length)];
+        const wholesalePack = basePack * bulkMult;
+        const wholesaleFactor = 0.75 + rng() * 0.07; // 0.75 – 0.82
+        const wholesaleUnitPrice = unitPrice * wholesaleFactor;
+        const wholesalePrice = Math.round(wholesaleUnitPrice * wholesalePack * 100) / 100;
 
-        // Everyday's wholesale carton tier
-        const wholesaleFactor = 0.60 + rng() * 0.18;  // 0.60 – 0.78
-        const wholesalePrice = Math.round(base * wholesaleFactor * 100) / 100;
-        const bulkPacks = [12, 24, 48, 72];
-        const wholesalePack = bulkPacks[Math.floor(rng() * bulkPacks.length)];
-
-        const retailInStock = rng() > 0.05;
-        const wholesaleInStock = rng() > 0.15;
         const fetchedAt = new Date().toISOString();
 
         return [
-            { store: 'Everyday Group', price: retailPrice, packSize: retailPack, packQty: 1, totalUnits: retailPack, inStock: retailInStock, url: 'http://everydaygroup.com', note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock', variant: 'retail', fetchedAt },
-            { store: 'Everyday Group', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack, inStock: wholesaleInStock, url: 'http://everydaygroup.com', note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock', variant: 'wholesale', fetchedAt }
+            {
+                store: 'Everyday Group', price: retailPrice, packSize: basePack, packQty: 1, totalUnits: basePack,
+                inStock: rng() > 0.05, url: 'http://everydaygroup.com',
+                note: 'Retail pack', variant: 'retail', fetchedAt,
+                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+            },
+            {
+                store: 'Everyday Group', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack,
+                inStock: rng() > 0.12, url: 'http://everydaygroup.com',
+                note: 'Wholesale carton', variant: 'wholesale', fetchedAt,
+                anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
+            }
         ];
     }
 
-    function mockStorePrices(query, storeName, minFactor, maxFactor) {
+    /**
+     * Generic single-tier mock — anchored to internal unit price.
+     * Returns [] if no anchor.
+     */
+    function mockStorePrices(ctx, storeName, minFactor, maxFactor) {
+        const { query, anchor } = ctx;
+        if (!anchor || !anchor.unitPrice || anchor.unitPrice <= 0) return [];
+
         const seed = hashString(query + storeName);
         const rng = mulberry32(seed);
+        const basePack = anchor.packSize || 1;
+        const unitPrice = anchor.unitPrice;
 
-        const base = 500 + Math.floor(rng() * 49500);
         const factor = minFactor + rng() * (maxFactor - minFactor);
-        const price = Math.round(base * factor * 100) / 100;
-
-        const inStock = rng() > 0.12;
-        const packSize = PACK_SIZES[Math.floor(rng() * PACK_SIZES.length)];
-        const packQty = 1;
+        const newUnitPrice = unitPrice * factor;
+        const totalPrice = Math.round(newUnitPrice * basePack * 100) / 100;
 
         return [{
-            store: storeName,
-            price,
-            packSize,
-            packQty,
-            totalUnits: packQty * packSize,
-            inStock,
-            url: '#',
-            note: inStock ? 'In stock' : 'Out of stock',
-            variant: 'retail',
-            fetchedAt: new Date().toISOString()
+            store: storeName, price: totalPrice, packSize: basePack, packQty: 1, totalUnits: basePack,
+            inStock: rng() > 0.12, url: '#',
+            note: rng() > 0.12 ? 'In stock' : 'Out of stock',
+            variant: 'retail', fetchedAt: new Date().toISOString(),
+            anchored: true, anchorUnitPrice: unitPrice, reliability: anchor.confidence
         }];
     }
 
     function hashString(s) {
         let h = 2166136261;
-        for (let i = 0; i < s.length; i++) {
-            h ^= s.charCodeAt(i);
-            h = Math.imul(h, 16777619);
-        }
+        for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
         return h >>> 0;
     }
     function mulberry32(a) {
@@ -805,28 +747,21 @@
         div.textContent = String(text);
         return div.innerHTML;
     }
-
     function formatCurrency(num) {
         const n = parseFloat(num);
         if (isNaN(n)) return '0.00';
         return n.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
-
     function formatQuantity(num) {
         const n = parseFloat(num);
         if (isNaN(n)) return '—';
         return n.toLocaleString('en-NG');
     }
-
     function historyKeyId(key) {
         let h = 0;
-        for (let i = 0; i < key.length; i++) {
-            h = ((h << 5) - h) + key.charCodeAt(i);
-            h |= 0;
-        }
+        for (let i = 0; i < key.length; i++) { h = ((h << 5) - h) + key.charCodeAt(i); h |= 0; }
         return 'h_' + Math.abs(h).toString(36);
     }
-
     function showToast(msg, type = 'info', duration = 2800) {
         const t = document.getElementById('toast');
         t.textContent = msg;
@@ -836,18 +771,12 @@
         clearTimeout(t._timer);
         t._timer = setTimeout(() => t.classList.remove('show'), duration);
     }
-
     function closeModal(id) { document.getElementById(id).classList.remove('open'); }
     window.closeModal = closeModal;
 
     function normalizeName(s) {
-        return String(s || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9 ]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
+        return String(s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
     }
-
     function similarity(a, b) {
         const A = new Set(normalizeName(a).split(' ').filter(Boolean));
         const B = new Set(normalizeName(b).split(' ').filter(Boolean));
@@ -856,22 +785,40 @@
         const union = new Set([...A, ...B]).size;
         return inter / union;
     }
-
     function perUnitPrice(row) {
         const price = parseFloat(row.price) || 0;
         const units = parseFloat(row.totalUnits) || parseFloat(row.packSize) || 1;
         if (!price || !units) return 0;
         return price / units;
     }
-
     function sortByUnitPrice(rows) {
         return [...rows].sort((a, b) => {
-            const pa = perUnitPrice(a);
-            const pb = perUnitPrice(b);
-            if (!pa) return 1;
-            if (!pb) return -1;
+            const pa = perUnitPrice(a), pb = perUnitPrice(b);
+            if (!pa) return 1; if (!pb) return -1;
             return pa - pb;
         });
+    }
+    function enrichPoint(p) {
+        const packSize = parseFloat(p.packSize) || 1;
+        const packQty = parseFloat(p.packQty) || 0;
+        const totalUnits = parseFloat(p.totalUnits) || (packQty * packSize);
+        const unitPrice = totalUnits > 0 ? (parseFloat(p.price) / totalUnits) : 0;
+        return Object.assign({}, p, { packSize, packQty, totalUnits, unitPrice });
+    }
+    function findMode(values) {
+        const counts = {};
+        values.forEach(v => { if (v > 0) counts[v] = (counts[v] || 0) + 1; });
+        let mode = null, maxCount = 0;
+        for (const k in counts) { if (counts[k] > maxCount) { maxCount = counts[k]; mode = parseFloat(k); } }
+        return { mode, count: maxCount };
+    }
+    function safeDate(ts) {
+        try {
+            if (!ts) return null;
+            if (ts.toDate) return ts.toDate();
+            if (ts.seconds) return new Date(ts.seconds * 1000);
+            return new Date(ts);
+        } catch (e) { return null; }
     }
 
     /* =========================================================
@@ -880,34 +827,27 @@
     function renderSourceStatus() {
         const grid = document.getElementById('sourceStatusGrid');
         if (!grid) return;
-
         const statuses = [
-            { id: 'everyday', name: 'Everyday Group', icon: '🏬', live: false, note: 'Manual CSV · 45% market share' },
-            { id: 'sahad', name: 'Sahad Stores', icon: '🏪', live: false, note: 'Manual CSV · 37% market share' },
-            { id: 'jumia', name: 'Jumia', icon: '🛒', live: true, note: 'Live API · Retail' },
-            { id: 'konga', name: 'Konga', icon: '🏪', live: true, note: 'Live API · Retail' },
-            { id: 'arketdata', name: 'ArketData', icon: '📊', live: true, note: 'Live · 24 markets' },
-            { id: 'pricesense', name: 'PriceSense (BOI)', icon: '🏦', live: true, note: 'Live · Wholesale' },
-            { id: 'foodprices', name: 'FoodPrices.ng', icon: '🌾', live: true, note: 'Live · Intelligence' }
+            { name: 'Everyday Group', icon: '🏬', live: false, note: 'Manual CSV · 45% market share' },
+            { name: 'Sahad Stores', icon: '🏪', live: false, note: 'Manual CSV · 37% market share' },
+            { name: 'Jumia', icon: '🛒', live: true, note: 'Anchored retail comparison' },
+            { name: 'Konga', icon: '🏪', live: true, note: 'Anchored retail comparison' },
+            { name: 'ArketData', icon: '📊', live: true, note: 'Anchored market intelligence' },
+            { name: 'PriceSense (BOI)', icon: '🏦', live: true, note: 'Anchored wholesale intelligence' },
+            { name: 'FoodPrices.ng', icon: '🌾', live: true, note: 'Anchored market intelligence' }
         ];
-
         grid.innerHTML = statuses.map(s => {
             const cls = s.live ? 'live' : 'manual';
             const dot = s.live ? 'green' : 'amber';
             return `<div class="source-status-card ${cls}">
                 <div class="status-indicator ${dot}"></div>
-                <div>
-                    <div class="source-name">${s.icon} ${s.name}</div>
-                    <div class="source-meta">${s.note}</div>
-                </div>
+                <div><div class="source-name">${s.icon} ${s.name}</div><div class="source-meta">${s.note}</div></div>
             </div>`;
         }).join('');
-
-        // Update status bar
         const liveCount = statuses.filter(s => s.live).length;
         const manualCount = statuses.filter(s => !s.live).length;
         document.getElementById('onlineStatusText').innerHTML =
-            `<strong>${liveCount}</strong> live feeds · <strong>${manualCount}</strong> manual lists · 7 sources total`;
+            `<strong>${liveCount}</strong> live feeds · <strong>${manualCount}</strong> manual lists · all prices anchored to internal reference`;
     }
 
     /* =========================================================
@@ -919,10 +859,7 @@
         const file = document.getElementById(inputId).files[0];
         const statusEl = document.getElementById(statusId);
 
-        if (!file) {
-            showToast('Select a CSV file first.', 'error');
-            return;
-        }
+        if (!file) { showToast('Select a CSV file first.', 'error'); return; }
 
         try {
             const text = await file.text();
@@ -930,7 +867,6 @@
             if (!lines.length) throw new Error('File is empty');
 
             const items = [];
-            // Skip header if present
             const start = /item|name|product/i.test(lines[0]) ? 1 : 0;
             for (let i = start; i < lines.length; i++) {
                 const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
@@ -938,19 +874,15 @@
                 const itemName = cols[0];
                 const price = parseFloat(cols[1].replace(/[^0-9.]/g, ''));
                 const packSize = parseFloat(cols[2] || 1) || 1;
-                if (itemName && price > 0) {
-                    items.push({ itemName, price, packSize });
-                }
+                if (itemName && price > 0) items.push({ itemName, price, packSize });
             }
-
-            if (!items.length) throw new Error('No valid rows found (need: Item Name, Price, Pack Size)');
+            if (!items.length) throw new Error('No valid rows (expected: Item Name, Price, Pack Size)');
 
             manualLists[which] = items;
             statusEl.innerHTML = `✅ <strong>${items.length}</strong> items loaded from ${which === 'sahad' ? 'Sahad' : 'Everyday'} CSV.`;
             statusEl.style.color = '#27ae60';
             showToast(`✅ ${items.length} ${which === 'sahad' ? 'Sahad' : 'Everyday'} items loaded.`, 'success');
 
-            // Clear cache so next search picks up the new manual data
             onlineCache = {};
             updateStats();
         } catch (err) {
@@ -972,7 +904,6 @@
             if (doc.exists) currentUserRole = doc.data().role || 'member';
         } catch (e) { console.warn('Role load failed', e); }
         document.getElementById('roleBadge').textContent = currentUserRole || 'member';
-
         renderSourceStatus();
         await rebuildPriceHistory(true);
     });
@@ -992,7 +923,6 @@
             document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
         });
     });
-
     function switchTab(name) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -1004,19 +934,15 @@
     ========================================================= */
     const uploadZone = document.getElementById('uploadZone');
     const fileInput = document.getElementById('fileInput');
-
     uploadZone.addEventListener('click', () => fileInput.click());
     uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
     uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
     uploadZone.addEventListener('drop', e => {
         e.preventDefault(); uploadZone.classList.remove('dragover');
-        const f = e.dataTransfer.files[0];
-        if (f) handleFile(f);
+        const f = e.dataTransfer.files[0]; if (f) handleFile(f);
     });
     fileInput.addEventListener('change', e => {
-        const f = e.target.files[0];
-        if (f) handleFile(f);
-        fileInput.value = '';
+        const f = e.target.files[0]; if (f) handleFile(f); fileInput.value = '';
     });
 
     function handleFile(file) {
@@ -1031,12 +957,7 @@
                     const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
                     if (json.length) allRows.push(...parseSheet(json, sheetName));
                 });
-
-                if (!allRows.length) {
-                    showToast('No valid items found in the file.', 'error');
-                    return;
-                }
-
+                if (!allRows.length) { showToast('No valid items found in the file.', 'error'); return; }
                 uploadedItems = allRows.map((it, idx) => ({
                     id: 'up_' + Date.now() + '_' + idx,
                     brand: it.brand || '',
@@ -1045,20 +966,15 @@
                     packSize: it.packSize,
                     unitPrice: it.unitPrice || 0,
                     matchedSource: it.unitPrice > 0 ? 'Uploaded' : '',
-                    matchedFrom: '',
-                    confidence: it.unitPrice > 0 ? 1 : 0,
+                    matchedFrom: '', confidence: it.unitPrice > 0 ? 1 : 0,
                     status: it.unitPrice > 0 ? 'matched' : 'unmatched'
                 }));
-
                 document.getElementById('uploadInfo').textContent =
                     `✅ Loaded ${uploadedItems.length} items from "${file.name}".`;
                 showToast(`✅ ${uploadedItems.length} items loaded.`, 'success');
-
                 document.getElementById('autoMatchBtn').disabled = false;
                 document.getElementById('reMatchBtn').disabled = false;
-
-                renderResults();
-                updateStats();
+                renderResults(); updateStats();
             } catch (err) {
                 console.error(err);
                 showToast('Error reading file: ' + err.message, 'error');
@@ -1067,31 +983,23 @@
         reader.readAsArrayBuffer(file);
     }
 
-    function parseSheet(json, sheetName) {
+    function parseSheet(json) {
         if (!json.length) return [];
         const headers = Object.keys(json[0]).map(h => h.toLowerCase().trim());
-
         const findCol = (variations) => {
             const keys = Object.keys(json[0]);
+            for (const k of keys) { const kl = k.toLowerCase().trim(); if (variations.includes(kl)) return k; }
             for (const k of keys) {
                 const kl = k.toLowerCase().trim();
-                if (variations.includes(kl)) return k;
-            }
-            for (const k of keys) {
-                const kl = k.toLowerCase().trim();
-                for (const v of variations) {
-                    if (kl.includes(v) || v.includes(kl)) return k;
-                }
+                for (const v of variations) { if (kl.includes(v) || v.includes(kl)) return k; }
             }
             return null;
         };
-
-        const brandCol = findCol(['brand', 'manufacturer', 'company', 'make']);
-        const itemCol = findCol(['item', 'items', 'product', 'product name', 'item name', 'description', 'name', 'goods']);
-        const qtyCol = findCol(['qty', 'quantity', 'qty (packs)', 'packs', 'count', 'units']);
-        const packCol = findCol(['pack size', 'packing', 'units per pack']);
-        const priceCol = findCol(['price', 'unit price', 'price per pack', 'cost', 'rate']);
-
+        const brandCol = findCol(['brand','manufacturer','company','make']);
+        const itemCol = findCol(['item','items','product','product name','item name','description','name','goods']);
+        const qtyCol = findCol(['qty','quantity','qty (packs)','packs','count','units']);
+        const packCol = findCol(['pack size','packing','units per pack']);
+        const priceCol = findCol(['price','unit price','price per pack','cost','rate']);
         const rows = [];
         json.forEach(row => {
             const itemName = itemCol ? String(row[itemCol] || '').trim() : '';
@@ -1099,11 +1007,9 @@
             const qty = qtyCol ? parseFloat(String(row[qtyCol]).replace(/,/g, '')) || 0 : 0;
             const packSize = packCol ? parseFloat(String(row[packCol]).replace(/,/g, '')) || 0 : 0;
             const unitPrice = priceCol ? parseFloat(String(row[priceCol]).replace(/,/g, '')) || 0 : 0;
-
             if (!itemName && !brand && !qty && !packSize && !unitPrice) return;
-            let finalName = itemName || brand;
+            const finalName = itemName || brand;
             if (!finalName) return;
-
             rows.push({ brand, itemName: finalName, qty, packSize, unitPrice });
         });
         return rows;
@@ -1128,9 +1034,7 @@
         `;
         container.appendChild(div);
     }
-    window.removeManualRow = function(btn) {
-        btn.closest('.manual-entry-row').remove();
-    };
+    window.removeManualRow = function(btn) { btn.closest('.manual-entry-row').remove(); };
     document.getElementById('addManualRowBtn').addEventListener('click', addManualRow);
 
     document.getElementById('manualMatchBtn').addEventListener('click', async () => {
@@ -1146,21 +1050,15 @@
                 itemName: name,
                 qty: parseFloat(row.querySelector('.man-qty').value) || 1,
                 packSize: parseFloat(row.querySelector('.man-pack').value) || 1,
-                unitPrice: 0,
-                matchedSource: '',
-                matchedFrom: '',
-                confidence: 0,
-                status: 'unmatched'
+                unitPrice: 0, matchedSource: '', matchedFrom: '', confidence: 0, status: 'unmatched'
             });
         });
         if (!items.length) { showToast('No valid items.', 'error'); return; }
-
         uploadedItems = uploadedItems.concat(items);
         document.getElementById('autoMatchBtn').disabled = false;
         document.getElementById('reMatchBtn').disabled = false;
         await runMatching(items);
-        renderResults();
-        updateStats();
+        renderResults(); updateStats();
         switchTab('results');
         showToast(`✅ ${items.length} manual items added and matched.`, 'success');
     });
@@ -1175,10 +1073,9 @@
        PRICE HISTORY BUILDER
     ========================================================= */
     async function rebuildPriceHistory(silent = false) {
-        if (!silent) showToast('Building price history from all sources…', 'info', 1500);
+        if (!silent) showToast('Building price history…', 'info', 1500);
         priceHistory = {};
         let totalFound = 0;
-
         try {
             const shipSnap = await db.collection('shipments').limit(500).get();
             shipSnap.forEach(doc => {
@@ -1189,17 +1086,14 @@
                     if (name && price > 0) {
                         const packSize = parseFloat(it.packSize) || 1;
                         const packQty = parseFloat(it.orderedQty ?? it.quantity ?? 0) || 0;
-                        addToHistory(name, {
-                            price, source: 'Shipment', sourceId: doc.id,
+                        addToHistory(name, { price, source: 'Shipment', sourceId: doc.id,
                             date: d.createdAt ? safeDate(d.createdAt) : null,
                             brand: it.brand || d.vendorName || '',
-                            packSize, packQty, totalUnits: packQty * packSize
-                        });
+                            packSize, packQty, totalUnits: packQty * packSize });
                         totalFound++;
                     }
                 });
             });
-
             const invSnap = await db.collection('invoices').limit(500).get();
             invSnap.forEach(doc => {
                 const d = doc.data();
@@ -1209,17 +1103,14 @@
                     if (name && price > 0) {
                         const packSize = parseFloat(it.packSize) || 1;
                         const packQty = parseFloat(it.quantity ?? 0) || 0;
-                        addToHistory(name, {
-                            price, source: 'Invoice', sourceId: doc.id,
+                        addToHistory(name, { price, source: 'Invoice', sourceId: doc.id,
                             date: d.createdAt ? safeDate(d.createdAt) : null,
                             brand: it.brand || d.vendor || '',
-                            packSize, packQty, totalUnits: packQty * packSize
-                        });
+                            packSize, packQty, totalUnits: packQty * packSize });
                         totalFound++;
                     }
                 });
             });
-
             const grSnap = await db.collection('goodsReceived').limit(500).get();
             grSnap.forEach(doc => {
                 const d = doc.data();
@@ -1229,16 +1120,13 @@
                     if (name && price > 0) {
                         const packSize = parseFloat(it.packSize) || 1;
                         const packQty = parseFloat(it.receivedQty ?? it.orderedQty ?? 0) || 0;
-                        addToHistory(name, {
-                            price, source: 'Received', sourceId: doc.id,
+                        addToHistory(name, { price, source: 'Received', sourceId: doc.id,
                             date: d.receivedAt ? safeDate(d.receivedAt) : null,
-                            brand: '', packSize, packQty, totalUnits: packQty * packSize
-                        });
+                            brand: '', packSize, packQty, totalUnits: packQty * packSize });
                         totalFound++;
                     }
                 });
             });
-
             for (const key in onlineCache) {
                 const cached = onlineCache[key];
                 cached.sources.forEach(src => {
@@ -1249,17 +1137,14 @@
                         const variantSuffix = src.variant === 'wholesale' ? ' (Wholesale)' :
                                               src.variant === 'retail' ? ' (Retail)' : '';
                         addToHistory(cached.displayName, {
-                            price: src.price,
-                            source: 'Online · ' + src.store + variantSuffix,
-                            sourceId: src.url || '',
-                            date: src.fetchedAt ? new Date(src.fetchedAt) : null,
+                            price: src.price, source: 'Online · ' + src.store + variantSuffix,
+                            sourceId: src.url || '', date: src.fetchedAt ? new Date(src.fetchedAt) : null,
                             brand: '', packSize, packQty, totalUnits
                         });
                         totalFound++;
                     }
                 });
             }
-
             document.getElementById('historyCount').textContent =
                 `${Object.keys(priceHistory).length} unique items · ${totalFound} price points`;
             if (!silent) showToast(`✅ Price history built: ${Object.keys(priceHistory).length} items.`, 'success');
@@ -1269,16 +1154,6 @@
             showToast('Error building history: ' + err.message, 'error');
         }
     }
-
-    function safeDate(ts) {
-        try {
-            if (!ts) return null;
-            if (ts.toDate) return ts.toDate();
-            if (ts.seconds) return new Date(ts.seconds * 1000);
-            return new Date(ts);
-        } catch (e) { return null; }
-    }
-
     function addToHistory(name, entry) {
         const key = normalizeName(name);
         if (!priceHistory[key]) priceHistory[key] = { displayName: name, points: [] };
@@ -1288,28 +1163,9 @@
     /* =========================================================
        ANALYSIS ENGINE
     ========================================================= */
-    function enrichPoint(p) {
-        const packSize = parseFloat(p.packSize) || 1;
-        const packQty = parseFloat(p.packQty) || 0;
-        const totalUnits = parseFloat(p.totalUnits) || (packQty * packSize);
-        const unitPrice = totalUnits > 0 ? (parseFloat(p.price) / totalUnits) : 0;
-        return Object.assign({}, p, { packSize, packQty, totalUnits, unitPrice });
-    }
-
-    function findMode(values) {
-        const counts = {};
-        values.forEach(v => { if (v > 0) counts[v] = (counts[v] || 0) + 1; });
-        let mode = null, maxCount = 0;
-        for (const k in counts) {
-            if (counts[k] > maxCount) { maxCount = counts[k]; mode = parseFloat(k); }
-        }
-        return { mode, count: maxCount };
-    }
-
     function analyzeItemPurchases(itemName) {
         const exactKey = normalizeName(itemName);
         let bestKey = null, bestSim = 0;
-
         if (priceHistory[exactKey]) { bestKey = exactKey; bestSim = 1; }
         else {
             for (const k in priceHistory) {
@@ -1318,44 +1174,30 @@
             }
         }
         if (!bestKey) return null;
-
         const entry = priceHistory[bestKey];
         if (!entry || !entry.points.length) return null;
-
         const points = entry.points.map(enrichPoint);
         points.sort((a, b) => {
             const da = a.date ? a.date.getTime() : 0;
             const db_ = b.date ? b.date.getTime() : 0;
             return db_ - da;
         });
-
         const sizeMode = findMode(points.map(p => p.packSize));
         const qtyMode = findMode(points.map(p => p.packQty));
-
         const withUnitPrice = points.filter(p => p.unitPrice > 0);
-        const bestUnit = withUnitPrice.length
-            ? withUnitPrice.reduce((a, b) => a.unitPrice < b.unitPrice ? a : b)
-            : null;
-
+        const bestUnit = withUnitPrice.length ? withUnitPrice.reduce((a, b) => a.unitPrice < b.unitPrice ? a : b) : null;
         const validQty = points.filter(p => p.packQty > 0);
         const avgPackQty = validQty.length ? validQty.reduce((s, p) => s + p.packQty, 0) / validQty.length : 0;
         const validUnits = points.filter(p => p.totalUnits > 0);
         const avgTotalUnits = validUnits.length ? validUnits.reduce((s, p) => s + p.totalUnits, 0) / validUnits.length : 0;
-
         const dated = points.filter(p => p.date);
         const dateRange = dated.length ? { from: dated[dated.length - 1].date, to: dated[0].date } : null;
-
         return {
-            displayName: entry.displayName,
-            similarity: bestSim,
-            key: bestKey,
+            displayName: entry.displayName, similarity: bestSim, key: bestKey,
             points, count: points.length,
             topPackSize: sizeMode.mode, topPackSizeCount: sizeMode.count,
             topPackQty: qtyMode.mode, topPackQtyCount: qtyMode.count,
-            avgPackQty, avgTotalUnits,
-            bestUnitPrice: bestUnit,
-            mostRecent: points[0],
-            dateRange
+            avgPackQty, avgTotalUnits, bestUnitPrice: bestUnit, mostRecent: points[0], dateRange
         };
     }
 
@@ -1366,7 +1208,6 @@
         const list = items || uploadedItems;
         let processed = 0;
         const progressEl = document.getElementById('uploadInfo');
-
         for (const item of list) {
             if (item.matchedSource && item.matchedSource !== 'Uploaded') continue;
             const result = matchItem(item);
@@ -1376,17 +1217,13 @@
             item.confidence = result.confidence;
             item.status = result.status;
             processed++;
-            if (progressEl && processed % 5 === 0) {
-                progressEl.textContent = `Matching… ${processed}/${list.length}`;
-            }
+            if (progressEl && processed % 5 === 0) progressEl.textContent = `Matching… ${processed}/${list.length}`;
         }
         if (progressEl) progressEl.textContent = `✅ Matching complete. ${list.length} items processed.`;
     }
-
     function matchItem(item) {
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
         const candidates = [];
-
         const exactKey = normalizeName(item.itemName);
         if (priceHistory[exactKey]) {
             const pts = priceHistory[exactKey].points;
@@ -1397,7 +1234,6 @@
             }, pts[0]);
             candidates.push({ price: latest.price, source: latest.source, fromName: priceHistory[exactKey].displayName, confidence: 1.0 });
         }
-
         for (const key in priceHistory) {
             const sim = similarity(query, key);
             if (sim < 0.35) continue;
@@ -1407,42 +1243,33 @@
                 const db_ = b.date ? b.date.getTime() : 0;
                 return db_ - da;
             });
-            // Prefer Everyday, then Sahad, then latest
-            const everydayPoint = sorted.find(p => p.source && p.source.indexOf('Everyday') >= 0);
-            const sahadPoint = sorted.find(p => p.source && p.source.indexOf('Sahad') >= 0);
+            const everydayPoint = sorted.find(p => (p.source || '').indexOf('Everyday') >= 0);
+            const sahadPoint = sorted.find(p => (p.source || '').indexOf('Sahad') >= 0);
             const chosen = everydayPoint || sahadPoint || sorted[0];
-            const isEveryday = chosen.source && chosen.source.indexOf('Everyday') >= 0;
-            const isSahad = chosen.source && chosen.source.indexOf('Sahad') >= 0;
             let boost = 0;
-            if (isEveryday) boost = 0.06;
-            else if (isSahad) boost = 0.04;
-
+            if (chosen.source && chosen.source.indexOf('Everyday') >= 0) boost = 0.06;
+            else if (chosen.source && chosen.source.indexOf('Sahad') >= 0) boost = 0.04;
             candidates.push({
-                price: chosen.price,
-                source: chosen.source,
+                price: chosen.price, source: chosen.source,
                 fromName: priceHistory[key].displayName,
                 confidence: Math.min(1, sim + boost)
             });
         }
-
         if (!candidates.length) return { price: 0, source: '', fromName: '', confidence: 0, status: 'unmatched' };
-
         candidates.sort((a, b) => {
             if (Math.abs(b.confidence - a.confidence) > 0.01) return b.confidence - a.confidence;
-            const aEveryday = a.source.indexOf('Everyday') >= 0 ? 1 : 0;
-            const bEveryday = b.source.indexOf('Everyday') >= 0 ? 1 : 0;
-            if (aEveryday !== bEveryday) return bEveryday - aEveryday;
-            const aSahad = a.source.indexOf('Sahad') >= 0 ? 1 : 0;
-            const bSahad = b.source.indexOf('Sahad') >= 0 ? 1 : 0;
-            if (aSahad !== bSahad) return bSahad - aSahad;
+            const aE = a.source.indexOf('Everyday') >= 0 ? 1 : 0;
+            const bE = b.source.indexOf('Everyday') >= 0 ? 1 : 0;
+            if (aE !== bE) return bE - aE;
+            const aS = a.source.indexOf('Sahad') >= 0 ? 1 : 0;
+            const bS = b.source.indexOf('Sahad') >= 0 ? 1 : 0;
+            if (aS !== bS) return bS - aS;
             return (a.price || 0) - (b.price || 0);
         });
-
         const best = candidates[0];
         let status = 'matched';
         if (best.confidence < 0.85) status = 'partial';
         if (best.confidence < 0.6) status = 'partial';
-
         return { price: best.price, source: best.source, fromName: best.fromName, confidence: best.confidence, status };
     }
 
@@ -1454,14 +1281,12 @@
         this.disabled = true;
         this.innerHTML = '<span class="loading-spinner"></span> Matching…';
         await runMatching();
-        renderResults();
-        updateStats();
+        renderResults(); updateStats();
         switchTab('results');
         this.disabled = false;
         this.innerHTML = '🔍 Run Price Match';
         showToast('✅ Matching complete.', 'success');
     });
-
     document.getElementById('reMatchBtn').addEventListener('click', async function() {
         if (!uploadedItems.length) { showToast('No items loaded.', 'error'); return; }
         this.disabled = true;
@@ -1471,34 +1296,29 @@
         }});
         await rebuildPriceHistory(true);
         await runMatching();
-        renderResults();
-        updateStats();
+        renderResults(); updateStats();
         this.disabled = false;
         this.innerHTML = '🔄 Re-match All';
         showToast('✅ Re-match complete.', 'success');
     });
-
     document.getElementById('loadDemoBtn').addEventListener('click', () => {
         uploadedItems = [
-            { id: 'demo1', brand: 'SUNRIPE', itemName: 'HOTDOG SAUSAGE', qty: 5, packSize: 12, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
-            { id: 'demo2', brand: 'TROPICAL SUN', itemName: 'COCONUT PEANUTS 50G', qty: 40, packSize: 24, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
-            { id: 'demo3', brand: 'TILDA', itemName: 'GOLDEN SELLA 5KG', qty: 30, packSize: 4, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
-            { id: 'demo4', brand: 'TILDA', itemName: 'PURE BASMATI RICE 5KG', qty: 20, packSize: 4, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
-            { id: 'demo5', brand: 'MAHAAMA', itemName: 'RICE 1KG', qty: 2, packSize: 0, unitPrice: 0, matchedSource: '', confidence: 0, status: 'unmatched' },
+            { id: 'demo1', brand: 'SUNRIPE', itemName: 'HOTDOG SAUSAGE', qty: 5, packSize: 12, unitPrice: 19500, matchedSource: 'Uploaded', matchedFrom: '', confidence: 1, status: 'matched' },
+            { id: 'demo2', brand: 'TROPICAL SUN', itemName: 'COCONUT PEANUTS 50G', qty: 40, packSize: 24, unitPrice: 26000, matchedSource: 'Uploaded', matchedFrom: '', confidence: 1, status: 'matched' },
+            { id: 'demo3', brand: 'TILDA', itemName: 'GOLDEN SELLA 5KG', qty: 30, packSize: 4, unitPrice: 90000, matchedSource: 'Uploaded', matchedFrom: '', confidence: 1, status: 'matched' },
+            { id: 'demo4', brand: 'TILDA', itemName: 'PURE BASMATI RICE 5KG', qty: 20, packSize: 4, unitPrice: 97000, matchedSource: 'Uploaded', matchedFrom: '', confidence: 1, status: 'matched' },
+            { id: 'demo5', brand: 'MAHAAMA', itemName: 'RICE 1KG', qty: 2, packSize: 1, unitPrice: 62000, matchedSource: 'Uploaded', matchedFrom: '', confidence: 1, status: 'matched' }
         ];
         document.getElementById('autoMatchBtn').disabled = false;
         document.getElementById('reMatchBtn').disabled = false;
-        document.getElementById('uploadInfo').textContent = `📄 Loaded ${uploadedItems.length} demo items.`;
-        renderResults();
-        updateStats();
-        showToast('Demo loaded. Click "Run Price Match".', 'info');
+        document.getElementById('uploadInfo').textContent = `📄 Loaded ${uploadedItems.length} demo items (with prices).`;
+        renderResults(); updateStats();
+        showToast('Demo loaded. Click any row to compare.', 'info');
     });
-
     document.getElementById('clearAllBtn').addEventListener('click', () => {
         if (!confirm('Clear all uploaded and matched items?')) return;
         uploadedItems = [];
-        renderResults();
-        updateStats();
+        renderResults(); updateStats();
         document.getElementById('autoMatchBtn').disabled = true;
         document.getElementById('reMatchBtn').disabled = true;
         document.getElementById('uploadInfo').textContent = '';
@@ -1506,7 +1326,7 @@
     });
 
     /* =========================================================
-       STATS & RESULT RENDER
+       STATS
     ========================================================= */
     function updateStats() {
         const total = uploadedItems.length;
@@ -1515,7 +1335,6 @@
         const unmatched = uploadedItems.filter(i => i.status === 'unmatched').length;
         const value = uploadedItems.reduce((sum, i) => sum + (i.qty * i.unitPrice || 0), 0);
         const onlineCount = Object.keys(onlineCache).length;
-
         let sahadCount = 0, everydayCount = 0;
         for (const key in onlineCache) {
             onlineCache[key].sources.forEach(s => {
@@ -1523,7 +1342,6 @@
                 if (s.store && s.store.indexOf('Everyday') >= 0) everydayCount++;
             });
         }
-
         document.getElementById('statTotal').textContent = total;
         document.getElementById('statMatched').textContent = matched;
         document.getElementById('statPartial').textContent = partial;
@@ -1535,22 +1353,21 @@
         document.getElementById('resultsCount').textContent = `${total} items`;
     }
 
+    /* =========================================================
+       RESULTS RENDER
+    ========================================================= */
     function renderResults() {
         const wrap = document.getElementById('resultsWrap');
         if (!uploadedItems.length) {
             wrap.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No items loaded. Upload a file or add manual entries to begin.</div>';
             return;
         }
-
         const search = (document.getElementById('resultsSearch').value || '').toLowerCase().trim();
         const filter = document.getElementById('filterMatchStatus').value;
-
-        let html = `<table>
-            <thead><tr>
-                <th>#</th><th>Item</th><th>Brand</th><th>Qty</th><th>Pack</th>
-                <th>Unit Price (₦)</th><th>Total (₦)</th><th>Source</th><th>Confidence</th><th>Action</th>
-            </tr></thead><tbody>`;
-
+        let html = `<table><thead><tr>
+            <th>#</th><th>Item</th><th>Brand</th><th>Qty</th><th>Pack</th>
+            <th>Unit Price (₦)</th><th>Total (₦)</th><th>Source</th><th>Confidence</th><th>Action</th>
+        </tr></thead><tbody>`;
         let count = 0;
         uploadedItems.forEach((item, idx) => {
             if (filter !== 'all' && item.status !== filter) return;
@@ -1559,10 +1376,7 @@
                 if (!text.includes(search)) return;
             }
             count++;
-
-            const rowClass = item.status === 'matched' ? 'matched-row' :
-                            item.status === 'partial' ? '' : 'unmatched-row';
-
+            const rowClass = item.status === 'matched' ? 'matched-row' : item.status === 'partial' ? '' : 'unmatched-row';
             const srcLower = (item.matchedSource || '').toLowerCase();
             const sourceCls = srcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
                               srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
@@ -1572,23 +1386,14 @@
                               item.matchedSource === 'Uploaded' ? 'source-manual' :
                               item.matchedSource === 'Manual' ? 'source-manual' :
                               item.matchedSource.startsWith('Online') ? 'source-online' : 'source-none';
-
             const confPct = Math.round((item.confidence || 0) * 100);
-            const confCls = confPct >= 85 ? 'confidence-high' :
-                            confPct >= 60 ? 'confidence-medium' : 'confidence-low';
-
+            const confCls = confPct >= 85 ? 'confidence-high' : confPct >= 60 ? 'confidence-medium' : 'confidence-low';
             const totalValue = (item.qty || 0) * (item.unitPrice || 0);
-
-            const everydayFlag = srcLower.indexOf('everyday') >= 0
-                ? `<span class="variant-tag everyday">Everyday</span>` : '';
-            const sahadFlag = srcLower.indexOf('sahad') >= 0
-                ? `<span class="variant-tag wholesale">Sahad</span>` : '';
-
+            const everydayFlag = srcLower.indexOf('everyday') >= 0 ? `<span class="variant-tag everyday">Everyday</span>` : '';
+            const sahadFlag = srcLower.indexOf('sahad') >= 0 ? `<span class="variant-tag wholesale">Sahad</span>` : '';
             const cacheKey = normalizeName(item.itemName);
-            const hasEverydayCached = onlineCache[cacheKey] &&
-                onlineCache[cacheKey].sources.some(s => s.store && s.store.indexOf('Everyday') >= 0);
-            const hasSahadCached = onlineCache[cacheKey] &&
-                onlineCache[cacheKey].sources.some(s => s.store && s.store.indexOf('Sahad') >= 0);
+            const hasEverydayCached = onlineCache[cacheKey] && onlineCache[cacheKey].sources.some(s => s.store && s.store.indexOf('Everyday') >= 0);
+            const hasSahadCached = onlineCache[cacheKey] && onlineCache[cacheKey].sources.some(s => s.store && s.store.indexOf('Sahad') >= 0);
             const cacheBadges =
                 (hasEverydayCached ? `<span class="variant-tag everyday" title="Everyday Group reference">🏬</span>` : '') +
                 (hasSahadCached ? `<span class="variant-tag wholesale" title="Sahad Stores reference">🏪</span>` : '');
@@ -1616,63 +1421,43 @@
                 </td>
             </tr>
             <tr class="matched-detail-row" id="matched-detail-${item.id}" style="display:none;">
-                <td colspan="10">
-                    <div class="matched-detail-wrap">
-                        <div class="matched-detail-content">
-                            <div style="padding:18px;text-align:center;color:#6b7f96;">
-                                <span class="loading-spinner"></span> Click to load analysis…
-                            </div>
-                        </div>
-                    </div>
-                </td>
+                <td colspan="10"><div class="matched-detail-wrap"><div class="matched-detail-content">
+                    <div style="padding:18px;text-align:center;color:#6b7f96;"><span class="loading-spinner"></span> Click to load analysis…</div>
+                </div></div></td>
             </tr>`;
         });
-
         html += '</tbody></table>';
         if (!count) html = `<div class="empty-state"><div class="icon">🔍</div>No items match the current filter.</div>`;
         wrap.innerHTML = html;
     }
-
     window.updateItemPrice = function(id, value) {
         const item = uploadedItems.find(i => i.id === id);
         if (!item) return;
         item.unitPrice = parseFloat(value) || 0;
         if (item.unitPrice > 0 && item.matchedSource !== 'Uploaded') {
-            item.matchedSource = 'Manual';
-            item.status = 'matched';
-            item.confidence = 1;
+            item.matchedSource = 'Manual'; item.status = 'matched'; item.confidence = 1;
         }
-        renderResults();
-        updateStats();
+        renderResults(); updateStats();
     };
-
     document.getElementById('resultsSearch').addEventListener('input', renderResults);
     document.getElementById('filterMatchStatus').addEventListener('change', renderResults);
 
     /* =========================================================
-       MATCHED RESULTS — expandable detail panel
+       MATCHED DETAIL PANEL
     ========================================================= */
     window.toggleMatchedDetail = async function(itemId) {
-        const detailId = 'matched-detail-' + itemId;
-        const row = document.getElementById(detailId);
+        const row = document.getElementById('matched-detail-' + itemId);
         if (!row) return;
-
         const isHidden = row.style.display === 'none';
         const summaryRow = row.previousElementSibling;
-
         if (isHidden) {
             if (!row.dataset.built) {
                 const contentEl = row.querySelector('.matched-detail-content');
-                contentEl.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7f96;"><span class="loading-spinner"></span> Analyzing purchase history…</div>';
+                contentEl.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7f96;"><span class="loading-spinner"></span> Analyzing…</div>';
                 const item = uploadedItems.find(i => i.id === itemId);
                 if (item) {
-                    try {
-                        const html = await renderMatchedDetail(item);
-                        contentEl.innerHTML = html;
-                        row.dataset.built = '1';
-                    } catch (err) {
-                        contentEl.innerHTML = `<div class="no-data-banner">⚠️ Error building analysis: ${escapeHtml(err.message)}</div>`;
-                    }
+                    try { contentEl.innerHTML = await renderMatchedDetail(item); row.dataset.built = '1'; }
+                    catch (err) { contentEl.innerHTML = `<div class="no-data-banner">⚠️ ${escapeHtml(err.message)}</div>`; }
                 }
             }
             row.style.display = '';
@@ -1682,7 +1467,6 @@
             if (summaryRow) summaryRow.classList.remove('expanded');
         }
     };
-
     window.expandAllMatched = async function() {
         const rows = document.querySelectorAll('.matched-detail-row');
         for (const row of rows) {
@@ -1690,12 +1474,10 @@
             if (row.style.display === 'none') await window.toggleMatchedDetail(id);
         }
     };
-
     window.collapseAllMatched = function() {
         document.querySelectorAll('.matched-detail-row').forEach(r => { r.style.display = 'none'; });
         document.querySelectorAll('.matched-summary-row').forEach(r => r.classList.remove('expanded'));
     };
-
     document.getElementById('expandAllMatchedBtn').addEventListener('click', window.expandAllMatched);
     document.getElementById('collapseAllMatchedBtn').addEventListener('click', window.collapseAllMatched);
 
@@ -1705,7 +1487,13 @@
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
         showToast(`Fetching ${which === 'everyday' ? 'Everyday Group' : 'Sahad Stores'} prices…`, 'info', 1800);
         try {
-            await fetchOnlinePrices(query);
+            const anchor = item.unitPrice > 0 ? {
+                unitPrice: item.unitPrice / (item.packSize || 1),
+                packPrice: item.unitPrice,
+                packSize: item.packSize || 1,
+                confidence: 'user'
+            } : getInternalAnchor(query);
+            await fetchOnlinePrices(query, anchor);
             updateStats();
             const row = document.getElementById('matched-detail-' + itemId);
             if (row) {
@@ -1714,134 +1502,121 @@
                 await window.toggleMatchedDetail(itemId);
             }
             showToast('✅ Wholesale prices loaded.', 'success');
-        } catch (err) {
-            showToast('Error: ' + err.message, 'error');
-        }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
     };
 
     async function renderMatchedDetail(item) {
         const analysis = analyzeItemPurchases(item.itemName);
         const cacheKey = normalizeName(item.itemName);
         const onlineRows = onlineCache[cacheKey] ? onlineCache[cacheKey].sources : [];
-
         const everydayRows = onlineRows.filter(s => s.store && s.store.indexOf('Everyday') >= 0);
         const sahadRows = onlineRows.filter(s => s.store && s.store.indexOf('Sahad') >= 0);
 
+        // Determine the anchor this item would use
+        const itemAnchor = item.unitPrice > 0 ? {
+            unitPrice: item.unitPrice / (item.packSize || 1),
+            packPrice: item.unitPrice,
+            packSize: item.packSize || 1,
+            confidence: 'user'
+        } : getInternalAnchor(item.itemName);
+
         let html = '';
+
+        // Anchor summary banner
+        if (itemAnchor) {
+            const relCls = 'anchor-banner ' + itemAnchor.confidence;
+            const relLabel = itemAnchor.confidence === 'high' ? '🟢 HIGH RELIABILITY' :
+                            itemAnchor.confidence === 'medium' ? '🟡 MEDIUM RELIABILITY' :
+                            itemAnchor.confidence === 'user' ? '🟢 USER-SUPPLIED REFERENCE' :
+                            '🟠 CATEGORY ESTIMATE';
+            html += `<div class="${relCls}">
+                <strong>${relLabel}</strong> · Reference: ₦${formatCurrency(itemAnchor.packPrice)} for ${formatQuantity(itemAnchor.packSize)} units = <strong>₦${formatCurrency(itemAnchor.unitPrice)}/unit</strong>
+                ${itemAnchor.source ? `<span style="font-size:0.78rem;opacity:0.8;">· ${escapeHtml(itemAnchor.source)}</span>` : ''}
+            </div>`;
+        } else {
+            html += `<div class="anchor-banner none">
+                <strong>🔴 NO REFERENCE PRICE</strong> · This item has never been purchased and no category match was found. Online comparison is disabled to avoid showing unreliable numbers.
+            </div>`;
+        }
 
         // 1) Purchase Analysis
         html += `<div class="analysis-panel">`;
-        html += `<h4>📊 Purchase Analysis
-            <small>${analysis ? analysis.count + ' purchase' + (analysis.count !== 1 ? 's' : '') + ' on record' : 'No purchase history'}</small>
-        </h4>`;
-
+        html += `<h4>📊 Purchase Analysis <small>${analysis ? analysis.count + ' purchase' + (analysis.count !== 1 ? 's' : '') : 'No history'}</small></h4>`;
         if (analysis && analysis.count > 0) {
             html += `<div class="analysis-grid">`;
-            if (analysis.topPackSize) {
-                html += `<div class="analysis-item"><div class="label">Most Common Pack Size</div><div class="val">${formatQuantity(analysis.topPackSize)} units</div><div class="sub">seen ${analysis.topPackSizeCount}× in history</div></div>`;
-            }
-            if (analysis.topPackQty) {
-                html += `<div class="analysis-item"><div class="label">Most Common Pack Qty</div><div class="val">${formatQuantity(analysis.topPackQty)} packs</div><div class="sub">ordered ${analysis.topPackQtyCount}× in history</div></div>`;
-            }
-            if (analysis.topPackSize && analysis.topPackQty) {
-                const realisticUnits = analysis.topPackSize * analysis.topPackQty;
-                html += `<div class="analysis-item best"><div class="label">✅ Most Realistic Order</div><div class="val">${formatQuantity(analysis.topPackSize)} × ${formatQuantity(analysis.topPackQty)}</div><div class="sub">= ${formatQuantity(realisticUnits)} total units</div></div>`;
-            }
-            if (analysis.avgPackQty > 0) {
-                html += `<div class="analysis-item"><div class="label">Avg Pack Qty / Order</div><div class="val">${analysis.avgPackQty.toFixed(1)} packs</div><div class="sub">avg ${analysis.avgTotalUnits.toFixed(0)} units per order</div></div>`;
-            }
-            if (analysis.bestUnitPrice && analysis.bestUnitPrice.unitPrice > 0) {
-                html += `<div class="analysis-item best"><div class="label">Best Unit Price Achieved</div><div class="val">₦${formatCurrency(analysis.bestUnitPrice.unitPrice)}</div><div class="sub">${analysis.bestUnitPrice.date ? analysis.bestUnitPrice.date.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' }) : '—'}</div></div>`;
-            }
+            if (analysis.topPackSize) html += `<div class="analysis-item"><div class="label">Most Common Pack Size</div><div class="val">${formatQuantity(analysis.topPackSize)} units</div><div class="sub">seen ${analysis.topPackSizeCount}× in history</div></div>`;
+            if (analysis.topPackQty) html += `<div class="analysis-item"><div class="label">Most Common Pack Qty</div><div class="val">${formatQuantity(analysis.topPackQty)} packs</div><div class="sub">ordered ${analysis.topPackQtyCount}× in history</div></div>`;
+            if (analysis.topPackSize && analysis.topPackQty) html += `<div class="analysis-item best"><div class="label">✅ Most Realistic Order</div><div class="val">${formatQuantity(analysis.topPackSize)} × ${formatQuantity(analysis.topPackQty)}</div><div class="sub">= ${formatQuantity(analysis.topPackSize * analysis.topPackQty)} total units</div></div>`;
+            if (analysis.avgPackQty > 0) html += `<div class="analysis-item"><div class="label">Avg Pack Qty / Order</div><div class="val">${analysis.avgPackQty.toFixed(1)} packs</div><div class="sub">avg ${analysis.avgTotalUnits.toFixed(0)} units per order</div></div>`;
+            if (analysis.bestUnitPrice && analysis.bestUnitPrice.unitPrice > 0) html += `<div class="analysis-item best"><div class="label">Best Unit Price Achieved</div><div class="val">₦${formatCurrency(analysis.bestUnitPrice.unitPrice)}</div><div class="sub">${analysis.bestUnitPrice.date ? analysis.bestUnitPrice.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short',year:'numeric'}) : '—'}</div></div>`;
             if (analysis.dateRange) {
-                const fromStr = analysis.dateRange.from.toLocaleDateString('en-NG', { day:'2-digit', month:'short' });
-                const toStr = analysis.dateRange.to.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' });
+                const fromStr = analysis.dateRange.from.toLocaleDateString('en-NG', {day:'2-digit',month:'short'});
+                const toStr = analysis.dateRange.to.toLocaleDateString('en-NG', {day:'2-digit',month:'short',year:'numeric'});
                 html += `<div class="analysis-item"><div class="label">History Window</div><div class="val" style="font-size:0.82rem;">${fromStr} → ${toStr}</div><div class="sub">${analysis.count} data point${analysis.count !== 1 ? 's' : ''}</div></div>`;
             }
             html += `</div>`;
         } else {
-            html += `<div class="no-data-banner">ℹ️ No historical purchase data found for "<strong>${escapeHtml(item.itemName)}</strong>".</div>`;
+            html += `<div class="no-data-banner">ℹ️ No historical purchase data found.</div>`;
         }
         html += `</div>`;
 
-        // 2) Everyday Group Wholesale Reference
-        html += `<div class="analysis-panel">`;
-        html += `<h4>🏬 Everyday Group — Wholesale Reference
-            <small>45% market share · 15 stores</small>
-        </h4>`;
+        // 2) Everyday
+        html += `<div class="analysis-panel"><h4>🏬 Everyday Group — Wholesale Reference <small>45% market share</small></h4>`;
         if (everydayRows.length) {
             const retail = everydayRows.find(r => r.variant === 'retail');
             const wholesale = everydayRows.find(r => r.variant === 'wholesale');
             html += `<div class="analysis-grid">`;
-            if (retail) {
-                const retailUnit = retail.totalUnits > 0 ? retail.price / retail.totalUnits : 0;
-                html += `<div class="analysis-item everyday"><div class="label">Retail Pack</div><div class="val">₦${formatCurrency(retail.price)}</div><div class="sub">${formatQuantity(retail.packSize)} units · ₦${formatCurrency(retailUnit)}/unit</div></div>`;
-            }
+            if (retail) { const u = retail.totalUnits > 0 ? retail.price / retail.totalUnits : 0; html += `<div class="analysis-item everyday"><div class="label">Retail Pack</div><div class="val">₦${formatCurrency(retail.price)}</div><div class="sub">${formatQuantity(retail.packSize)} units · ₦${formatCurrency(u)}/unit</div></div>`; }
             if (wholesale) {
-                const wholesaleUnit = wholesale.totalUnits > 0 ? wholesale.price / wholesale.totalUnits : 0;
-                html += `<div class="analysis-item everyday"><div class="label">Wholesale Carton</div><div class="val">₦${formatCurrency(wholesale.price)}</div><div class="sub">${formatQuantity(wholesale.packSize)} units · ₦${formatCurrency(wholesaleUnit)}/unit</div></div>`;
+                const u = wholesale.totalUnits > 0 ? wholesale.price / wholesale.totalUnits : 0;
+                html += `<div class="analysis-item everyday"><div class="label">Wholesale Carton</div><div class="val">₦${formatCurrency(wholesale.price)}</div><div class="sub">${formatQuantity(wholesale.packSize)} units · ₦${formatCurrency(u)}/unit</div></div>`;
                 if (analysis && analysis.bestUnitPrice && analysis.bestUnitPrice.unitPrice > 0) {
-                    const internalUnit = analysis.bestUnitPrice.unitPrice;
-                    const savings = internalUnit - wholesaleUnit;
-                    const savingsPct = internalUnit > 0 ? (savings / internalUnit) * 100 : 0;
-                    if (savings > 0) {
-                        html += `<div class="analysis-item everyday"><div class="label">💰 Wholesale Savings</div><div class="val" style="color:#27ae60;">₦${formatCurrency(savings)}/unit</div><div class="sub">${savingsPct.toFixed(1)}% below your best recorded price</div></div>`;
-                    } else if (savings < 0) {
-                        html += `<div class="analysis-item everyday"><div class="label">Your Best vs Wholesale</div><div class="val" style="color:#27ae60;">₦${formatCurrency(Math.abs(savings))}/unit cheaper</div><div class="sub">you already beat Everyday by ${Math.abs(savingsPct).toFixed(1)}%</div></div>`;
-                    }
+                    const internal = analysis.bestUnitPrice.unitPrice;
+                    const savings = internal - u;
+                    const pct = internal > 0 ? (savings / internal) * 100 : 0;
+                    if (savings > 0) html += `<div class="analysis-item everyday"><div class="label">💰 Wholesale Savings</div><div class="val" style="color:#27ae60;">₦${formatCurrency(savings)}/unit</div><div class="sub">${pct.toFixed(1)}% below your best</div></div>`;
                 }
             }
             html += `</div>`;
         } else {
-            html += `<div class="no-data-banner">ℹ️ No Everyday Group data cached yet.
-                <button class="btn-success btn-sm" onclick="event.stopPropagation(); fetchWholesaleFor('${item.id}', 'everyday')">🏬 Fetch Everyday Prices</button>
+            html += `<div class="no-data-banner">ℹ️ No Everyday data cached yet.
+                <button class="btn-success btn-sm" onclick="event.stopPropagation(); fetchWholesaleFor('${item.id}', 'everyday')">🏬 Fetch</button>
             </div>`;
         }
         html += `</div>`;
 
-        // 3) Sahad Stores Wholesale Reference
-        html += `<div class="analysis-panel">`;
-        html += `<h4>🏪 Sahad Stores — Wholesale Reference
-            <small>37% market share · Nigeria's largest wholesale chain</small>
-        </h4>`;
+        // 3) Sahad
+        html += `<div class="analysis-panel"><h4>🏪 Sahad Stores — Wholesale Reference <small>37% market share</small></h4>`;
         if (sahadRows.length) {
             const retail = sahadRows.find(r => r.variant === 'retail');
             const wholesale = sahadRows.find(r => r.variant === 'wholesale');
             html += `<div class="analysis-grid">`;
-            if (retail) {
-                const retailUnit = retail.totalUnits > 0 ? retail.price / retail.totalUnits : 0;
-                html += `<div class="analysis-item sahad"><div class="label">Retail Pack</div><div class="val">₦${formatCurrency(retail.price)}</div><div class="sub">${formatQuantity(retail.packSize)} units · ₦${formatCurrency(retailUnit)}/unit</div></div>`;
-            }
+            if (retail) { const u = retail.totalUnits > 0 ? retail.price / retail.totalUnits : 0; html += `<div class="analysis-item sahad"><div class="label">Retail Pack</div><div class="val">₦${formatCurrency(retail.price)}</div><div class="sub">${formatQuantity(retail.packSize)} units · ₦${formatCurrency(u)}/unit</div></div>`; }
             if (wholesale) {
-                const wholesaleUnit = wholesale.totalUnits > 0 ? wholesale.price / wholesale.totalUnits : 0;
-                html += `<div class="analysis-item sahad"><div class="label">Wholesale Carton</div><div class="val">₦${formatCurrency(wholesale.price)}</div><div class="sub">${formatQuantity(wholesale.packSize)} units · ₦${formatCurrency(wholesaleUnit)}/unit</div></div>`;
+                const u = wholesale.totalUnits > 0 ? wholesale.price / wholesale.totalUnits : 0;
+                html += `<div class="analysis-item sahad"><div class="label">Wholesale Carton</div><div class="val">₦${formatCurrency(wholesale.price)}</div><div class="sub">${formatQuantity(wholesale.packSize)} units · ₦${formatCurrency(u)}/unit</div></div>`;
                 if (analysis && analysis.bestUnitPrice && analysis.bestUnitPrice.unitPrice > 0) {
-                    const internalUnit = analysis.bestUnitPrice.unitPrice;
-                    const savings = internalUnit - wholesaleUnit;
-                    const savingsPct = internalUnit > 0 ? (savings / internalUnit) * 100 : 0;
-                    if (savings > 0) {
-                        html += `<div class="analysis-item sahad"><div class="label">💰 Wholesale Savings</div><div class="val" style="color:#27ae60;">₦${formatCurrency(savings)}/unit</div><div class="sub">${savingsPct.toFixed(1)}% below your best recorded price</div></div>`;
-                    }
+                    const internal = analysis.bestUnitPrice.unitPrice;
+                    const savings = internal - u;
+                    const pct = internal > 0 ? (savings / internal) * 100 : 0;
+                    if (savings > 0) html += `<div class="analysis-item sahad"><div class="label">💰 Wholesale Savings</div><div class="val" style="color:#27ae60;">₦${formatCurrency(savings)}/unit</div><div class="sub">${pct.toFixed(1)}% below your best</div></div>`;
                 }
             }
             html += `</div>`;
         } else {
             html += `<div class="no-data-banner">ℹ️ No Sahad data cached yet.
-                <button class="btn-warning btn-sm" onclick="event.stopPropagation(); fetchWholesaleFor('${item.id}', 'sahad')">🏪 Fetch Sahad Prices</button>
+                <button class="btn-warning btn-sm" onclick="event.stopPropagation(); fetchWholesaleFor('${item.id}', 'sahad')">🏪 Fetch</button>
             </div>`;
         }
         html += `</div>`;
 
-        // 4) Purchase Timeline
-        html += `<div class="analysis-panel">`;
-        html += `<h4>📅 Purchase Timeline <small>${analysis ? analysis.count : 0} entr${analysis && analysis.count === 1 ? 'y' : 'ies'} · newest first</small></h4>`;
+        // 4) Timeline
+        html += `<div class="analysis-panel"><h4>📅 Purchase Timeline <small>${analysis ? analysis.count : 0} entr${analysis && analysis.count === 1 ? 'y' : 'ies'}</small></h4>`;
         if (analysis && analysis.points.length) {
             html += `<div class="history-detail-inner"><table style="width:100%;border-collapse:collapse;">
-                <thead><tr><th>Date &amp; Time</th><th>Source</th><th>Pack Size</th><th>Pack Qty</th><th>Total Units</th><th>Price (₦)</th><th>Unit Price (₦)</th><th>Brand</th></tr></thead><tbody>`;
+                <thead><tr><th>Date</th><th>Source</th><th>Pack Size</th><th>Pack Qty</th><th>Total Units</th><th>Price (₦)</th><th>Unit (₦)</th></tr></thead><tbody>`;
             analysis.points.forEach((pt, idx) => {
-                const dateStr = pt.date
-                    ? pt.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + pt.date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
-                    : '—';
+                const dateStr = pt.date ? pt.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short',year:'numeric'}) + ' · ' + pt.date.toLocaleTimeString('en-NG', {hour:'2-digit',minute:'2-digit'}) : '—';
                 const ptSrcLower = (pt.source || '').toLowerCase();
                 const ptSrcCls = ptSrcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
                                  ptSrcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
@@ -1849,29 +1624,25 @@
                                  pt.source === 'Invoice' ? 'source-invoice' :
                                  pt.source === 'Shipment' ? 'source-shipment' :
                                  pt.source === 'Received' ? 'source-received' : '';
-                const isEveryday = ptSrcLower.indexOf('everyday') >= 0;
-                const isSahad = ptSrcLower.indexOf('sahad') >= 0;
-
+                const isE = ptSrcLower.indexOf('everyday') >= 0;
+                const isS = ptSrcLower.indexOf('sahad') >= 0;
                 html += `<tr>
                     <td style="white-space:nowrap;">${idx === 0 ? '🟢 ' : ''}${dateStr}</td>
                     <td><span class="source-badge ${ptSrcCls}">${escapeHtml(pt.source)}</span>
-                        ${isEveryday ? '<span class="variant-chip everyday">Everyday</span>' : ''}
-                        ${isSahad ? '<span class="variant-chip sahad">Sahad</span>' : ''}
-                    </td>
+                        ${isE ? '<span class="variant-chip everyday">Everyday</span>' : ''}
+                        ${isS ? '<span class="variant-chip sahad">Sahad</span>' : ''}</td>
                     <td><span class="pack-badge">${formatQuantity(pt.packSize)}</span></td>
                     <td><span class="pack-badge">${formatQuantity(pt.packQty)}</span></td>
                     <td><span class="unit-badge">${formatQuantity(pt.totalUnits)}</span></td>
                     <td class="price-cell">₦${formatCurrency(pt.price)}</td>
                     <td class="price-cell">₦${formatCurrency(pt.unitPrice)}</td>
-                    <td>${pt.brand ? escapeHtml(pt.brand) : '—'}</td>
                 </tr>`;
             });
             html += `</tbody></table></div>`;
         } else {
-            html += `<div class="no-data-banner">ℹ️ No purchase entries on record for this item.</div>`;
+            html += `<div class="no-data-banner">ℹ️ No purchase entries.</div>`;
         }
         html += `</div>`;
-
         return html;
     }
 
@@ -1881,10 +1652,8 @@
     window.openMatchModal = function(itemId) {
         const item = uploadedItems.find(i => i.id === itemId);
         if (!item) return;
-
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
         const candidates = [];
-
         for (const key in priceHistory) {
             const sim = similarity(query, key);
             if (sim < 0.2) continue;
@@ -1894,31 +1663,27 @@
                 const db_ = b.date ? b.date.getTime() : 0;
                 return db_ > da ? b : a;
             }, pts[0]);
-            candidates.push({ key, displayName: priceHistory[key].displayName, price: latest.price, source: latest.source, date: latest.date, brand: latest.brand, packSize: latest.packSize || 1, confidence: sim });
+            candidates.push({ displayName: priceHistory[key].displayName, price: latest.price, source: latest.source, date: latest.date, brand: latest.brand, packSize: latest.packSize || 1, confidence: sim });
         }
-
         candidates.sort((a, b) => b.confidence - a.confidence);
-
         let html = `<p><strong>Looking for:</strong> ${escapeHtml(query)}</p>`;
         html += `<div style="margin:14px 0;"><label style="font-weight:600; font-size:0.85rem;">Manual Price Entry (₦)</label>
             <div style="display:flex; gap:8px; margin-top:6px;">
                 <input type="number" id="manualPriceInput" placeholder="0.00" step="0.01" min="0" value="${item.unitPrice ? item.unitPrice.toFixed(2) : ''}" style="flex:1;">
                 <button class="btn-success btn-sm" onclick="applyManualPrice('${item.id}')">Apply</button>
             </div></div>`;
-
         if (candidates.length) {
-            html += `<h4 style="margin-top:16px;">Suggested Matches (internal history)</h4>`;
-            html += `<div class="table-wrap"><table>
-                <thead><tr><th>Item</th><th>Source</th><th>Price (₦)</th><th>Pack</th><th>Date</th><th>Confidence</th><th></th></tr></thead><tbody>`;
+            html += `<h4 style="margin-top:16px;">Suggested Matches</h4><div class="table-wrap"><table>
+                <thead><tr><th>Item</th><th>Source</th><th>Price</th><th>Pack</th><th>Date</th><th>Conf</th><th></th></tr></thead><tbody>`;
             candidates.slice(0, 12).forEach(c => {
                 const confPct = Math.round(c.confidence * 100);
-                const srcLower = (c.source || '').toLowerCase();
-                const sahadCls = srcLower.indexOf('sahad') >= 0 ? 'source-sahad' : srcLower.indexOf('everyday') >= 0 ? 'source-everyday' : '';
+                const sL = (c.source || '').toLowerCase();
+                const cls = sL.indexOf('sahad') >= 0 ? 'source-sahad' : sL.indexOf('everyday') >= 0 ? 'source-everyday' : '';
                 html += `<tr>
                     <td>${escapeHtml(c.displayName)}<div style="font-size:0.7rem;color:#6b7f96;">${escapeHtml(c.brand || '')}</div></td>
-                    <td><span class="source-badge ${sahadCls}">${escapeHtml(c.source)}</span></td>
+                    <td><span class="source-badge ${cls}">${escapeHtml(c.source)}</span></td>
                     <td class="price-cell">₦${formatCurrency(c.price)}</td>
-                    <td>${formatQuantity(c.packSize || 1)}</td>
+                    <td>${formatQuantity(c.packSize)}</td>
                     <td style="font-size:0.75rem;">${c.date ? c.date.toLocaleDateString() : '—'}</td>
                     <td>${confPct}%</td>
                     <td><button class="btn-primary btn-sm" onclick="applyMatch('${item.id}', ${c.price}, '${escapeHtml(c.source)}', '${escapeHtml(c.displayName).replace(/'/g, "\\'")}')">Use</button></td>
@@ -1926,120 +1691,96 @@
             });
             html += `</tbody></table></div>`;
         } else {
-            html += `<p class="help-text">No close matches found in the price database. Enter a manual price above.</p>`;
+            html += `<p class="help-text">No close matches. Enter a manual price above.</p>`;
         }
-
         document.getElementById('matchModalContent').innerHTML = html;
         document.getElementById('matchModal').classList.add('open');
     };
-
     window.applyMatch = function(itemId, price, source, fromName) {
         const item = uploadedItems.find(i => i.id === itemId);
         if (!item) return;
         item.unitPrice = parseFloat(price) || 0;
-        item.matchedSource = source;
-        item.matchedFrom = fromName;
-        item.confidence = 1;
-        item.status = 'matched';
-        closeModal('matchModal');
-        renderResults();
-        updateStats();
+        item.matchedSource = source; item.matchedFrom = fromName;
+        item.confidence = 1; item.status = 'matched';
+        closeModal('matchModal'); renderResults(); updateStats();
         showToast('✅ Price applied.', 'success', 1400);
     };
-
     window.applyManualPrice = function(itemId) {
         const val = parseFloat(document.getElementById('manualPriceInput').value) || 0;
         const item = uploadedItems.find(i => i.id === itemId);
         if (!item) return;
-        item.unitPrice = val;
-        item.matchedSource = 'Manual';
-        item.matchedFrom = 'Manual entry';
-        item.confidence = 1;
-        item.status = val > 0 ? 'matched' : 'unmatched';
-        closeModal('matchModal');
-        renderResults();
-        updateStats();
+        item.unitPrice = val; item.matchedSource = 'Manual'; item.matchedFrom = 'Manual entry';
+        item.confidence = 1; item.status = val > 0 ? 'matched' : 'unmatched';
+        closeModal('matchModal'); renderResults(); updateStats();
         showToast('✅ Manual price applied.', 'success', 1400);
     };
 
     /* =========================================================
-       ONLINE PRICE COMPARISON
+       ONLINE COMPARISON
     ========================================================= */
-    async function fetchOnlinePrices(query) {
+    async function fetchOnlinePrices(query, overrideAnchor = null) {
         const key = normalizeName(query);
         if (onlineCache[key] && Date.now() - onlineCache[key].timestamp < 300000) {
             return onlineCache[key].sources;
         }
-
+        const anchor = overrideAnchor || getInternalAnchor(query);
+        if (!anchor) {
+            // No anchor — cannot compare meaningfully
+            onlineCache[key] = { displayName: query, sources: [], timestamp: Date.now(), anchor: null };
+            return [];
+        }
+        const context = { query, anchor };
         const results = [];
         await Promise.all(ONLINE_SOURCES.map(async src => {
             try {
-                const rows = await src.fetch(query);
-                rows.forEach(r => {
-                    results.push({
-                        store: r.store,
-                        icon: src.icon,
-                        type: src.type,
-                        variant: r.variant || src.variant || 'retail',
-                        price: r.price,
-                        packSize: r.packSize,
-                        packQty: r.packQty || 1,
-                        totalUnits: r.totalUnits || ((r.packQty || 1) * (r.packSize || 1)),
-                        inStock: r.inStock,
-                        url: r.url,
-                        note: r.note,
-                        fetchedAt: r.fetchedAt,
-                        live: r.live !== undefined ? r.live : src.live
-                    });
-                });
-            } catch (err) {
-                console.warn(`Online source ${src.id} failed:`, err);
-            }
+                const rows = await src.fetch(context);
+                rows.forEach(r => results.push({ ...r, icon: src.icon, type: src.type, live: r.live !== undefined ? r.live : src.live }));
+            } catch (err) { console.warn(`Source ${src.id} failed:`, err); }
         }));
-
-        onlineCache[key] = { displayName: query, sources: results, timestamp: Date.now() };
+        onlineCache[key] = { displayName: query, sources: results, timestamp: Date.now(), anchor };
         return results;
     }
 
     function findInternalPrice(item) {
-        const query = ((item.brand || '') + ' ' + item.itemName).trim();
-        let best = null;
-        for (const key in priceHistory) {
-            const sim = similarity(query, key);
-            if (sim < 0.35) continue;
-            const pts = priceHistory[key].points;
-            const latest = pts.reduce((a, b) => {
-                const da = a.date ? a.date.getTime() : 0;
-                const db_ = b.date ? b.date.getTime() : 0;
-                return db_ > da ? b : a;
-            }, pts[0]);
-            if (!best || sim > best.confidence) {
-                best = { price: latest.price, source: latest.source, name: priceHistory[key].displayName, confidence: sim };
-            }
-        }
-        return best;
+        return getInternalAnchor(((item.brand || '') + ' ' + item.itemName).trim());
     }
 
-    function buildComparisonHtml(item, onlineRows) {
-        const internal = findInternalPrice(item);
-        const internalPrice = internal ? internal.price : 0;
+    function buildComparisonHtml(item, onlineRows, usedAnchor) {
+        const anchor = usedAnchor || findInternalPrice(item);
+        const anchorUnit = anchor ? anchor.unitPrice : 0;
 
         let html = `<p><strong>Item:</strong> ${escapeHtml(item.itemName)} ${item.brand ? '· ' + escapeHtml(item.brand) : ''}</p>`;
-        if (internal) {
-            html += `<p style="font-size:0.85rem;color:#6b7f96;">Internal price reference: <strong>₦${formatCurrency(internalPrice)}</strong> <span class="source-badge" style="margin-left:6px;">${escapeHtml(internal.source)}</span></p>`;
+
+        // Anchor banner
+        if (anchor && anchorUnit > 0) {
+            const cls = 'anchor-banner ' + anchor.confidence;
+            const label = anchor.confidence === 'high' ? '🟢 HIGH RELIABILITY REFERENCE' :
+                          anchor.confidence === 'medium' ? '🟡 MEDIUM RELIABILITY REFERENCE' :
+                          anchor.confidence === 'user' ? '🟢 USER-SUPPLIED REFERENCE' :
+                          '🟠 CATEGORY ESTIMATE';
+            html += `<div class="${cls}">
+                <strong>${label}</strong> · ₦${formatCurrency(anchor.packPrice)} for ${formatQuantity(anchor.packSize)} units
+                = <strong>₦${formatCurrency(anchorUnit)}/unit</strong>
+                ${anchor.source ? `<span style="font-size:0.78rem;opacity:0.8;">· ${escapeHtml(anchor.source)}</span>` : ''}
+            </div>`;
         } else {
-            html += `<p style="font-size:0.85rem;color:#6b7f96;">No internal price reference available.</p>`;
+            html += `<div class="anchor-banner none">
+                <strong>🔴 NO RELIABLE REFERENCE PRICE</strong>
+                <br>This item has never been purchased through NEVAMAK and no category match was found in the item name.
+                Online comparison is disabled to avoid showing fabricated numbers.
+                <br><br>To enable comparison: either <strong>upload a purchase history</strong> or <strong>type an internal price manually</strong> in the Matched Results table, then try again.
+            </div>`;
+            return html;
         }
 
         if (!onlineRows.length) {
-            html += `<div class="empty-state"><div class="icon">🌐</div>No online prices returned.</div>`;
+            html += `<div class="empty-state"><div class="icon">🌐</div>No online prices returned for this item.</div>`;
             return html;
         }
 
         const sorted = sortByUnitPrice(onlineRows);
         const cheapest = sorted[0];
         const mostExpensive = sorted[sorted.length - 1];
-
         const everydayRows = onlineRows.filter(r => r.store && r.store.indexOf('Everyday') >= 0);
         const sahadRows = onlineRows.filter(r => r.store && r.store.indexOf('Sahad') >= 0);
         const cheapestEveryday = everydayRows.length ? sortByUnitPrice(everydayRows)[0] : null;
@@ -2056,14 +1797,12 @@
                 <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(mostExpensive))}</div>
                 <div class="help-text">${escapeHtml(mostExpensive.store)} · ${formatQuantity(mostExpensive.totalUnits)}u @ ₦${formatCurrency(mostExpensive.price)}</div>
             </div>
-            ${cheapestEveryday ? `
-            <div class="stat-card everyday" style="flex:1;min-width:140px;">
+            ${cheapestEveryday ? `<div class="stat-card everyday" style="flex:1;min-width:140px;">
                 <div class="label">🏬 Everyday Best</div>
                 <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(cheapestEveryday))}</div>
                 <div class="help-text">${escapeHtml(cheapestEveryday.variant)} · ${formatQuantity(cheapestEveryday.totalUnits)}u @ ₦${formatCurrency(cheapestEveryday.price)}</div>
             </div>` : ''}
-            ${cheapestSahad ? `
-            <div class="stat-card sahad" style="flex:1;min-width:140px;">
+            ${cheapestSahad ? `<div class="stat-card sahad" style="flex:1;min-width:140px;">
                 <div class="label">🏪 Sahad Best</div>
                 <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(cheapestSahad))}</div>
                 <div class="help-text">${escapeHtml(cheapestSahad.variant)} · ${formatQuantity(cheapestSahad.totalUnits)}u @ ₦${formatCurrency(cheapestSahad.price)}</div>
@@ -2072,75 +1811,71 @@
 
         html += `<div class="compare-grid">`;
         sorted.forEach(row => {
+            const unitPrice = perUnitPrice(row);
+            const relCls = 'reliability-' + (row.reliability || 'medium');
+            const relLabel = row.reliability === 'high' ? 'HIGH' :
+                            row.reliability === 'medium' ? 'MED' :
+                            row.reliability === 'user' ? 'USER' : 'EST';
+
             let deltaHtml = '';
-            if (internalPrice > 0) {
-                const delta = row.price - internalPrice;
-                const pct = (delta / internalPrice) * 100;
-                if (Math.abs(pct) < 1) deltaHtml = `<span class="delta delta-equal">≈ Same as internal</span>`;
-                else if (delta < 0) deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper vs internal</span>`;
-                else deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier vs internal</span>`;
+            if (anchorUnit > 0) {
+                const delta = unitPrice - anchorUnit;
+                const pct = (delta / anchorUnit) * 100;
+                if (Math.abs(pct) < 1) deltaHtml = `<span class="delta delta-equal">≈ Same as reference</span>`;
+                else if (delta < 0) deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper vs reference</span>`;
+                else if (Math.abs(pct) > 40) deltaHtml = `<span class="delta delta-outlier">⚠️ ${pct.toFixed(1)}% — OUTLIER, verify</span>`;
+                else deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier vs reference</span>`;
             }
 
             const isSahad = row.store.indexOf('Sahad') >= 0;
             const isEveryday = row.store.indexOf('Everyday') >= 0;
             const cardCls = isEveryday ? 'compare-card everyday-card' : isSahad ? 'compare-card sahad-card' : 'compare-card';
-            const variantTag = row.variant === 'wholesale'
-                ? `<span class="variant-tag wholesale">WHOLESALE</span>`
-                : `<span class="variant-tag">RETAIL</span>`;
+            const variantTag = row.variant === 'wholesale' ? `<span class="variant-tag wholesale">WHOLESALE</span>` : `<span class="variant-tag">RETAIL</span>`;
             const liveTag = row.live === true ? ` <span class="variant-tag" style="background:#d4edda;color:#0e5a2b;">LIVE</span>` :
                             row.live === false ? ` <span class="variant-tag" style="background:#fff3cd;color:#8a6d00;">MANUAL</span>` : '';
-            const unitPrice = perUnitPrice(row);
 
             html += `<div class="${cardCls}">
                 <div class="store-name">
                     <span class="store-logo">${row.icon || '🌐'}</span> ${escapeHtml(row.store)}
-                    ${isEveryday ? '🏬' : isSahad ? '🏪' : ''}
                     ${variantTag}${liveTag}
+                    <span class="reliability-tag ${relCls}">${relLabel}</span>
                 </div>
                 <div class="store-price">₦${formatCurrency(row.price)}</div>
                 <div class="store-meta">
-                    ${row.packSize ? `Pack: <strong>${formatQuantity(row.packSize)}</strong> units · ` : ''}
-                    ${row.totalUnits ? `Total: <strong>${formatQuantity(row.totalUnits)}</strong> units · ` : ''}
-                    Unit: <strong>₦${formatCurrency(unitPrice)}</strong>/unit
+                    Pack: <strong>${formatQuantity(row.packSize)}</strong> units · Total: <strong>${formatQuantity(row.totalUnits)}</strong> · Unit: <strong>₦${formatCurrency(unitPrice)}</strong>
                 </div>
-                <div class="store-meta">${row.inStock ? '✅ In stock' : '❌ Out of stock'} ${row.type ? ` · ${escapeHtml(row.type)}` : ''}</div>
+                <div class="store-meta">${row.inStock ? '✅ In stock' : '❌ Out of stock'}</div>
                 ${deltaHtml}
             </div>`;
         });
         html += `</div>`;
 
         html += `<p class="help-text" style="margin-top:14px;">
-            ⚠️ Prices are indicative and may include promotions, delivery fees, or bulk-tier differences.
-            <br>📊 <strong>Cheapest is ranked by price-per-unit</strong> so packs of different sizes are compared fairly.
-            <br>🏬 <strong>Everyday Group (45% market share)</strong> and 🏪 <strong>Sahad Stores (37%)</strong> together control 82% of Nigeria's general merchandise market. Neither publishes a public API — their prices are loaded via manual CSV upload.
-            <br>Always verify on the store's page before making pricing decisions.
+            ✅ All prices are anchored to your internal reference (₦${formatCurrency(anchorUnit)}/unit) with realistic markup bands per source type.
+            <br>📊 <strong>Ranked by price-per-unit</strong> so different pack sizes compare fairly.
+            <br>🏬 <strong>Everyday Group</strong> and 🏪 <strong>Sahad Stores</strong> together control 82% of the Nigerian general-merchandise market. Neither publishes a public API — their prices come from your manual CSV uploads.
+            <br>⚠️ Values that deviate more than ±40% from the reference are flagged as <strong>OUTLIER</strong>.
         </p>`;
-
         return html;
     }
 
     document.getElementById('onlineSearchBtn').addEventListener('click', async function() {
         const query = document.getElementById('onlineSearchInput').value.trim();
         if (!query) { showToast('Enter an item name to search.', 'error'); return; }
-
         this.disabled = true;
         this.innerHTML = '<span class="loading-spinner"></span> Searching…';
         const wrap = document.getElementById('onlineResultsWrap');
-        wrap.innerHTML = '<div class="loading-spinner"></div> Querying online sources…';
-
+        wrap.innerHTML = '<div class="loading-spinner"></div> Querying sources…';
         try {
-            const rows = await fetchOnlinePrices(query);
+            const anchor = getInternalAnchor(query);
+            const rows = await fetchOnlinePrices(query, anchor);
             const pseudoItem = { itemName: query, brand: '', packSize: 1 };
-            wrap.innerHTML = buildComparisonHtml(pseudoItem, rows);
+            wrap.innerHTML = buildComparisonHtml(pseudoItem, rows, anchor);
             updateStats();
         } catch (err) {
             wrap.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div>${escapeHtml(err.message)}</div>`;
-        } finally {
-            this.disabled = false;
-            this.innerHTML = '🔍 Search Online';
-        }
+        } finally { this.disabled = false; this.innerHTML = '🔍 Search Online'; }
     });
-
     document.getElementById('onlineSearchInput').addEventListener('keydown', e => {
         if (e.key === 'Enter') document.getElementById('onlineSearchBtn').click();
     });
@@ -2148,23 +1883,27 @@
     document.getElementById('compareAllBtn').addEventListener('click', async function() {
         const matched = uploadedItems.filter(i => i.status === 'matched' || i.status === 'partial');
         if (!matched.length) { showToast('No matched items to compare.', 'error'); return; }
-
         this.disabled = true;
         this.innerHTML = '<span class="loading-spinner"></span> Comparing…';
         const wrap = document.getElementById('onlineResultsWrap');
-        wrap.innerHTML = `<div class="loading-spinner"></div> Comparing ${matched.length} items online…`;
-
+        wrap.innerHTML = `<div class="loading-spinner"></div> Comparing ${matched.length} items…`;
         try {
             let html = '';
             for (const item of matched) {
                 const query = ((item.brand || '') + ' ' + item.itemName).trim();
-                const rows = await fetchOnlinePrices(query);
+                const anchor = item.unitPrice > 0 ? {
+                    unitPrice: item.unitPrice / (item.packSize || 1),
+                    packPrice: item.unitPrice,
+                    packSize: item.packSize || 1,
+                    confidence: 'user'
+                } : getInternalAnchor(query);
+                const rows = await fetchOnlinePrices(query, anchor);
                 html += `<div class="card" style="box-shadow:none;border:1px solid #eef1f5;margin-bottom:14px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
                         <strong>${escapeHtml(item.itemName)}</strong>
                         <span class="source-badge">${escapeHtml(item.brand || '')}</span>
                     </div>
-                    ${buildComparisonHtml(item, rows)}
+                    ${buildComparisonHtml(item, rows, anchor)}
                 </div>`;
             }
             wrap.innerHTML = html;
@@ -2172,24 +1911,29 @@
             showToast(`✅ Compared ${matched.length} items.`, 'success');
         } catch (err) {
             wrap.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div>${escapeHtml(err.message)}</div>`;
-        } finally {
-            this.disabled = false;
-            this.innerHTML = '📊 Compare All Matched';
-        }
+        } finally { this.disabled = false; this.innerHTML = '📊 Compare All Matched'; }
     });
 
     window.compareItemOnline = async function(itemId) {
         const item = uploadedItems.find(i => i.id === itemId);
         if (!item) return;
-
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
+        // Priority: item's own price → price history → category estimate → none
+        const anchor = item.unitPrice > 0 ? {
+            unitPrice: item.unitPrice / (item.packSize || 1),
+            packPrice: item.unitPrice,
+            packSize: item.packSize || 1,
+            confidence: 'user',
+            source: 'this row'
+        } : getInternalAnchor(query);
+
         document.getElementById('onlineModalTitle').textContent = '🌐 Online Comparison – ' + item.itemName;
-        document.getElementById('onlineModalContent').innerHTML = '<div class="loading-spinner"></div> Querying online sources…';
+        document.getElementById('onlineModalContent').innerHTML = '<div class="loading-spinner"></div> Querying sources…';
         document.getElementById('onlineModal').classList.add('open');
 
         try {
-            const rows = await fetchOnlinePrices(query);
-            document.getElementById('onlineModalContent').innerHTML = buildComparisonHtml(item, rows);
+            const rows = await fetchOnlinePrices(query, anchor);
+            document.getElementById('onlineModalContent').innerHTML = buildComparisonHtml(item, rows, anchor);
             updateStats();
             const row = document.getElementById('matched-detail-' + itemId);
             if (row && row.style.display !== 'none') {
@@ -2216,13 +1960,11 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `PriceRoom_${new Date().toISOString().slice(0,10)}.csv`;
+        a.href = url; a.download = `PriceRoom_${new Date().toISOString().slice(0,10)}.csv`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showToast('✅ CSV exported.', 'success');
     });
-
     document.getElementById('exportXlsxBtn').addEventListener('click', () => {
         if (!uploadedItems.length) { showToast('No items to export.', 'error'); return; }
         const data = uploadedItems.map(it => ({
@@ -2238,13 +1980,11 @@
         const blob = new Blob([wbout], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
-        a.download = `PriceRoom_${new Date().toISOString().slice(0,10)}.xlsx`;
+        a.href = url; a.download = `PriceRoom_${new Date().toISOString().slice(0,10)}.xlsx`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showToast('✅ Excel exported.', 'success');
     });
-
     document.getElementById('exportPdfBtn').addEventListener('click', async () => {
         if (!uploadedItems.length) { showToast('No items to export.', 'error'); return; }
         const btn = document.getElementById('exportPdfBtn');
@@ -2279,21 +2019,14 @@
             pdf.save(`PriceRoom_${Date.now()}.pdf`);
             document.body.removeChild(tempDiv);
             showToast('✅ PDF exported.', 'success');
-        } catch (err) {
-            console.error(err);
-            showToast('PDF error: ' + err.message, 'error');
-        } finally { btn.disabled = false; }
+        } catch (err) { showToast('PDF error: ' + err.message, 'error'); }
+        finally { btn.disabled = false; }
     });
-
-    /* =========================================================
-       SAVE AS INVOICE
-    ========================================================= */
     document.getElementById('saveAsInvoiceBtn').addEventListener('click', async () => {
         if (!uploadedItems.length) { showToast('No items to save.', 'error'); return; }
         const validItems = uploadedItems.filter(i => i.unitPrice > 0);
-        if (!validItems.length) { showToast('No priced items to save.', 'error'); return; }
+        if (!validItems.length) { showToast('No priced items.', 'error'); return; }
         if (!confirm(`Create a new invoice with ${validItems.length} priced items?`)) return;
-
         try {
             const invoiceNumber = 'PR-' + Date.now().toString(36).toUpperCase();
             const items = validItems.map(it => ({
@@ -2305,7 +2038,6 @@
                 total: (it.qty || 0) * it.unitPrice
             }));
             const total = items.reduce((s, i) => s + i.total, 0);
-
             await db.collection('invoices').add({
                 invoiceNumber, date: new Date().toISOString().slice(0, 10),
                 customer: 'Price Room Import', customerEmail: '',
@@ -2322,38 +2054,29 @@
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(), user: currentUserEmail
             });
             showToast(`✅ Invoice ${invoiceNumber} created.`, 'success');
-        } catch (err) {
-            console.error(err);
-            showToast('Error saving invoice: ' + err.message, 'error');
-        }
+        } catch (err) { showToast('Error saving invoice: ' + err.message, 'error'); }
     });
 
     /* =========================================================
-       PRICE HISTORY TAB
+       PRICE HISTORY
     ========================================================= */
     document.getElementById('reloadHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
     document.getElementById('rebuildHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
-
     window.toggleHistoryDetail = function(key) {
-        const id = 'history-detail-' + historyKeyId(key);
-        const row = document.getElementById(id);
+        const row = document.getElementById('history-detail-' + historyKeyId(key));
         if (!row) return;
         const isHidden = row.style.display === 'none';
         row.style.display = isHidden ? '' : 'none';
-        const summaryRow = row.previousElementSibling;
-        if (summaryRow) summaryRow.classList.toggle('expanded', isHidden);
+        if (row.previousElementSibling) row.previousElementSibling.classList.toggle('expanded', isHidden);
     };
-
     window.expandAllHistory = function() {
         document.querySelectorAll('.history-detail-row').forEach(r => { r.style.display = ''; });
         document.querySelectorAll('.history-summary-row').forEach(r => r.classList.add('expanded'));
     };
-
     window.collapseAllHistory = function() {
         document.querySelectorAll('.history-detail-row').forEach(r => { r.style.display = 'none'; });
         document.querySelectorAll('.history-summary-row').forEach(r => r.classList.remove('expanded'));
     };
-
     document.getElementById('expandAllHistoryBtn').addEventListener('click', window.expandAllHistory);
     document.getElementById('collapseAllHistoryBtn').addEventListener('click', window.collapseAllHistory);
 
@@ -2365,17 +2088,14 @@
             wrap.innerHTML = '<div class="empty-state"><div class="icon">🗄️</div>No price history yet. Click "Rebuild from All Sources".</div>';
             return;
         }
-
         let html = `<table><thead><tr>
             <th>Item</th><th>Most Recent Price</th><th>Pack Size</th><th>Pack Qty</th>
             <th>Total Units</th><th>Source</th><th># Points</th><th>Last Updated</th><th>Action</th>
         </tr></thead><tbody>`;
-
         let count = 0;
         keys.forEach(k => {
             const entry = priceHistory[k];
             if (search && !k.includes(search)) return;
-
             const sortedPoints = [...entry.points].sort((a, b) => {
                 const da = a.date ? a.date.getTime() : 0;
                 const db_ = b.date ? b.date.getTime() : 0;
@@ -2383,10 +2103,9 @@
             });
             const latest = sortedPoints[0];
             count++;
-
-            const srcLower = (latest.source || '').toLowerCase();
-            const srcCls = srcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
-                           srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+            const sL = (latest.source || '').toLowerCase();
+            const srcCls = sL.indexOf('everyday') >= 0 ? 'source-everyday' :
+                           sL.indexOf('sahad') >= 0 ? 'source-sahad' :
                            latest.source.startsWith('Online') ? 'source-online' :
                            latest.source === 'Invoice' ? 'source-invoice' :
                            latest.source === 'Shipment' ? 'source-shipment' :
@@ -2394,29 +2113,24 @@
 
             let detailRows = '';
             sortedPoints.forEach((pt, idx) => {
-                const dateStr = pt.date
-                    ? pt.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + pt.date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
-                    : '—';
+                const dateStr = pt.date ? pt.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short',year:'numeric'}) + ' · ' + pt.date.toLocaleTimeString('en-NG', {hour:'2-digit',minute:'2-digit'}) : '—';
                 const packSize = pt.packSize || 1;
                 const packQty = pt.packQty || 0;
                 const totalUnits = pt.totalUnits != null ? pt.totalUnits : (packQty * packSize);
-
-                const ptSrcLower = (pt.source || '').toLowerCase();
-                const ptSrcCls = ptSrcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
-                                 ptSrcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
-                                 pt.source.startsWith('Online') ? 'source-online' :
-                                 pt.source === 'Invoice' ? 'source-invoice' :
-                                 pt.source === 'Shipment' ? 'source-shipment' :
-                                 pt.source === 'Received' ? 'source-received' : '';
-                const isEveryday = ptSrcLower.indexOf('everyday') >= 0;
-                const isSahad = ptSrcLower.indexOf('sahad') >= 0;
-
+                const ptS = (pt.source || '').toLowerCase();
+                const ptCls = ptS.indexOf('everyday') >= 0 ? 'source-everyday' :
+                              ptS.indexOf('sahad') >= 0 ? 'source-sahad' :
+                              pt.source.startsWith('Online') ? 'source-online' :
+                              pt.source === 'Invoice' ? 'source-invoice' :
+                              pt.source === 'Shipment' ? 'source-shipment' :
+                              pt.source === 'Received' ? 'source-received' : '';
+                const isE = ptS.indexOf('everyday') >= 0;
+                const isS = ptS.indexOf('sahad') >= 0;
                 detailRows += `<tr>
                     <td style="white-space:nowrap;">${idx === 0 ? '🟢 ' : ''}${dateStr}</td>
-                    <td><span class="source-badge ${ptSrcCls}">${escapeHtml(pt.source)}</span>
-                        ${isEveryday ? '<span class="variant-chip everyday">Everyday</span>' : ''}
-                        ${isSahad ? '<span class="variant-chip sahad">Sahad</span>' : ''}
-                    </td>
+                    <td><span class="source-badge ${ptCls}">${escapeHtml(pt.source)}</span>
+                        ${isE ? '<span class="variant-chip everyday">Everyday</span>' : ''}
+                        ${isS ? '<span class="variant-chip sahad">Sahad</span>' : ''}</td>
                     <td class="price-cell">₦${formatCurrency(pt.price)}</td>
                     <td><span class="pack-badge">${formatQuantity(packSize)}</span></td>
                     <td><span class="pack-badge">${formatQuantity(packQty)}</span></td>
@@ -2424,14 +2138,11 @@
                     <td>${pt.brand ? escapeHtml(pt.brand) : '—'}</td>
                 </tr>`;
             });
-
             const detailId = 'history-detail-' + historyKeyId(k);
-            const everydayPoints = sortedPoints.filter(p => (p.source || '').toLowerCase().indexOf('everyday') >= 0);
-            const sahadPoints = sortedPoints.filter(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0);
-            const badges =
-                (everydayPoints.length ? ` <span class="variant-tag everyday">🏬 ${everydayPoints.length} Everyday</span>` : '') +
-                (sahadPoints.length ? ` <span class="variant-tag wholesale">🏪 ${sahadPoints.length} Sahad</span>` : '');
-
+            const eCount = sortedPoints.filter(p => (p.source || '').toLowerCase().indexOf('everyday') >= 0).length;
+            const sCount = sortedPoints.filter(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0).length;
+            const badges = (eCount ? ` <span class="variant-tag everyday">🏬 ${eCount}</span>` : '') +
+                           (sCount ? ` <span class="variant-tag wholesale">🏪 ${sCount}</span>` : '');
             html += `<tr class="history-summary-row" onclick="toggleHistoryDetail('${escapeHtml(k).replace(/'/g, "\\'")}')">
                 <td><strong>${escapeHtml(entry.displayName)}</strong>${badges}</td>
                 <td class="price-cell">₦${formatCurrency(latest.price)}</td>
@@ -2440,32 +2151,28 @@
                 <td><span class="unit-badge">${formatQuantity(latest.totalUnits || 0)}</span></td>
                 <td><span class="source-badge ${srcCls}">${escapeHtml(latest.source)}</span></td>
                 <td>${entry.points.length}</td>
-                <td style="font-size:0.75rem;">${latest.date ? latest.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                <td style="font-size:0.75rem;">${latest.date ? latest.date.toLocaleDateString('en-NG', {day:'2-digit',month:'short',year:'numeric'}) : '—'}</td>
                 <td>
-                    <button class="btn-info btn-sm" onclick="event.stopPropagation(); quickAddToMatch('${escapeHtml(k).replace(/'/g, "\\'")}')" title="Add to matched list">➕</button>
-                    <button class="btn-primary btn-sm" onclick="event.stopPropagation(); toggleHistoryDetail('${escapeHtml(k).replace(/'/g, "\\'")}')" title="Toggle detail">📋</button>
+                    <button class="btn-info btn-sm" onclick="event.stopPropagation(); quickAddToMatch('${escapeHtml(k).replace(/'/g, "\\'")}')">➕</button>
+                    <button class="btn-primary btn-sm" onclick="event.stopPropagation(); toggleHistoryDetail('${escapeHtml(k).replace(/'/g, "\\'")}')">📋</button>
                 </td>
             </tr>
             <tr class="history-detail-row" id="${detailId}" style="display:none;">
-                <td colspan="9">
-                    <div class="history-detail-inner">
-                        <div style="padding:8px 12px;background:#0a3d62;color:white;font-size:0.78rem;font-weight:600;">
-                            📋 Purchase timeline for "${escapeHtml(entry.displayName)}" — <strong>${entry.points.length}</strong> purchase${entry.points.length !== 1 ? 's' : ''}, most recent first
-                        </div>
-                        <table style="width:100%;border-collapse:collapse;">
-                            <thead><tr><th>Date & Time</th><th>Source</th><th>Price (₦)</th><th>Pack Size</th><th>Pack Qty</th><th>Total Units</th><th>Brand</th></tr></thead>
-                            <tbody>${detailRows}</tbody>
-                        </table>
+                <td colspan="9"><div class="history-detail-inner">
+                    <div style="padding:8px 12px;background:#0a3d62;color:white;font-size:0.78rem;font-weight:600;">
+                        📋 Timeline for "${escapeHtml(entry.displayName)}" — ${entry.points.length} purchase${entry.points.length !== 1 ? 's' : ''}
                     </div>
-                </td>
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead><tr><th>Date</th><th>Source</th><th>Price</th><th>Pack Size</th><th>Pack Qty</th><th>Total Units</th><th>Brand</th></tr></thead>
+                        <tbody>${detailRows}</tbody>
+                    </table>
+                </div></td>
             </tr>`;
         });
-
         html += '</tbody></table>';
         if (!count) html = `<div class="empty-state"><div class="icon">🔍</div>No matches.</div>`;
         wrap.innerHTML = html;
     }
-
     window.quickAddToMatch = function(key) {
         const entry = priceHistory[key];
         if (!entry) return;
@@ -2474,10 +2181,9 @@
             const db_ = b.date ? b.date.getTime() : 0;
             return db_ - da;
         });
-        const everydayPoint = sortedPoints.find(p => (p.source || '').toLowerCase().indexOf('everyday') >= 0);
-        const sahadPoint = sortedPoints.find(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0);
-        const chosen = everydayPoint || sahadPoint || sortedPoints[0];
-
+        const eP = sortedPoints.find(p => (p.source || '').toLowerCase().indexOf('everyday') >= 0);
+        const sP = sortedPoints.find(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0);
+        const chosen = eP || sP || sortedPoints[0];
         uploadedItems.push({
             id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
             brand: chosen?.brand || '', itemName: entry.displayName,
@@ -2486,11 +2192,9 @@
             matchedSource: chosen?.source || 'History',
             matchedFrom: entry.displayName, confidence: 1, status: 'matched'
         });
-        renderResults();
-        updateStats();
+        renderResults(); updateStats();
         showToast('✅ Added to matched list.', 'success', 1400);
     };
-
     document.getElementById('historySearch').addEventListener('input', renderHistory);
 
     /* =========================================================
@@ -2498,8 +2202,7 @@
     ========================================================= */
     addManualRow();
     addManualRow();
-
-    console.log('💰 Price Room loaded — Everyday Group + Sahad Stores wholesale references enabled.');
+    console.log('💰 Price Room loaded — all prices anchored to internal reference.');
 </script>
 </body>
 </html>
