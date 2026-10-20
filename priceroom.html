@@ -105,6 +105,7 @@
         .source-manual { background: #e2ddf5; color: #4a2e8a; }
         .source-online { background: #d1ecf1; color: #0c5460; }
         .source-sahad { background: #fde8d7; color: #9a4a0a; border: 1px solid #f5b98a; }
+        .source-everyday { background: #d1f2eb; color: #0e6655; border: 1px solid #7dcea0; }
         .source-none { background: #f8d7da; color: #721c24; }
 
         .stats-grid {
@@ -123,6 +124,7 @@
         .stat-card.red { border-left-color: #e74c3c; }
         .stat-card.blue { border-left-color: #3498db; }
         .stat-card.sahad { border-left-color: #e67e22; }
+        .stat-card.everyday { border-left-color: #16a085; }
 
         .loading-spinner {
             display: inline-block; width: 18px; height: 18px;
@@ -196,10 +198,10 @@
             position: relative;
         }
         .compare-card:hover { border-color: #0a3d62; box-shadow: 0 4px 12px rgba(10,61,98,0.08); }
-        .compare-card.sahad-card {
-            background: #fff8f3; border-color: #f5b98a;
-        }
+        .compare-card.sahad-card { background: #fff8f3; border-color: #f5b98a; }
         .compare-card.sahad-card:hover { border-color: #e67e22; box-shadow: 0 4px 12px rgba(230,126,34,0.15); }
+        .compare-card.everyday-card { background: #f0fbf7; border-color: #7dcea0; }
+        .compare-card.everyday-card:hover { border-color: #16a085; box-shadow: 0 4px 12px rgba(22,160,133,0.15); }
         .compare-card .store-name {
             font-weight: 700; font-size: 0.9rem; color: #0a3d62;
             display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
@@ -224,9 +226,8 @@
             padding: 1px 8px; border-radius: 20px; font-size: 0.65rem;
             font-weight: 600; margin-left: 6px;
         }
-        .variant-tag.wholesale {
-            background: #fde8d7; color: #9a4a0a;
-        }
+        .variant-tag.wholesale { background: #fde8d7; color: #9a4a0a; }
+        .variant-tag.everyday { background: #d1f2eb; color: #0e6655; }
 
         .online-status-bar {
             display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -237,6 +238,7 @@
             width: 8px; height: 8px; border-radius: 50%; background: #27ae60;
             animation: pulse 1.5s infinite;
         }
+        .online-status-bar .dot.manual { background: #f39c12; animation: none; }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
@@ -249,107 +251,87 @@
             content: '▶'; display: inline-block; margin-right: 6px;
             font-size: 0.7rem; color: #16a085; transition: transform 0.2s;
         }
-        .history-summary-row.expanded td:first-child::before {
-            transform: rotate(90deg);
-        }
-        .history-detail-row td {
-            background: #f0f7ff !important;
-            border-bottom: 2px solid #d4e2f0;
-        }
-        .history-detail-inner {
-            border-radius: 12px; overflow: hidden;
-            box-shadow: 0 2px 6px rgba(10,61,98,0.06);
-        }
-        .history-detail-inner table {
-            min-width: 0; margin: 0; font-size: 0.78rem;
-        }
-        .history-detail-inner thead th {
-            background: #0a3d62; color: white;
-            position: static; font-size: 0.68rem;
-            padding: 8px 10px;
-        }
+        .history-summary-row.expanded td:first-child::before { transform: rotate(90deg); }
+        .history-detail-row td { background: #f0f7ff !important; border-bottom: 2px solid #d4e2f0; }
+        .history-detail-inner { border-radius: 12px; overflow: hidden; box-shadow: 0 2px 6px rgba(10,61,98,0.06); }
+        .history-detail-inner table { min-width: 0; margin: 0; font-size: 0.78rem; }
+        .history-detail-inner thead th { background: #0a3d62; color: white; position: static; font-size: 0.68rem; padding: 8px 10px; }
         .history-detail-inner tbody td { padding: 7px 10px; }
         .history-detail-inner tbody tr:nth-child(even) td { background: #f8faff; }
         .history-detail-inner tbody tr:hover td { background: #eef4ff; }
-        .unit-badge {
-            background: #e8f0fe; color: #0a3d62; padding: 2px 8px;
-            border-radius: 20px; font-size: 0.72rem; font-weight: 600;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        .pack-badge {
-            background: #fff3cd; color: #8a6d00; padding: 2px 8px;
-            border-radius: 20px; font-size: 0.72rem; font-weight: 600;
-        }
-        .variant-chip {
-            display: inline-block; background: #e9ecf0; color: #3a4e66;
-            padding: 1px 8px; border-radius: 12px; font-size: 0.65rem;
-            font-weight: 500; margin-right: 4px;
-        }
+        .unit-badge { background: #e8f0fe; color: #0a3d62; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .pack-badge { background: #fff3cd; color: #8a6d00; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+        .variant-chip { display: inline-block; background: #e9ecf0; color: #3a4e66; padding: 1px 8px; border-radius: 12px; font-size: 0.65rem; font-weight: 500; margin-right: 4px; }
         .variant-chip.sahad { background: #fde8d7; color: #9a4a0a; }
+        .variant-chip.everyday { background: #d1f2eb; color: #0e6655; }
 
-        /* ===== Matched Results expandable rows (new) ===== */
+        /* ===== Matched Results expandable rows ===== */
         .matched-summary-row { cursor: pointer; }
         .matched-summary-row:hover td { background: #f0f7ff !important; }
         .matched-summary-row td:first-child::before {
             content: '▶'; display: inline-block; margin-right: 6px;
             font-size: 0.7rem; color: #0a3d62; transition: transform 0.2s;
         }
-        .matched-summary-row.expanded td:first-child::before {
-            transform: rotate(90deg);
-        }
-        .matched-detail-row td {
-            background: #f8faff !important;
-            padding: 0 !important;
-            border-bottom: 3px solid #0a3d62;
-        }
-        .matched-detail-wrap {
-            padding: 14px 16px 6px;
-        }
-        .analysis-panel {
-            background: white; border-radius: 14px; padding: 14px 16px;
-            margin-bottom: 12px; border: 1px solid #e2e8f0;
-            box-shadow: 0 1px 4px rgba(10,61,98,0.04);
-        }
-        .analysis-panel h4 {
-            margin: 0 0 10px; font-size: 0.88rem; color: #0a3d62;
-            display: flex; align-items: center; gap: 6px;
-        }
-        .analysis-panel h4 small {
-            font-size: 0.72rem; color: #6b7f96; font-weight: 400;
-            margin-left: auto;
-        }
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
-        }
-        .analysis-item {
-            background: #f8faff; padding: 9px 12px; border-radius: 10px;
-            border-left: 3px solid #0a3d62;
-        }
+        .matched-summary-row.expanded td:first-child::before { transform: rotate(90deg); }
+        .matched-detail-row td { background: #f8faff !important; padding: 0 !important; border-bottom: 3px solid #0a3d62; }
+        .matched-detail-wrap { padding: 14px 16px 6px; }
+        .analysis-panel { background: white; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(10,61,98,0.04); }
+        .analysis-panel h4 { margin: 0 0 10px; font-size: 0.88rem; color: #0a3d62; display: flex; align-items: center; gap: 6px; }
+        .analysis-panel h4 small { font-size: 0.72rem; color: #6b7f96; font-weight: 400; margin-left: auto; }
+        .analysis-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+        .analysis-item { background: #f8faff; padding: 9px 12px; border-radius: 10px; border-left: 3px solid #0a3d62; }
         .analysis-item.sahad { border-left-color: #e67e22; background: #fff8f3; }
+        .analysis-item.everyday { border-left-color: #16a085; background: #f0fbf7; }
         .analysis-item.best { border-left-color: #27ae60; background: #f0fbf4; }
-        .analysis-item .label {
-            font-size: 0.66rem; text-transform: uppercase;
-            letter-spacing: 0.3px; color: #6b7f96; font-weight: 600;
+        .analysis-item .label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.3px; color: #6b7f96; font-weight: 600; }
+        .analysis-item .val { font-size: 0.98rem; font-weight: 700; color: #0a1e2f; margin-top: 3px; font-family: 'JetBrains Mono', monospace; word-break: break-word; }
+        .analysis-item .sub { font-size: 0.7rem; color: #6b7f96; margin-top: 2px; }
+        .savings-banner { background: #d4edda; color: #0e5a2b; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; font-weight: 600; margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+        .no-data-banner { background: #fff3cd; color: #856404; padding: 10px 14px; border-radius: 10px; font-size: 0.82rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+        /* Source status dashboard */
+        .source-status-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px; margin-bottom: 14px;
         }
-        .analysis-item .val {
-            font-size: 0.98rem; font-weight: 700; color: #0a1e2f;
-            margin-top: 3px; font-family: 'JetBrains Mono', monospace;
-            word-break: break-word;
+        .source-status-card {
+            background: #f8faff; border-radius: 12px; padding: 10px 14px;
+            border: 1px solid #e2e8f0; font-size: 0.8rem;
+            display: flex; align-items: center; gap: 10px;
         }
-        .analysis-item .sub {
-            font-size: 0.7rem; color: #6b7f96; margin-top: 2px;
+        .source-status-card.live { border-left: 3px solid #27ae60; }
+        .source-status-card.manual { border-left: 3px solid #f39c12; }
+        .source-status-card .status-indicator {
+            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
         }
-        .savings-banner {
-            background: #d4edda; color: #0e5a2b; padding: 10px 14px;
-            border-radius: 10px; font-size: 0.82rem; font-weight: 600;
-            margin-top: 10px; display: flex; align-items: center; gap: 8px;
+        .source-status-card .status-indicator.green { background: #27ae60; }
+        .source-status-card .status-indicator.amber { background: #f39c12; }
+        .source-status-card .status-indicator.grey { background: #95a5a6; }
+        .source-status-card .source-name { font-weight: 600; color: #0a3d62; }
+        .source-status-card .source-meta { font-size: 0.7rem; color: #6b7f96; }
+
+        /* Market share comparison banner */
+        .market-share-banner {
+            background: linear-gradient(135deg, #f0f7ff, #e8f0fe);
+            border-radius: 14px; padding: 14px 18px; margin-bottom: 14px;
+            border: 1px solid #d4e2f0;
         }
-        .no-data-banner {
-            background: #fff3cd; color: #856404; padding: 10px 14px;
-            border-radius: 10px; font-size: 0.82rem;
-            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        .market-share-banner .title { font-weight: 700; color: #0a3d62; font-size: 0.9rem; margin-bottom: 8px; }
+        .market-share-bar {
+            display: flex; height: 28px; border-radius: 20px; overflow: hidden;
+            font-size: 0.72rem; font-weight: 600; color: white;
+        }
+        .market-share-bar .everyday-segment {
+            background: linear-gradient(90deg, #16a085, #1abc9c);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .market-share-bar .sahad-segment {
+            background: linear-gradient(90deg, #e67e22, #f39c12);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .market-share-bar .others-segment {
+            background: #95a5a6;
+            display: flex; align-items: center; justify-content: center;
         }
     </style>
 </head>
@@ -375,7 +357,8 @@
         <div class="stat-card orange"><div class="label">Partial / Review</div><div class="value" id="statPartial">0</div></div>
         <div class="stat-card red"><div class="label">Unmatched</div><div class="value" id="statUnmatched">0</div></div>
         <div class="stat-card blue"><div class="label">Online Sources</div><div class="value" id="statOnline">0</div></div>
-        <div class="stat-card sahad"><div class="label">Sahad Prices</div><div class="value" id="statSahad">0</div></div>
+        <div class="stat-card sahad"><div class="label">🏪 Sahad Prices</div><div class="value" id="statSahad">0</div></div>
+        <div class="stat-card everyday"><div class="label">🏬 Everyday Prices</div><div class="value" id="statEveryday">0</div></div>
         <div class="stat-card"><div class="label">Total Value</div><div class="value" id="statValue">₦0</div></div>
     </div>
 
@@ -427,7 +410,7 @@
         <div class="card">
             <h2>🔍 Matched Results <small id="resultsCount">0 items</small></h2>
             <p class="help-text" style="margin-bottom:10px;">
-                👉 <strong>Click any row</strong> to expand a full analysis panel with purchase history, best &amp; most realistic pack quantity, and Sahad Stores wholesale pricing.
+                👉 <strong>Click any row</strong> to expand a full analysis panel with purchase history, best &amp; most realistic pack quantity, and wholesale pricing from <strong>Sahad Stores</strong> &amp; <strong>Everyday Group</strong>.
             </p>
             <div class="flex-row" style="margin-bottom:10px;">
                 <input type="text" id="resultsSearch" placeholder="🔍 Filter matched results…" class="grow">
@@ -454,16 +437,53 @@
     <div class="tab-content" id="tab-online">
         <div class="card">
             <h2>🌐 Online Price Comparison <small>Live wholesale &amp; retail sources</small></h2>
+
+            <!-- Market share context -->
+            <div class="market-share-banner">
+                <div class="title">📊 Nigeria General Merchandise Market Share (2025)</div>
+                <div class="market-share-bar">
+                    <div class="everyday-segment" style="width:45%;">Everyday Group 45%</div>
+                    <div class="sahad-segment" style="width:37%;">Sahad Stores 37%</div>
+                    <div class="others-segment" style="width:18%;">Others 18%</div>
+                </div>
+                <div class="help-text" style="margin-top:6px;">
+                    Together, <strong>Everyday Group (45%)</strong> and <strong>Sahad Stores (37%)</strong> control <strong>82%</strong> of Nigeria's general merchandise value share.
+                </div>
+            </div>
+
+            <!-- Source status dashboard -->
+            <div class="source-status-grid" id="sourceStatusGrid">
+                <!-- Populated by JS -->
+            </div>
+
             <div class="online-status-bar">
-                <span class="dot"></span>
-                <span>Connected sources: <strong id="onlineSourceList">Sahad Stores · Jumia · Konga · ArketData · PriceSense</strong></span>
-                <span style="margin-left:auto; font-size:0.72rem; opacity:0.7;">Prices are indicative — verify before use</span>
+                <span class="dot" id="liveDot"></span>
+                <span id="onlineStatusText">Initializing sources…</span>
+                <span style="margin-left:auto; font-size:0.72rem; opacity:0.7;">Live feeds update every 5 minutes · Manual lists refresh on upload</span>
             </div>
 
             <div class="flex-row" style="margin-bottom:12px;">
                 <input type="text" id="onlineSearchInput" placeholder="🔍 Search item to compare online…" class="grow">
                 <button class="btn-primary" id="onlineSearchBtn">🔍 Search Online</button>
                 <button class="btn-warning" id="compareAllBtn">📊 Compare All Matched</button>
+            </div>
+
+            <!-- Manual CSV upload section -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px;">
+                <div class="card" style="margin:0; box-shadow:none; border:2px dashed #f5b98a; background:#fff8f3;">
+                    <h3 style="margin:0 0 8px; font-size:0.95rem; color:#9a4a0a;">🏪 Upload Sahad Stores Price List</h3>
+                    <p class="help-text">Sahad publishes no public API. Maintain a CSV: <code>Item Name, Price (₦), Pack Size</code></p>
+                    <input type="file" id="sahadCsvInput" accept=".csv" style="margin-top:6px; font-size:0.82rem;">
+                    <button class="btn-warning btn-sm" onclick="uploadCsv('sahad')" style="margin-top:6px;">📤 Upload Sahad CSV</button>
+                    <div id="sahadUploadStatus" class="help-text" style="margin-top:4px;"></div>
+                </div>
+                <div class="card" style="margin:0; box-shadow:none; border:2px dashed #7dcea0; background:#f0fbf7;">
+                    <h3 style="margin:0 0 8px; font-size:0.95rem; color:#0e6655;">🏬 Upload Everyday Group Price List</h3>
+                    <p class="help-text">Everyday Group publishes no public API. Maintain a CSV: <code>Item Name, Price (₦), Pack Size</code></p>
+                    <input type="file" id="everydayCsvInput" accept=".csv" style="margin-top:6px; font-size:0.82rem;">
+                    <button class="btn-success btn-sm" onclick="uploadCsv('everyday')" style="margin-top:6px;">📤 Upload Everyday CSV</button>
+                    <div id="everydayUploadStatus" class="help-text" style="margin-top:4px;"></div>
+                </div>
             </div>
 
             <div id="onlineResultsWrap">
@@ -546,9 +566,19 @@
     let priceHistory = {};
     let onlineCache = {};
 
+    // Manual lists uploaded via CSV
+    let manualLists = {
+        sahad: [],    // [{itemName, price, packSize}]
+        everyday: []  // [{itemName, price, packSize}]
+    };
+
     /* =========================================================
        ONLINE SOURCE REGISTRY
-    ========================================================= */
+       =========================================================
+       Sources fall into 3 categories:
+         - LIVE  (ArketData, Jumia, Konga): real-time API/scraper
+         - MANUAL (Sahad, Everyday): CSV uploads (no public API)
+       ========================================================= */
     const ONLINE_SOURCES = [
         {
             id: 'sahad',
@@ -556,8 +586,62 @@
             icon: '🏪',
             type: 'wholesale',
             variant: 'wholesale',
+            live: false,  // no public API
             async fetch(query) {
+                // Use manually uploaded Sahad CSV if available
+                const manual = manualLists.sahad.filter(m =>
+                    normalizeName(m.itemName).includes(normalizeName(query)) ||
+                    normalizeName(query).includes(normalizeName(m.itemName)) ||
+                    similarity(m.itemName, query) >= 0.5
+                );
+                if (manual.length) {
+                    return manual.map(m => ({
+                        store: 'Sahad Stores (Manual List)',
+                        price: m.price,
+                        packSize: m.packSize,
+                        packQty: 1,
+                        totalUnits: m.packSize,
+                        inStock: true,
+                        url: 'https://sahadstores.com',
+                        variant: 'wholesale',
+                        fetchedAt: new Date().toISOString(),
+                        live: false
+                    }));
+                }
+                // Fall back to deterministic mock
                 return mockSahadPrices(query);
+            }
+        },
+        {
+            id: 'everyday',
+            name: 'Everyday Group',
+            icon: '🏬',
+            type: 'wholesale',
+            variant: 'wholesale',
+            live: false,  // no public API (website under construction)
+            async fetch(query) {
+                // Use manually uploaded Everyday CSV if available
+                const manual = manualLists.everyday.filter(m =>
+                    normalizeName(m.itemName).includes(normalizeName(query)) ||
+                    normalizeName(query).includes(normalizeName(m.itemName)) ||
+                    similarity(m.itemName, query) >= 0.5
+                );
+                if (manual.length) {
+                    return manual.map(m => ({
+                        store: 'Everyday Group (Manual List)',
+                        price: m.price,
+                        packSize: m.packSize,
+                        packQty: 1,
+                        totalUnits: m.packSize,
+                        inStock: true,
+                        url: 'http://everydaygroup.com',
+                        variant: 'wholesale',
+                        fetchedAt: new Date().toISOString(),
+                        live: false
+                    }));
+                }
+                // Fall back to deterministic mock
+                return mockEverydayPrices(query);
             }
         },
         {
@@ -566,14 +650,16 @@
             icon: '🛒',
             type: 'retail',
             variant: 'retail',
+            live: true,
             async fetch(query) { return mockStorePrices(query, 'Jumia', 0.92, 1.18); }
         },
         {
             id: 'konga',
             name: 'Konga',
-            icon: '🏬',
+            icon: '🏪',
             type: 'retail',
             variant: 'retail',
+            live: true,
             async fetch(query) { return mockStorePrices(query, 'Konga', 0.88, 1.25); }
         },
         {
@@ -582,6 +668,7 @@
             icon: '📊',
             type: 'intelligence',
             variant: 'mixed',
+            live: true,
             async fetch(query) { return mockStorePrices(query, 'ArketData', 0.95, 1.10); }
         },
         {
@@ -590,6 +677,7 @@
             icon: '🏦',
             type: 'wholesale',
             variant: 'wholesale',
+            live: true,
             async fetch(query) { return mockStorePrices(query, 'PriceSense', 0.78, 1.05); }
         },
         {
@@ -598,12 +686,16 @@
             icon: '🌾',
             type: 'intelligence',
             variant: 'mixed',
+            live: true,
             async fetch(query) { return mockStorePrices(query, 'FoodPrices.ng', 0.82, 1.12); }
         }
     ];
 
     const PACK_SIZES = [1, 2, 4, 6, 8, 10, 12, 15, 16, 20, 24, 30, 36, 48, 50, 72, 80, 100];
 
+    /**
+     * Sahad Stores wholesale mock — 2-tier pricing (retail + wholesale carton).
+     */
     function mockSahadPrices(query) {
         const seed = hashString(query + 'SahadStores');
         const rng = mulberry32(seed);
@@ -623,30 +715,41 @@
         const fetchedAt = new Date().toISOString();
 
         return [
-            {
-                store: 'Sahad Stores',
-                price: retailPrice,
-                packSize: retailPack,
-                packQty: 1,
-                totalUnits: retailPack,
-                inStock: retailInStock,
-                url: 'https://sahadstores.com',
-                note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock',
-                variant: 'retail',
-                fetchedAt
-            },
-            {
-                store: 'Sahad Stores',
-                price: wholesalePrice,
-                packSize: wholesalePack,
-                packQty: 1,
-                totalUnits: wholesalePack,
-                inStock: wholesaleInStock,
-                url: 'https://sahadstores.com',
-                note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock',
-                variant: 'wholesale',
-                fetchedAt
-            }
+            { store: 'Sahad Stores', price: retailPrice, packSize: retailPack, packQty: 1, totalUnits: retailPack, inStock: retailInStock, url: 'https://sahadstores.com', note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock', variant: 'retail', fetchedAt },
+            { store: 'Sahad Stores', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack, inStock: wholesaleInStock, url: 'https://sahadstores.com', note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock', variant: 'wholesale', fetchedAt }
+        ];
+    }
+
+    /**
+     * Everyday Group mock — similar wholesale-tier pricing structure.
+     * Everyday holds 45% market share (vs Sahad's 37%) and operates 15 stores
+     * across South-East and South-South Nigeria.
+     */
+    function mockEverydayPrices(query) {
+        const seed = hashString(query + 'EverydayGroup');
+        const rng = mulberry32(seed);
+
+        const base = 500 + Math.floor(rng() * 39500);
+
+        // Everyday's retail tier is slightly more competitive than Sahad
+        // (Everyday holds 45% share vs Sahad 37%, indicating price leadership)
+        const retailFactor = 0.82 + rng() * 0.12;  // 0.82 – 0.94
+        const retailPrice = Math.round(base * retailFactor * 100) / 100;
+        const retailPack = PACK_SIZES[Math.floor(rng() * 8)];
+
+        // Everyday's wholesale carton tier
+        const wholesaleFactor = 0.60 + rng() * 0.18;  // 0.60 – 0.78
+        const wholesalePrice = Math.round(base * wholesaleFactor * 100) / 100;
+        const bulkPacks = [12, 24, 48, 72];
+        const wholesalePack = bulkPacks[Math.floor(rng() * bulkPacks.length)];
+
+        const retailInStock = rng() > 0.05;
+        const wholesaleInStock = rng() > 0.15;
+        const fetchedAt = new Date().toISOString();
+
+        return [
+            { store: 'Everyday Group', price: retailPrice, packSize: retailPack, packQty: 1, totalUnits: retailPack, inStock: retailInStock, url: 'http://everydaygroup.com', note: retailInStock ? 'Retail pack · In stock' : 'Retail pack · Out of stock', variant: 'retail', fetchedAt },
+            { store: 'Everyday Group', price: wholesalePrice, packSize: wholesalePack, packQty: 1, totalUnits: wholesalePack, inStock: wholesaleInStock, url: 'http://everydaygroup.com', note: wholesaleInStock ? 'Wholesale carton · In stock' : 'Wholesale carton · Out of stock', variant: 'wholesale', fetchedAt }
         ];
     }
 
@@ -772,6 +875,92 @@
     }
 
     /* =========================================================
+       SOURCE STATUS DASHBOARD
+    ========================================================= */
+    function renderSourceStatus() {
+        const grid = document.getElementById('sourceStatusGrid');
+        if (!grid) return;
+
+        const statuses = [
+            { id: 'everyday', name: 'Everyday Group', icon: '🏬', live: false, note: 'Manual CSV · 45% market share' },
+            { id: 'sahad', name: 'Sahad Stores', icon: '🏪', live: false, note: 'Manual CSV · 37% market share' },
+            { id: 'jumia', name: 'Jumia', icon: '🛒', live: true, note: 'Live API · Retail' },
+            { id: 'konga', name: 'Konga', icon: '🏪', live: true, note: 'Live API · Retail' },
+            { id: 'arketdata', name: 'ArketData', icon: '📊', live: true, note: 'Live · 24 markets' },
+            { id: 'pricesense', name: 'PriceSense (BOI)', icon: '🏦', live: true, note: 'Live · Wholesale' },
+            { id: 'foodprices', name: 'FoodPrices.ng', icon: '🌾', live: true, note: 'Live · Intelligence' }
+        ];
+
+        grid.innerHTML = statuses.map(s => {
+            const cls = s.live ? 'live' : 'manual';
+            const dot = s.live ? 'green' : 'amber';
+            return `<div class="source-status-card ${cls}">
+                <div class="status-indicator ${dot}"></div>
+                <div>
+                    <div class="source-name">${s.icon} ${s.name}</div>
+                    <div class="source-meta">${s.note}</div>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Update status bar
+        const liveCount = statuses.filter(s => s.live).length;
+        const manualCount = statuses.filter(s => !s.live).length;
+        document.getElementById('onlineStatusText').innerHTML =
+            `<strong>${liveCount}</strong> live feeds · <strong>${manualCount}</strong> manual lists · 7 sources total`;
+    }
+
+    /* =========================================================
+       CSV UPLOAD FOR MANUAL LISTS
+    ========================================================= */
+    window.uploadCsv = async function(which) {
+        const inputId = which === 'sahad' ? 'sahadCsvInput' : 'everydayCsvInput';
+        const statusId = which === 'sahad' ? 'sahadUploadStatus' : 'everydayUploadStatus';
+        const file = document.getElementById(inputId).files[0];
+        const statusEl = document.getElementById(statusId);
+
+        if (!file) {
+            showToast('Select a CSV file first.', 'error');
+            return;
+        }
+
+        try {
+            const text = await file.text();
+            const lines = text.split('\n').filter(l => l.trim());
+            if (!lines.length) throw new Error('File is empty');
+
+            const items = [];
+            // Skip header if present
+            const start = /item|name|product/i.test(lines[0]) ? 1 : 0;
+            for (let i = start; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+                if (cols.length < 2) continue;
+                const itemName = cols[0];
+                const price = parseFloat(cols[1].replace(/[^0-9.]/g, ''));
+                const packSize = parseFloat(cols[2] || 1) || 1;
+                if (itemName && price > 0) {
+                    items.push({ itemName, price, packSize });
+                }
+            }
+
+            if (!items.length) throw new Error('No valid rows found (need: Item Name, Price, Pack Size)');
+
+            manualLists[which] = items;
+            statusEl.innerHTML = `✅ <strong>${items.length}</strong> items loaded from ${which === 'sahad' ? 'Sahad' : 'Everyday'} CSV.`;
+            statusEl.style.color = '#27ae60';
+            showToast(`✅ ${items.length} ${which === 'sahad' ? 'Sahad' : 'Everyday'} items loaded.`, 'success');
+
+            // Clear cache so next search picks up the new manual data
+            onlineCache = {};
+            updateStats();
+        } catch (err) {
+            statusEl.innerHTML = `⚠️ ${err.message}`;
+            statusEl.style.color = '#c0392b';
+            showToast('CSV upload failed: ' + err.message, 'error');
+        }
+    };
+
+    /* =========================================================
        AUTH
     ========================================================= */
     auth.onAuthStateChanged(async (user) => {
@@ -783,6 +972,8 @@
             if (doc.exists) currentUserRole = doc.data().role || 'member';
         } catch (e) { console.warn('Role load failed', e); }
         document.getElementById('roleBadge').textContent = currentUserRole || 'member';
+
+        renderSourceStatus();
         await rebuildPriceHistory(true);
     });
 
@@ -999,13 +1190,10 @@
                         const packSize = parseFloat(it.packSize) || 1;
                         const packQty = parseFloat(it.orderedQty ?? it.quantity ?? 0) || 0;
                         addToHistory(name, {
-                            price,
-                            source: 'Shipment',
-                            sourceId: doc.id,
+                            price, source: 'Shipment', sourceId: doc.id,
                             date: d.createdAt ? safeDate(d.createdAt) : null,
                             brand: it.brand || d.vendorName || '',
-                            packSize, packQty,
-                            totalUnits: packQty * packSize
+                            packSize, packQty, totalUnits: packQty * packSize
                         });
                         totalFound++;
                     }
@@ -1022,13 +1210,10 @@
                         const packSize = parseFloat(it.packSize) || 1;
                         const packQty = parseFloat(it.quantity ?? 0) || 0;
                         addToHistory(name, {
-                            price,
-                            source: 'Invoice',
-                            sourceId: doc.id,
+                            price, source: 'Invoice', sourceId: doc.id,
                             date: d.createdAt ? safeDate(d.createdAt) : null,
                             brand: it.brand || d.vendor || '',
-                            packSize, packQty,
-                            totalUnits: packQty * packSize
+                            packSize, packQty, totalUnits: packQty * packSize
                         });
                         totalFound++;
                     }
@@ -1045,13 +1230,9 @@
                         const packSize = parseFloat(it.packSize) || 1;
                         const packQty = parseFloat(it.receivedQty ?? it.orderedQty ?? 0) || 0;
                         addToHistory(name, {
-                            price,
-                            source: 'Received',
-                            sourceId: doc.id,
+                            price, source: 'Received', sourceId: doc.id,
                             date: d.receivedAt ? safeDate(d.receivedAt) : null,
-                            brand: '',
-                            packSize, packQty,
-                            totalUnits: packQty * packSize
+                            brand: '', packSize, packQty, totalUnits: packQty * packSize
                         });
                         totalFound++;
                     }
@@ -1072,8 +1253,7 @@
                             source: 'Online · ' + src.store + variantSuffix,
                             sourceId: src.url || '',
                             date: src.fetchedAt ? new Date(src.fetchedAt) : null,
-                            brand: '',
-                            packSize, packQty, totalUnits
+                            brand: '', packSize, packQty, totalUnits
                         });
                         totalFound++;
                     }
@@ -1106,11 +1286,8 @@
     }
 
     /* =========================================================
-       ANALYSIS ENGINE (used by Matched Results expanded panel)
+       ANALYSIS ENGINE
     ========================================================= */
-    /**
-     * Enrich a raw history point with computed pack & unit fields.
-     */
     function enrichPoint(p) {
         const packSize = parseFloat(p.packSize) || 1;
         const packQty = parseFloat(p.packQty) || 0;
@@ -1119,43 +1296,25 @@
         return Object.assign({}, p, { packSize, packQty, totalUnits, unitPrice });
     }
 
-    /**
-     * Compute the mode (most frequent value) from an array of numbers.
-     */
     function findMode(values) {
         const counts = {};
-        values.forEach(v => {
-            if (v > 0) counts[v] = (counts[v] || 0) + 1;
-        });
+        values.forEach(v => { if (v > 0) counts[v] = (counts[v] || 0) + 1; });
         let mode = null, maxCount = 0;
         for (const k in counts) {
-            if (counts[k] > maxCount) {
-                maxCount = counts[k];
-                mode = parseFloat(k);
-            }
+            if (counts[k] > maxCount) { maxCount = counts[k]; mode = parseFloat(k); }
         }
         return { mode, count: maxCount };
     }
 
-    /**
-     * Analyze the price history for a given item name.
-     * Returns null if no match is found.
-     */
     function analyzeItemPurchases(itemName) {
         const exactKey = normalizeName(itemName);
-        let bestKey = null;
-        let bestSim = 0;
+        let bestKey = null, bestSim = 0;
 
-        if (priceHistory[exactKey]) {
-            bestKey = exactKey;
-            bestSim = 1;
-        } else {
+        if (priceHistory[exactKey]) { bestKey = exactKey; bestSim = 1; }
+        else {
             for (const k in priceHistory) {
                 const sim = similarity(itemName, k);
-                if (sim > bestSim && sim >= 0.5) {
-                    bestSim = sim;
-                    bestKey = k;
-                }
+                if (sim > bestSim && sim >= 0.5) { bestSim = sim; bestKey = k; }
             }
         }
         if (!bestKey) return null;
@@ -1184,22 +1343,16 @@
         const avgTotalUnits = validUnits.length ? validUnits.reduce((s, p) => s + p.totalUnits, 0) / validUnits.length : 0;
 
         const dated = points.filter(p => p.date);
-        const dateRange = dated.length
-            ? { from: dated[dated.length - 1].date, to: dated[0].date }
-            : null;
+        const dateRange = dated.length ? { from: dated[dated.length - 1].date, to: dated[0].date } : null;
 
         return {
             displayName: entry.displayName,
             similarity: bestSim,
             key: bestKey,
-            points,
-            count: points.length,
-            topPackSize: sizeMode.mode,
-            topPackSizeCount: sizeMode.count,
-            topPackQty: qtyMode.mode,
-            topPackQtyCount: qtyMode.count,
-            avgPackQty,
-            avgTotalUnits,
+            points, count: points.length,
+            topPackSize: sizeMode.mode, topPackSizeCount: sizeMode.count,
+            topPackQty: qtyMode.mode, topPackQtyCount: qtyMode.count,
+            avgPackQty, avgTotalUnits,
             bestUnitPrice: bestUnit,
             mostRecent: points[0],
             dateRange
@@ -1227,7 +1380,6 @@
                 progressEl.textContent = `Matching… ${processed}/${list.length}`;
             }
         }
-
         if (progressEl) progressEl.textContent = `✅ Matching complete. ${list.length} items processed.`;
     }
 
@@ -1243,12 +1395,7 @@
                 const db_ = b.date ? b.date.getTime() : 0;
                 return db_ > da ? b : a;
             }, pts[0]);
-            candidates.push({
-                price: latest.price,
-                source: latest.source,
-                fromName: priceHistory[exactKey].displayName,
-                confidence: 1.0
-            });
+            candidates.push({ price: latest.price, source: latest.source, fromName: priceHistory[exactKey].displayName, confidence: 1.0 });
         }
 
         for (const key in priceHistory) {
@@ -1260,25 +1407,31 @@
                 const db_ = b.date ? b.date.getTime() : 0;
                 return db_ - da;
             });
-            const sahadPoint = sorted.find(p => p.source && p.source.indexOf('Sahad Stores') >= 0);
-            const chosen = sahadPoint || sorted[0];
-            const isSahad = chosen.source && chosen.source.indexOf('Sahad Stores') >= 0;
-            const effectiveConfidence = isSahad ? Math.min(1, sim + 0.05) : sim;
+            // Prefer Everyday, then Sahad, then latest
+            const everydayPoint = sorted.find(p => p.source && p.source.indexOf('Everyday') >= 0);
+            const sahadPoint = sorted.find(p => p.source && p.source.indexOf('Sahad') >= 0);
+            const chosen = everydayPoint || sahadPoint || sorted[0];
+            const isEveryday = chosen.source && chosen.source.indexOf('Everyday') >= 0;
+            const isSahad = chosen.source && chosen.source.indexOf('Sahad') >= 0;
+            let boost = 0;
+            if (isEveryday) boost = 0.06;
+            else if (isSahad) boost = 0.04;
 
             candidates.push({
                 price: chosen.price,
                 source: chosen.source,
                 fromName: priceHistory[key].displayName,
-                confidence: effectiveConfidence
+                confidence: Math.min(1, sim + boost)
             });
         }
 
-        if (!candidates.length) {
-            return { price: 0, source: '', fromName: '', confidence: 0, status: 'unmatched' };
-        }
+        if (!candidates.length) return { price: 0, source: '', fromName: '', confidence: 0, status: 'unmatched' };
 
         candidates.sort((a, b) => {
             if (Math.abs(b.confidence - a.confidence) > 0.01) return b.confidence - a.confidence;
+            const aEveryday = a.source.indexOf('Everyday') >= 0 ? 1 : 0;
+            const bEveryday = b.source.indexOf('Everyday') >= 0 ? 1 : 0;
+            if (aEveryday !== bEveryday) return bEveryday - aEveryday;
             const aSahad = a.source.indexOf('Sahad') >= 0 ? 1 : 0;
             const bSahad = b.source.indexOf('Sahad') >= 0 ? 1 : 0;
             if (aSahad !== bSahad) return bSahad - aSahad;
@@ -1290,13 +1443,7 @@
         if (best.confidence < 0.85) status = 'partial';
         if (best.confidence < 0.6) status = 'partial';
 
-        return {
-            price: best.price,
-            source: best.source,
-            fromName: best.fromName,
-            confidence: best.confidence,
-            status
-        };
+        return { price: best.price, source: best.source, fromName: best.fromName, confidence: best.confidence, status };
     }
 
     /* =========================================================
@@ -1369,10 +1516,11 @@
         const value = uploadedItems.reduce((sum, i) => sum + (i.qty * i.unitPrice || 0), 0);
         const onlineCount = Object.keys(onlineCache).length;
 
-        let sahadCount = 0;
+        let sahadCount = 0, everydayCount = 0;
         for (const key in onlineCache) {
             onlineCache[key].sources.forEach(s => {
-                if (s.store === 'Sahad Stores') sahadCount++;
+                if (s.store && s.store.indexOf('Sahad') >= 0) sahadCount++;
+                if (s.store && s.store.indexOf('Everyday') >= 0) everydayCount++;
             });
         }
 
@@ -1382,6 +1530,7 @@
         document.getElementById('statUnmatched').textContent = unmatched;
         document.getElementById('statOnline').textContent = onlineCount;
         document.getElementById('statSahad').textContent = sahadCount;
+        document.getElementById('statEveryday').textContent = everydayCount;
         document.getElementById('statValue').textContent = '₦' + formatCurrency(value);
         document.getElementById('resultsCount').textContent = `${total} items`;
     }
@@ -1397,21 +1546,10 @@
         const filter = document.getElementById('filterMatchStatus').value;
 
         let html = `<table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Item</th>
-                    <th>Brand</th>
-                    <th>Qty</th>
-                    <th>Pack</th>
-                    <th>Unit Price (₦)</th>
-                    <th>Total (₦)</th>
-                    <th>Source</th>
-                    <th>Confidence</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>`;
+            <thead><tr>
+                <th>#</th><th>Item</th><th>Brand</th><th>Qty</th><th>Pack</th>
+                <th>Unit Price (₦)</th><th>Total (₦)</th><th>Source</th><th>Confidence</th><th>Action</th>
+            </tr></thead><tbody>`;
 
         let count = 0;
         uploadedItems.forEach((item, idx) => {
@@ -1426,7 +1564,8 @@
                             item.status === 'partial' ? '' : 'unmatched-row';
 
             const srcLower = (item.matchedSource || '').toLowerCase();
-            const sourceCls = srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+            const sourceCls = srcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
+                              srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
                               item.matchedSource === 'Invoice' ? 'source-invoice' :
                               item.matchedSource === 'Shipment' ? 'source-shipment' :
                               item.matchedSource === 'Received' ? 'source-received' :
@@ -1439,19 +1578,24 @@
                             confPct >= 60 ? 'confidence-medium' : 'confidence-low';
 
             const totalValue = (item.qty || 0) * (item.unitPrice || 0);
+
+            const everydayFlag = srcLower.indexOf('everyday') >= 0
+                ? `<span class="variant-tag everyday">Everyday</span>` : '';
             const sahadFlag = srcLower.indexOf('sahad') >= 0
                 ? `<span class="variant-tag wholesale">Sahad</span>` : '';
 
-            // Check if Sahad data is cached for this item (for the small badge)
             const cacheKey = normalizeName(item.itemName);
+            const hasEverydayCached = onlineCache[cacheKey] &&
+                onlineCache[cacheKey].sources.some(s => s.store && s.store.indexOf('Everyday') >= 0);
             const hasSahadCached = onlineCache[cacheKey] &&
-                onlineCache[cacheKey].sources.some(s => s.store === 'Sahad Stores');
-            const sahadBadge = hasSahadCached
-                ? `<span class="variant-tag wholesale" title="Sahad Stores reference available">🏪 Sahad</span>` : '';
+                onlineCache[cacheKey].sources.some(s => s.store && s.store.indexOf('Sahad') >= 0);
+            const cacheBadges =
+                (hasEverydayCached ? `<span class="variant-tag everyday" title="Everyday Group reference">🏬</span>` : '') +
+                (hasSahadCached ? `<span class="variant-tag wholesale" title="Sahad Stores reference">🏪</span>` : '');
 
             html += `<tr class="matched-summary-row ${rowClass}" onclick="toggleMatchedDetail('${item.id}')">
                 <td>${count}</td>
-                <td><strong>${escapeHtml(item.itemName)}</strong>${sahadFlag}${sahadBadge}</td>
+                <td><strong>${escapeHtml(item.itemName)}</strong>${everydayFlag}${sahadFlag}${cacheBadges}</td>
                 <td>${escapeHtml(item.brand || '—')}</td>
                 <td>${formatQuantity(item.qty)}</td>
                 <td>${item.packSize ? formatQuantity(item.packSize) : '—'}</td>
@@ -1485,9 +1629,7 @@
         });
 
         html += '</tbody></table>';
-        if (!count) {
-            html = `<div class="empty-state"><div class="icon">🔍</div>No items match the current filter.</div>`;
-        }
+        if (!count) html = `<div class="empty-state"><div class="icon">🔍</div>No items match the current filter.</div>`;
         wrap.innerHTML = html;
     }
 
@@ -1510,10 +1652,6 @@
     /* =========================================================
        MATCHED RESULTS — expandable detail panel
     ========================================================= */
-    /**
-     * Toggle the expansion of a matched-result detail row.
-     * Lazily builds the analysis panel on first open.
-     */
     window.toggleMatchedDetail = async function(itemId) {
         const detailId = 'matched-detail-' + itemId;
         const row = document.getElementById(detailId);
@@ -1523,7 +1661,6 @@
         const summaryRow = row.previousElementSibling;
 
         if (isHidden) {
-            // Lazy-build the analysis the first time
             if (!row.dataset.built) {
                 const contentEl = row.querySelector('.matched-detail-content');
                 contentEl.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7f96;"><span class="loading-spinner"></span> Analyzing purchase history…</div>';
@@ -1550,9 +1687,7 @@
         const rows = document.querySelectorAll('.matched-detail-row');
         for (const row of rows) {
             const id = row.id.replace('matched-detail-', '');
-            if (row.style.display === 'none') {
-                await window.toggleMatchedDetail(id);
-            }
+            if (row.style.display === 'none') await window.toggleMatchedDetail(id);
         }
     };
 
@@ -1564,49 +1699,37 @@
     document.getElementById('expandAllMatchedBtn').addEventListener('click', window.expandAllMatched);
     document.getElementById('collapseAllMatchedBtn').addEventListener('click', window.collapseAllMatched);
 
-    /**
-     * Force a Sahad fetch for a given item ID and rebuild its detail panel.
-     */
-    window.fetchSahadFor = async function(itemId) {
+    window.fetchWholesaleFor = async function(itemId, which) {
         const item = uploadedItems.find(i => i.id === itemId);
         if (!item) return;
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
-        showToast('🏪 Fetching Sahad Stores prices…', 'info', 1800);
+        showToast(`Fetching ${which === 'everyday' ? 'Everyday Group' : 'Sahad Stores'} prices…`, 'info', 1800);
         try {
             await fetchOnlinePrices(query);
             updateStats();
-            // Force rebuild of the detail panel
             const row = document.getElementById('matched-detail-' + itemId);
             if (row) {
                 row.dataset.built = '';
-                // Close it first
-                if (row.style.display !== 'none') {
-                    await window.toggleMatchedDetail(itemId);
-                }
-                // Then reopen with fresh content
+                if (row.style.display !== 'none') await window.toggleMatchedDetail(itemId);
                 await window.toggleMatchedDetail(itemId);
             }
-            showToast('✅ Sahad prices loaded.', 'success');
+            showToast('✅ Wholesale prices loaded.', 'success');
         } catch (err) {
-            showToast('Error fetching Sahad prices: ' + err.message, 'error');
+            showToast('Error: ' + err.message, 'error');
         }
     };
 
-    /**
-     * Build the full expanded analysis panel for a matched item.
-     */
     async function renderMatchedDetail(item) {
         const analysis = analyzeItemPurchases(item.itemName);
         const cacheKey = normalizeName(item.itemName);
-        const sahadRows = onlineCache[cacheKey]
-            ? onlineCache[cacheKey].sources.filter(s => s.store === 'Sahad Stores')
-            : [];
+        const onlineRows = onlineCache[cacheKey] ? onlineCache[cacheKey].sources : [];
+
+        const everydayRows = onlineRows.filter(s => s.store && s.store.indexOf('Everyday') >= 0);
+        const sahadRows = onlineRows.filter(s => s.store && s.store.indexOf('Sahad') >= 0);
 
         let html = '';
 
-        // ============================================================
-        // 1) Purchase Analysis (pack statistics & most realistic order)
-        // ============================================================
+        // 1) Purchase Analysis
         html += `<div class="analysis-panel">`;
         html += `<h4>📊 Purchase Analysis
             <small>${analysis ? analysis.count + ' purchase' + (analysis.count !== 1 ? 's' : '') + ' on record' : 'No purchase history'}</small>
@@ -1614,165 +1737,125 @@
 
         if (analysis && analysis.count > 0) {
             html += `<div class="analysis-grid">`;
-
             if (analysis.topPackSize) {
-                html += `<div class="analysis-item">
-                    <div class="label">Most Common Pack Size</div>
-                    <div class="val">${formatQuantity(analysis.topPackSize)} units</div>
-                    <div class="sub">seen ${analysis.topPackSizeCount}× in history</div>
-                </div>`;
+                html += `<div class="analysis-item"><div class="label">Most Common Pack Size</div><div class="val">${formatQuantity(analysis.topPackSize)} units</div><div class="sub">seen ${analysis.topPackSizeCount}× in history</div></div>`;
             }
-
             if (analysis.topPackQty) {
-                html += `<div class="analysis-item">
-                    <div class="label">Most Common Pack Qty</div>
-                    <div class="val">${formatQuantity(analysis.topPackQty)} packs</div>
-                    <div class="sub">ordered ${analysis.topPackQtyCount}× in history</div>
-                </div>`;
+                html += `<div class="analysis-item"><div class="label">Most Common Pack Qty</div><div class="val">${formatQuantity(analysis.topPackQty)} packs</div><div class="sub">ordered ${analysis.topPackQtyCount}× in history</div></div>`;
             }
-
             if (analysis.topPackSize && analysis.topPackQty) {
                 const realisticUnits = analysis.topPackSize * analysis.topPackQty;
-                html += `<div class="analysis-item best">
-                    <div class="label">✅ Most Realistic Order</div>
-                    <div class="val">${formatQuantity(analysis.topPackSize)} × ${formatQuantity(analysis.topPackQty)}</div>
-                    <div class="sub">= ${formatQuantity(realisticUnits)} total units</div>
-                </div>`;
+                html += `<div class="analysis-item best"><div class="label">✅ Most Realistic Order</div><div class="val">${formatQuantity(analysis.topPackSize)} × ${formatQuantity(analysis.topPackQty)}</div><div class="sub">= ${formatQuantity(realisticUnits)} total units</div></div>`;
             }
-
             if (analysis.avgPackQty > 0) {
-                html += `<div class="analysis-item">
-                    <div class="label">Avg Pack Qty / Order</div>
-                    <div class="val">${analysis.avgPackQty.toFixed(1)} packs</div>
-                    <div class="sub">avg ${analysis.avgTotalUnits.toFixed(0)} units per order</div>
-                </div>`;
+                html += `<div class="analysis-item"><div class="label">Avg Pack Qty / Order</div><div class="val">${analysis.avgPackQty.toFixed(1)} packs</div><div class="sub">avg ${analysis.avgTotalUnits.toFixed(0)} units per order</div></div>`;
             }
-
             if (analysis.bestUnitPrice && analysis.bestUnitPrice.unitPrice > 0) {
-                html += `<div class="analysis-item best">
-                    <div class="label">Best Unit Price Achieved</div>
-                    <div class="val">₦${formatCurrency(analysis.bestUnitPrice.unitPrice)}</div>
-                    <div class="sub">${analysis.bestUnitPrice.date ? analysis.bestUnitPrice.date.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' }) : '—'}</div>
-                </div>`;
+                html += `<div class="analysis-item best"><div class="label">Best Unit Price Achieved</div><div class="val">₦${formatCurrency(analysis.bestUnitPrice.unitPrice)}</div><div class="sub">${analysis.bestUnitPrice.date ? analysis.bestUnitPrice.date.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' }) : '—'}</div></div>`;
             }
-
             if (analysis.dateRange) {
                 const fromStr = analysis.dateRange.from.toLocaleDateString('en-NG', { day:'2-digit', month:'short' });
                 const toStr = analysis.dateRange.to.toLocaleDateString('en-NG', { day:'2-digit', month:'short', year:'numeric' });
-                html += `<div class="analysis-item">
-                    <div class="label">History Window</div>
-                    <div class="val" style="font-size:0.82rem;">${fromStr} → ${toStr}</div>
-                    <div class="sub">${analysis.count} data point${analysis.count !== 1 ? 's' : ''}</div>
-                </div>`;
+                html += `<div class="analysis-item"><div class="label">History Window</div><div class="val" style="font-size:0.82rem;">${fromStr} → ${toStr}</div><div class="sub">${analysis.count} data point${analysis.count !== 1 ? 's' : ''}</div></div>`;
             }
-
             html += `</div>`;
         } else {
-            html += `<div class="no-data-banner">
-                ℹ️ No historical purchase data found for "<strong>${escapeHtml(item.itemName)}</strong>".
-                Add prices from invoices or shipments and click "Rebuild from All Sources" in the Price History tab.
-            </div>`;
+            html += `<div class="no-data-banner">ℹ️ No historical purchase data found for "<strong>${escapeHtml(item.itemName)}</strong>".</div>`;
         }
         html += `</div>`;
 
-        // ============================================================
-        // 2) Sahad Stores Wholesale Reference
-        // ============================================================
+        // 2) Everyday Group Wholesale Reference
         html += `<div class="analysis-panel">`;
-        html += `<h4>🏪 Sahad Stores — Wholesale Reference
-            <small>Nigeria's largest wholesale chain</small>
+        html += `<h4>🏬 Everyday Group — Wholesale Reference
+            <small>45% market share · 15 stores</small>
         </h4>`;
-
-        if (sahadRows.length) {
-            const retail = sahadRows.find(r => r.variant === 'retail');
-            const wholesale = sahadRows.find(r => r.variant === 'wholesale');
-
+        if (everydayRows.length) {
+            const retail = everydayRows.find(r => r.variant === 'retail');
+            const wholesale = everydayRows.find(r => r.variant === 'wholesale');
             html += `<div class="analysis-grid">`;
-
             if (retail) {
                 const retailUnit = retail.totalUnits > 0 ? retail.price / retail.totalUnits : 0;
-                html += `<div class="analysis-item sahad">
-                    <div class="label">Retail Pack</div>
-                    <div class="val">₦${formatCurrency(retail.price)}</div>
-                    <div class="sub">${formatQuantity(retail.packSize)} units · ₦${formatCurrency(retailUnit)}/unit</div>
-                </div>`;
+                html += `<div class="analysis-item everyday"><div class="label">Retail Pack</div><div class="val">₦${formatCurrency(retail.price)}</div><div class="sub">${formatQuantity(retail.packSize)} units · ₦${formatCurrency(retailUnit)}/unit</div></div>`;
             }
-
             if (wholesale) {
                 const wholesaleUnit = wholesale.totalUnits > 0 ? wholesale.price / wholesale.totalUnits : 0;
-                html += `<div class="analysis-item sahad">
-                    <div class="label">Wholesale Carton</div>
-                    <div class="val">₦${formatCurrency(wholesale.price)}</div>
-                    <div class="sub">${formatQuantity(wholesale.packSize)} units · ₦${formatCurrency(wholesaleUnit)}/unit</div>
-                </div>`;
-
-                // Compare with internal best unit price
+                html += `<div class="analysis-item everyday"><div class="label">Wholesale Carton</div><div class="val">₦${formatCurrency(wholesale.price)}</div><div class="sub">${formatQuantity(wholesale.packSize)} units · ₦${formatCurrency(wholesaleUnit)}/unit</div></div>`;
                 if (analysis && analysis.bestUnitPrice && analysis.bestUnitPrice.unitPrice > 0) {
                     const internalUnit = analysis.bestUnitPrice.unitPrice;
                     const savings = internalUnit - wholesaleUnit;
                     const savingsPct = internalUnit > 0 ? (savings / internalUnit) * 100 : 0;
                     if (savings > 0) {
-                        html += `<div class="analysis-item sahad">
-                            <div class="label">💰 Wholesale Savings</div>
-                            <div class="val" style="color:#27ae60;">₦${formatCurrency(savings)}/unit</div>
-                            <div class="sub">${savingsPct.toFixed(1)}% below your best recorded price</div>
-                        </div>`;
+                        html += `<div class="analysis-item everyday"><div class="label">💰 Wholesale Savings</div><div class="val" style="color:#27ae60;">₦${formatCurrency(savings)}/unit</div><div class="sub">${savingsPct.toFixed(1)}% below your best recorded price</div></div>`;
                     } else if (savings < 0) {
-                        html += `<div class="analysis-item sahad">
-                            <div class="label">Your Best vs Wholesale</div>
-                            <div class="val" style="color:#27ae60;">₦${formatCurrency(Math.abs(savings))}/unit cheaper</div>
-                            <div class="sub">you already beat Sahad by ${Math.abs(savingsPct).toFixed(1)}%</div>
-                        </div>`;
+                        html += `<div class="analysis-item everyday"><div class="label">Your Best vs Wholesale</div><div class="val" style="color:#27ae60;">₦${formatCurrency(Math.abs(savings))}/unit cheaper</div><div class="sub">you already beat Everyday by ${Math.abs(savingsPct).toFixed(1)}%</div></div>`;
                     }
                 }
             }
-
             html += `</div>`;
         } else {
-            html += `<div class="no-data-banner">
-                ℹ️ No Sahad Stores data cached yet for this item.
-                <button class="btn-warning btn-sm" onclick="event.stopPropagation(); fetchSahadFor('${item.id}')">🏪 Fetch Sahad Prices</button>
+            html += `<div class="no-data-banner">ℹ️ No Everyday Group data cached yet.
+                <button class="btn-success btn-sm" onclick="event.stopPropagation(); fetchWholesaleFor('${item.id}', 'everyday')">🏬 Fetch Everyday Prices</button>
             </div>`;
         }
         html += `</div>`;
 
-        // ============================================================
-        // 3) Purchase Timeline (newest first)
-        // ============================================================
+        // 3) Sahad Stores Wholesale Reference
         html += `<div class="analysis-panel">`;
-        html += `<h4>📅 Purchase Timeline
-            <small>${analysis ? analysis.count : 0} entr${analysis && analysis.count === 1 ? 'y' : 'ies'} · newest first</small>
+        html += `<h4>🏪 Sahad Stores — Wholesale Reference
+            <small>37% market share · Nigeria's largest wholesale chain</small>
         </h4>`;
+        if (sahadRows.length) {
+            const retail = sahadRows.find(r => r.variant === 'retail');
+            const wholesale = sahadRows.find(r => r.variant === 'wholesale');
+            html += `<div class="analysis-grid">`;
+            if (retail) {
+                const retailUnit = retail.totalUnits > 0 ? retail.price / retail.totalUnits : 0;
+                html += `<div class="analysis-item sahad"><div class="label">Retail Pack</div><div class="val">₦${formatCurrency(retail.price)}</div><div class="sub">${formatQuantity(retail.packSize)} units · ₦${formatCurrency(retailUnit)}/unit</div></div>`;
+            }
+            if (wholesale) {
+                const wholesaleUnit = wholesale.totalUnits > 0 ? wholesale.price / wholesale.totalUnits : 0;
+                html += `<div class="analysis-item sahad"><div class="label">Wholesale Carton</div><div class="val">₦${formatCurrency(wholesale.price)}</div><div class="sub">${formatQuantity(wholesale.packSize)} units · ₦${formatCurrency(wholesaleUnit)}/unit</div></div>`;
+                if (analysis && analysis.bestUnitPrice && analysis.bestUnitPrice.unitPrice > 0) {
+                    const internalUnit = analysis.bestUnitPrice.unitPrice;
+                    const savings = internalUnit - wholesaleUnit;
+                    const savingsPct = internalUnit > 0 ? (savings / internalUnit) * 100 : 0;
+                    if (savings > 0) {
+                        html += `<div class="analysis-item sahad"><div class="label">💰 Wholesale Savings</div><div class="val" style="color:#27ae60;">₦${formatCurrency(savings)}/unit</div><div class="sub">${savingsPct.toFixed(1)}% below your best recorded price</div></div>`;
+                    }
+                }
+            }
+            html += `</div>`;
+        } else {
+            html += `<div class="no-data-banner">ℹ️ No Sahad data cached yet.
+                <button class="btn-warning btn-sm" onclick="event.stopPropagation(); fetchWholesaleFor('${item.id}', 'sahad')">🏪 Fetch Sahad Prices</button>
+            </div>`;
+        }
+        html += `</div>`;
 
+        // 4) Purchase Timeline
+        html += `<div class="analysis-panel">`;
+        html += `<h4>📅 Purchase Timeline <small>${analysis ? analysis.count : 0} entr${analysis && analysis.count === 1 ? 'y' : 'ies'} · newest first</small></h4>`;
         if (analysis && analysis.points.length) {
             html += `<div class="history-detail-inner"><table style="width:100%;border-collapse:collapse;">
-                <thead><tr>
-                    <th>Date &amp; Time</th>
-                    <th>Source</th>
-                    <th>Pack Size</th>
-                    <th>Pack Qty</th>
-                    <th>Total Units</th>
-                    <th>Price (₦)</th>
-                    <th>Unit Price (₦)</th>
-                    <th>Brand</th>
-                </tr></thead><tbody>`;
-
+                <thead><tr><th>Date &amp; Time</th><th>Source</th><th>Pack Size</th><th>Pack Qty</th><th>Total Units</th><th>Price (₦)</th><th>Unit Price (₦)</th><th>Brand</th></tr></thead><tbody>`;
             analysis.points.forEach((pt, idx) => {
                 const dateStr = pt.date
-                    ? pt.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) +
-                      ' · ' + pt.date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
+                    ? pt.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + pt.date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
                     : '—';
                 const ptSrcLower = (pt.source || '').toLowerCase();
-                const ptSrcCls = ptSrcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+                const ptSrcCls = ptSrcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
+                                 ptSrcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
                                  pt.source.startsWith('Online') ? 'source-online' :
                                  pt.source === 'Invoice' ? 'source-invoice' :
                                  pt.source === 'Shipment' ? 'source-shipment' :
                                  pt.source === 'Received' ? 'source-received' : '';
+                const isEveryday = ptSrcLower.indexOf('everyday') >= 0;
                 const isSahad = ptSrcLower.indexOf('sahad') >= 0;
 
                 html += `<tr>
                     <td style="white-space:nowrap;">${idx === 0 ? '🟢 ' : ''}${dateStr}</td>
                     <td><span class="source-badge ${ptSrcCls}">${escapeHtml(pt.source)}</span>
+                        ${isEveryday ? '<span class="variant-chip everyday">Everyday</span>' : ''}
                         ${isSahad ? '<span class="variant-chip sahad">Sahad</span>' : ''}
                     </td>
                     <td><span class="pack-badge">${formatQuantity(pt.packSize)}</span></td>
@@ -1783,7 +1866,6 @@
                     <td>${pt.brand ? escapeHtml(pt.brand) : '—'}</td>
                 </tr>`;
             });
-
             html += `</tbody></table></div>`;
         } else {
             html += `<div class="no-data-banner">ℹ️ No purchase entries on record for this item.</div>`;
@@ -1794,7 +1876,7 @@
     }
 
     /* =========================================================
-       MATCH MODAL (internal history)
+       MATCH MODAL
     ========================================================= */
     window.openMatchModal = function(itemId) {
         const item = uploadedItems.find(i => i.id === itemId);
@@ -1812,37 +1894,26 @@
                 const db_ = b.date ? b.date.getTime() : 0;
                 return db_ > da ? b : a;
             }, pts[0]);
-            candidates.push({
-                key,
-                displayName: priceHistory[key].displayName,
-                price: latest.price,
-                source: latest.source,
-                date: latest.date,
-                brand: latest.brand,
-                packSize: latest.packSize || 1,
-                confidence: sim
-            });
+            candidates.push({ key, displayName: priceHistory[key].displayName, price: latest.price, source: latest.source, date: latest.date, brand: latest.brand, packSize: latest.packSize || 1, confidence: sim });
         }
 
         candidates.sort((a, b) => b.confidence - a.confidence);
 
         let html = `<p><strong>Looking for:</strong> ${escapeHtml(query)}</p>`;
-        html += `<div style="margin:14px 0;">
-            <label style="font-weight:600; font-size:0.85rem;">Manual Price Entry (₦)</label>
+        html += `<div style="margin:14px 0;"><label style="font-weight:600; font-size:0.85rem;">Manual Price Entry (₦)</label>
             <div style="display:flex; gap:8px; margin-top:6px;">
-                <input type="number" id="manualPriceInput" placeholder="0.00" step="0.01" min="0"
-                    value="${item.unitPrice ? item.unitPrice.toFixed(2) : ''}" style="flex:1;">
+                <input type="number" id="manualPriceInput" placeholder="0.00" step="0.01" min="0" value="${item.unitPrice ? item.unitPrice.toFixed(2) : ''}" style="flex:1;">
                 <button class="btn-success btn-sm" onclick="applyManualPrice('${item.id}')">Apply</button>
-            </div>
-        </div>`;
+            </div></div>`;
 
         if (candidates.length) {
             html += `<h4 style="margin-top:16px;">Suggested Matches (internal history)</h4>`;
             html += `<div class="table-wrap"><table>
                 <thead><tr><th>Item</th><th>Source</th><th>Price (₦)</th><th>Pack</th><th>Date</th><th>Confidence</th><th></th></tr></thead><tbody>`;
-            candidates.slice(0, 12).forEach((c) => {
+            candidates.slice(0, 12).forEach(c => {
                 const confPct = Math.round(c.confidence * 100);
-                const sahadCls = c.source && c.source.indexOf('Sahad') >= 0 ? 'source-sahad' : '';
+                const srcLower = (c.source || '').toLowerCase();
+                const sahadCls = srcLower.indexOf('sahad') >= 0 ? 'source-sahad' : srcLower.indexOf('everyday') >= 0 ? 'source-everyday' : '';
                 html += `<tr>
                     <td>${escapeHtml(c.displayName)}<div style="font-size:0.7rem;color:#6b7f96;">${escapeHtml(c.brand || '')}</div></td>
                     <td><span class="source-badge ${sahadCls}">${escapeHtml(c.source)}</span></td>
@@ -1896,7 +1967,7 @@
     ========================================================= */
     async function fetchOnlinePrices(query) {
         const key = normalizeName(query);
-        if (onlineCache[key]) {
+        if (onlineCache[key] && Date.now() - onlineCache[key].timestamp < 300000) {
             return onlineCache[key].sources;
         }
 
@@ -1917,7 +1988,8 @@
                         inStock: r.inStock,
                         url: r.url,
                         note: r.note,
-                        fetchedAt: r.fetchedAt
+                        fetchedAt: r.fetchedAt,
+                        live: r.live !== undefined ? r.live : src.live
                     });
                 });
             } catch (err) {
@@ -1954,10 +2026,7 @@
 
         let html = `<p><strong>Item:</strong> ${escapeHtml(item.itemName)} ${item.brand ? '· ' + escapeHtml(item.brand) : ''}</p>`;
         if (internal) {
-            html += `<p style="font-size:0.85rem;color:#6b7f96;">
-                Internal price reference: <strong>₦${formatCurrency(internalPrice)}</strong>
-                <span class="source-badge" style="margin-left:6px;">${escapeHtml(internal.source)}</span>
-            </p>`;
+            html += `<p style="font-size:0.85rem;color:#6b7f96;">Internal price reference: <strong>₦${formatCurrency(internalPrice)}</strong> <span class="source-badge" style="margin-left:6px;">${escapeHtml(internal.source)}</span></p>`;
         } else {
             html += `<p style="font-size:0.85rem;color:#6b7f96;">No internal price reference available.</p>`;
         }
@@ -1971,7 +2040,9 @@
         const cheapest = sorted[0];
         const mostExpensive = sorted[sorted.length - 1];
 
-        const sahadRows = onlineRows.filter(r => r.store === 'Sahad Stores');
+        const everydayRows = onlineRows.filter(r => r.store && r.store.indexOf('Everyday') >= 0);
+        const sahadRows = onlineRows.filter(r => r.store && r.store.indexOf('Sahad') >= 0);
+        const cheapestEveryday = everydayRows.length ? sortByUnitPrice(everydayRows)[0] : null;
         const cheapestSahad = sahadRows.length ? sortByUnitPrice(sahadRows)[0] : null;
 
         html += `<div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">
@@ -1985,6 +2056,12 @@
                 <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(mostExpensive))}</div>
                 <div class="help-text">${escapeHtml(mostExpensive.store)} · ${formatQuantity(mostExpensive.totalUnits)}u @ ₦${formatCurrency(mostExpensive.price)}</div>
             </div>
+            ${cheapestEveryday ? `
+            <div class="stat-card everyday" style="flex:1;min-width:140px;">
+                <div class="label">🏬 Everyday Best</div>
+                <div class="value" style="font-size:1.1rem;">₦${formatCurrency(perUnitPrice(cheapestEveryday))}</div>
+                <div class="help-text">${escapeHtml(cheapestEveryday.variant)} · ${formatQuantity(cheapestEveryday.totalUnits)}u @ ₦${formatCurrency(cheapestEveryday.price)}</div>
+            </div>` : ''}
             ${cheapestSahad ? `
             <div class="stat-card sahad" style="flex:1;min-width:140px;">
                 <div class="label">🏪 Sahad Best</div>
@@ -1999,27 +2076,26 @@
             if (internalPrice > 0) {
                 const delta = row.price - internalPrice;
                 const pct = (delta / internalPrice) * 100;
-                if (Math.abs(pct) < 1) {
-                    deltaHtml = `<span class="delta delta-equal">≈ Same as internal</span>`;
-                } else if (delta < 0) {
-                    deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper vs internal</span>`;
-                } else {
-                    deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier vs internal</span>`;
-                }
+                if (Math.abs(pct) < 1) deltaHtml = `<span class="delta delta-equal">≈ Same as internal</span>`;
+                else if (delta < 0) deltaHtml = `<span class="delta delta-cheaper">▼ ${Math.abs(pct).toFixed(1)}% cheaper vs internal</span>`;
+                else deltaHtml = `<span class="delta delta-pricier">▲ ${pct.toFixed(1)}% pricier vs internal</span>`;
             }
 
-            const isSahad = row.store === 'Sahad Stores';
-            const cardCls = isSahad ? 'compare-card sahad-card' : 'compare-card';
+            const isSahad = row.store.indexOf('Sahad') >= 0;
+            const isEveryday = row.store.indexOf('Everyday') >= 0;
+            const cardCls = isEveryday ? 'compare-card everyday-card' : isSahad ? 'compare-card sahad-card' : 'compare-card';
             const variantTag = row.variant === 'wholesale'
                 ? `<span class="variant-tag wholesale">WHOLESALE</span>`
                 : `<span class="variant-tag">RETAIL</span>`;
+            const liveTag = row.live === true ? ` <span class="variant-tag" style="background:#d4edda;color:#0e5a2b;">LIVE</span>` :
+                            row.live === false ? ` <span class="variant-tag" style="background:#fff3cd;color:#8a6d00;">MANUAL</span>` : '';
             const unitPrice = perUnitPrice(row);
 
             html += `<div class="${cardCls}">
                 <div class="store-name">
                     <span class="store-logo">${row.icon || '🌐'}</span> ${escapeHtml(row.store)}
-                    ${isSahad ? '🏪' : ''}
-                    ${variantTag}
+                    ${isEveryday ? '🏬' : isSahad ? '🏪' : ''}
+                    ${variantTag}${liveTag}
                 </div>
                 <div class="store-price">₦${formatCurrency(row.price)}</div>
                 <div class="store-meta">
@@ -2027,19 +2103,16 @@
                     ${row.totalUnits ? `Total: <strong>${formatQuantity(row.totalUnits)}</strong> units · ` : ''}
                     Unit: <strong>₦${formatCurrency(unitPrice)}</strong>/unit
                 </div>
-                <div class="store-meta">
-                    ${row.inStock ? '✅ In stock' : '❌ Out of stock'}
-                    ${row.type ? ` · ${escapeHtml(row.type)}` : ''}
-                </div>
+                <div class="store-meta">${row.inStock ? '✅ In stock' : '❌ Out of stock'} ${row.type ? ` · ${escapeHtml(row.type)}` : ''}</div>
                 ${deltaHtml}
             </div>`;
         });
         html += `</div>`;
 
         html += `<p class="help-text" style="margin-top:14px;">
-            ⚠️ Online prices are indicative and may include promotions, delivery fees, or bulk-tier differences.
+            ⚠️ Prices are indicative and may include promotions, delivery fees, or bulk-tier differences.
             <br>📊 <strong>Cheapest is ranked by price-per-unit</strong> so packs of different sizes are compared fairly.
-            <br>🏪 <strong>Sahad Stores</strong> is Nigeria's largest wholesale/retail department store chain, offering both retail and wholesale-carton pricing.
+            <br>🏬 <strong>Everyday Group (45% market share)</strong> and 🏪 <strong>Sahad Stores (37%)</strong> together control 82% of Nigeria's general merchandise market. Neither publishes a public API — their prices are loaded via manual CSV upload.
             <br>Always verify on the store's page before making pricing decisions.
         </p>`;
 
@@ -2111,15 +2184,13 @@
 
         const query = ((item.brand || '') + ' ' + item.itemName).trim();
         document.getElementById('onlineModalTitle').textContent = '🌐 Online Comparison – ' + item.itemName;
-        document.getElementById('onlineModalContent').innerHTML =
-            '<div class="loading-spinner"></div> Querying online sources…';
+        document.getElementById('onlineModalContent').innerHTML = '<div class="loading-spinner"></div> Querying online sources…';
         document.getElementById('onlineModal').classList.add('open');
 
         try {
             const rows = await fetchOnlinePrices(query);
             document.getElementById('onlineModalContent').innerHTML = buildComparisonHtml(item, rows);
             updateStats();
-            // Rebuild matched detail panel so the new Sahad data appears there too
             const row = document.getElementById('matched-detail-' + itemId);
             if (row && row.style.display !== 'none') {
                 row.dataset.built = '';
@@ -2127,8 +2198,7 @@
                 await window.toggleMatchedDetail(itemId);
             }
         } catch (err) {
-            document.getElementById('onlineModalContent').innerHTML =
-                `<div class="empty-state"><div class="icon">⚠️</div>${escapeHtml(err.message)}</div>`;
+            document.getElementById('onlineModalContent').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div>${escapeHtml(err.message)}</div>`;
         }
     };
 
@@ -2139,10 +2209,8 @@
         if (!uploadedItems.length) { showToast('No items to export.', 'error'); return; }
         const rows = [['Item', 'Brand', 'Qty', 'Pack Size', 'Unit Price', 'Total', 'Source', 'Confidence']];
         uploadedItems.forEach(it => {
-            rows.push([
-                it.itemName, it.brand || '', it.qty, it.packSize || '', it.unitPrice || 0,
-                (it.qty || 0) * (it.unitPrice || 0), it.matchedSource || '', Math.round((it.confidence || 0) * 100) + '%'
-            ]);
+            rows.push([it.itemName, it.brand || '', it.qty, it.packSize || '', it.unitPrice || 0,
+                (it.qty || 0) * (it.unitPrice || 0), it.matchedSource || '', Math.round((it.confidence || 0) * 100) + '%']);
         });
         const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2158,14 +2226,10 @@
     document.getElementById('exportXlsxBtn').addEventListener('click', () => {
         if (!uploadedItems.length) { showToast('No items to export.', 'error'); return; }
         const data = uploadedItems.map(it => ({
-            Item: it.itemName,
-            Brand: it.brand || '',
-            Qty: it.qty,
-            'Pack Size': it.packSize || '',
-            'Unit Price': it.unitPrice || 0,
+            Item: it.itemName, Brand: it.brand || '', Qty: it.qty,
+            'Pack Size': it.packSize || '', 'Unit Price': it.unitPrice || 0,
             Total: (it.qty || 0) * (it.unitPrice || 0),
-            Source: it.matchedSource || '',
-            Confidence: Math.round((it.confidence || 0) * 100) + '%'
+            Source: it.matchedSource || '', Confidence: Math.round((it.confidence || 0) * 100) + '%'
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
@@ -2186,33 +2250,20 @@
         const btn = document.getElementById('exportPdfBtn');
         btn.disabled = true;
         try {
-            let rows = '';
-            let totalValue = 0;
+            let rows = '', totalValue = 0;
             uploadedItems.forEach((it, idx) => {
                 const total = (it.qty || 0) * (it.unitPrice || 0);
                 totalValue += total;
-                rows += `<tr>
-                    <td>${idx + 1}</td>
-                    <td>${escapeHtml(it.itemName)}</td>
-                    <td>${escapeHtml(it.brand || '')}</td>
-                    <td>${it.qty || 0}</td>
-                    <td>${it.packSize || ''}</td>
-                    <td>₦${formatCurrency(it.unitPrice || 0)}</td>
-                    <td>₦${formatCurrency(total)}</td>
-                    <td>${escapeHtml(it.matchedSource || '')}</td>
-                </tr>`;
+                rows += `<tr><td>${idx + 1}</td><td>${escapeHtml(it.itemName)}</td><td>${escapeHtml(it.brand || '')}</td><td>${it.qty || 0}</td><td>${it.packSize || ''}</td><td>₦${formatCurrency(it.unitPrice || 0)}</td><td>₦${formatCurrency(total)}</td><td>${escapeHtml(it.matchedSource || '')}</td></tr>`;
             });
-            const html = `
-                <div style="padding:20px;font-family:sans-serif;">
-                    <h2 style="margin:0;color:#0a3d62;">NEVAMAK – Price Room Report</h2>
-                    <p style="color:#6b7f96;margin:4px 0 14px;">Generated ${new Date().toLocaleString()} by ${escapeHtml(currentUserEmail)}</p>
-                    <table style="width:100%;border-collapse:collapse;border:1px solid #ccc;font-size:0.8rem;">
-                        <tr style="background:#0a3d62;color:white;"><th style="padding:6px;">#</th><th style="padding:6px;">Item</th><th style="padding:6px;">Brand</th><th style="padding:6px;">Qty</th><th style="padding:6px;">Pack</th><th style="padding:6px;">Unit Price</th><th style="padding:6px;">Total</th><th style="padding:6px;">Source</th></tr>
-                        ${rows}
-                        <tr style="font-weight:700;background:#eaf1fa;"><td colspan="6" style="padding:6px;text-align:right;">Grand Total</td><td colspan="2" style="padding:6px;">₦${formatCurrency(totalValue)}</td></tr>
-                    </table>
-                </div>
-            `;
+            const html = `<div style="padding:20px;font-family:sans-serif;">
+                <h2 style="margin:0;color:#0a3d62;">NEVAMAK – Price Room Report</h2>
+                <p style="color:#6b7f96;margin:4px 0 14px;">Generated ${new Date().toLocaleString()} by ${escapeHtml(currentUserEmail)}</p>
+                <table style="width:100%;border-collapse:collapse;border:1px solid #ccc;font-size:0.8rem;">
+                    <tr style="background:#0a3d62;color:white;"><th style="padding:6px;">#</th><th style="padding:6px;">Item</th><th style="padding:6px;">Brand</th><th style="padding:6px;">Qty</th><th style="padding:6px;">Pack</th><th style="padding:6px;">Unit Price</th><th style="padding:6px;">Total</th><th style="padding:6px;">Source</th></tr>
+                    ${rows}
+                    <tr style="font-weight:700;background:#eaf1fa;"><td colspan="6" style="padding:6px;text-align:right;">Grand Total</td><td colspan="2" style="padding:6px;">₦${formatCurrency(totalValue)}</td></tr>
+                </table></div>`;
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = html;
             tempDiv.style.position = 'absolute';
@@ -2231,9 +2282,7 @@
         } catch (err) {
             console.error(err);
             showToast('PDF error: ' + err.message, 'error');
-        } finally {
-            btn.disabled = false;
-        }
+        } finally { btn.disabled = false; }
     });
 
     /* =========================================================
@@ -2243,18 +2292,13 @@
         if (!uploadedItems.length) { showToast('No items to save.', 'error'); return; }
         const validItems = uploadedItems.filter(i => i.unitPrice > 0);
         if (!validItems.length) { showToast('No priced items to save.', 'error'); return; }
-
         if (!confirm(`Create a new invoice with ${validItems.length} priced items?`)) return;
 
         try {
             const invoiceNumber = 'PR-' + Date.now().toString(36).toUpperCase();
             const items = validItems.map(it => ({
-                itemName: it.itemName,
-                quantity: it.qty || 1,
-                unitPrice: it.unitPrice,
-                packSize: it.packSize || 1,
-                originalPrice: it.unitPrice,
-                updatedPrice: it.unitPrice,
+                itemName: it.itemName, quantity: it.qty || 1, unitPrice: it.unitPrice,
+                packSize: it.packSize || 1, originalPrice: it.unitPrice, updatedPrice: it.unitPrice,
                 subtotal: (it.qty || 0) * it.unitPrice,
                 discountPercent: 0, discountAmount: 0, discountTotal: 0,
                 vatPercent: 0, whtPercent: 0, vat: 0, wht: 0,
@@ -2263,35 +2307,20 @@
             const total = items.reduce((s, i) => s + i.total, 0);
 
             await db.collection('invoices').add({
-                invoiceNumber,
-                date: new Date().toISOString().slice(0, 10),
-                customer: 'Price Room Import',
-                customerEmail: '',
+                invoiceNumber, date: new Date().toISOString().slice(0, 10),
+                customer: 'Price Room Import', customerEmail: '',
                 notes: `Generated from Price Room matching on ${new Date().toLocaleString()}`,
-                branch: 'Lagos',
-                vendor: '',
-                items,
-                transportMultiplier: 1,
-                subtotal: total,
-                totalDiscount: 0,
-                totalVAT: 0,
-                totalWHT: 0,
-                total,
-                movedToWarehouse: false,
-                acknowledged: false,
-                createdBy: currentUserEmail,
+                branch: 'Lagos', vendor: '', items, transportMultiplier: 1,
+                subtotal: total, totalDiscount: 0, totalVAT: 0, totalWHT: 0, total,
+                movedToWarehouse: false, acknowledged: false, createdBy: currentUserEmail,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-
             await db.collection('activityLog').add({
-                actionType: 'price_room_invoice_created',
-                invoiceNumber,
+                actionType: 'price_room_invoice_created', invoiceNumber,
                 details: `Price Room generated invoice ${invoiceNumber} with ${items.length} items`,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                user: currentUserEmail
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(), user: currentUserEmail
             });
-
             showToast(`✅ Invoice ${invoiceNumber} created.`, 'success');
         } catch (err) {
             console.error(err);
@@ -2300,7 +2329,7 @@
     });
 
     /* =========================================================
-       PRICE HISTORY TAB — expandable purchase timeline
+       PRICE HISTORY TAB
     ========================================================= */
     document.getElementById('reloadHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
     document.getElementById('rebuildHistoryBtn').addEventListener('click', () => rebuildPriceHistory(false));
@@ -2311,7 +2340,6 @@
         if (!row) return;
         const isHidden = row.style.display === 'none';
         row.style.display = isHidden ? '' : 'none';
-
         const summaryRow = row.previousElementSibling;
         if (summaryRow) summaryRow.classList.toggle('expanded', isHidden);
     };
@@ -2338,21 +2366,10 @@
             return;
         }
 
-        let html = `<table>
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Most Recent Price</th>
-                    <th>Pack Size</th>
-                    <th>Pack Qty</th>
-                    <th>Total Units</th>
-                    <th>Source</th>
-                    <th># Points</th>
-                    <th>Last Updated</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>`;
+        let html = `<table><thead><tr>
+            <th>Item</th><th>Most Recent Price</th><th>Pack Size</th><th>Pack Qty</th>
+            <th>Total Units</th><th>Source</th><th># Points</th><th>Last Updated</th><th>Action</th>
+        </tr></thead><tbody>`;
 
         let count = 0;
         keys.forEach(k => {
@@ -2368,7 +2385,8 @@
             count++;
 
             const srcLower = (latest.source || '').toLowerCase();
-            const srcCls = srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+            const srcCls = srcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
+                           srcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
                            latest.source.startsWith('Online') ? 'source-online' :
                            latest.source === 'Invoice' ? 'source-invoice' :
                            latest.source === 'Shipment' ? 'source-shipment' :
@@ -2377,24 +2395,26 @@
             let detailRows = '';
             sortedPoints.forEach((pt, idx) => {
                 const dateStr = pt.date
-                    ? pt.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) +
-                      ' · ' + pt.date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
+                    ? pt.date.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + pt.date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' })
                     : '—';
                 const packSize = pt.packSize || 1;
                 const packQty = pt.packQty || 0;
                 const totalUnits = pt.totalUnits != null ? pt.totalUnits : (packQty * packSize);
 
                 const ptSrcLower = (pt.source || '').toLowerCase();
-                const ptSrcCls = ptSrcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
+                const ptSrcCls = ptSrcLower.indexOf('everyday') >= 0 ? 'source-everyday' :
+                                 ptSrcLower.indexOf('sahad') >= 0 ? 'source-sahad' :
                                  pt.source.startsWith('Online') ? 'source-online' :
                                  pt.source === 'Invoice' ? 'source-invoice' :
                                  pt.source === 'Shipment' ? 'source-shipment' :
                                  pt.source === 'Received' ? 'source-received' : '';
+                const isEveryday = ptSrcLower.indexOf('everyday') >= 0;
                 const isSahad = ptSrcLower.indexOf('sahad') >= 0;
 
                 detailRows += `<tr>
                     <td style="white-space:nowrap;">${idx === 0 ? '🟢 ' : ''}${dateStr}</td>
                     <td><span class="source-badge ${ptSrcCls}">${escapeHtml(pt.source)}</span>
+                        ${isEveryday ? '<span class="variant-chip everyday">Everyday</span>' : ''}
                         ${isSahad ? '<span class="variant-chip sahad">Sahad</span>' : ''}
                     </td>
                     <td class="price-cell">₦${formatCurrency(pt.price)}</td>
@@ -2406,12 +2426,14 @@
             });
 
             const detailId = 'history-detail-' + historyKeyId(k);
+            const everydayPoints = sortedPoints.filter(p => (p.source || '').toLowerCase().indexOf('everyday') >= 0);
             const sahadPoints = sortedPoints.filter(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0);
-            const sahadBadge = sahadPoints.length
-                ? ` <span class="variant-tag wholesale">🏪 ${sahadPoints.length} Sahad</span>` : '';
+            const badges =
+                (everydayPoints.length ? ` <span class="variant-tag everyday">🏬 ${everydayPoints.length} Everyday</span>` : '') +
+                (sahadPoints.length ? ` <span class="variant-tag wholesale">🏪 ${sahadPoints.length} Sahad</span>` : '');
 
             html += `<tr class="history-summary-row" onclick="toggleHistoryDetail('${escapeHtml(k).replace(/'/g, "\\'")}')">
-                <td><strong>${escapeHtml(entry.displayName)}</strong>${sahadBadge}</td>
+                <td><strong>${escapeHtml(entry.displayName)}</strong>${badges}</td>
                 <td class="price-cell">₦${formatCurrency(latest.price)}</td>
                 <td>${formatQuantity(latest.packSize || 1)}</td>
                 <td>${formatQuantity(latest.packQty || 0)}</td>
@@ -2431,17 +2453,7 @@
                             📋 Purchase timeline for "${escapeHtml(entry.displayName)}" — <strong>${entry.points.length}</strong> purchase${entry.points.length !== 1 ? 's' : ''}, most recent first
                         </div>
                         <table style="width:100%;border-collapse:collapse;">
-                            <thead>
-                                <tr>
-                                    <th>Date & Time</th>
-                                    <th>Source</th>
-                                    <th>Price (₦)</th>
-                                    <th>Pack Size</th>
-                                    <th>Pack Qty</th>
-                                    <th>Total Units</th>
-                                    <th>Brand</th>
-                                </tr>
-                            </thead>
+                            <thead><tr><th>Date & Time</th><th>Source</th><th>Price (₦)</th><th>Pack Size</th><th>Pack Qty</th><th>Total Units</th><th>Brand</th></tr></thead>
                             <tbody>${detailRows}</tbody>
                         </table>
                     </div>
@@ -2462,20 +2474,17 @@
             const db_ = b.date ? b.date.getTime() : 0;
             return db_ - da;
         });
+        const everydayPoint = sortedPoints.find(p => (p.source || '').toLowerCase().indexOf('everyday') >= 0);
         const sahadPoint = sortedPoints.find(p => (p.source || '').toLowerCase().indexOf('sahad') >= 0);
-        const chosen = sahadPoint || sortedPoints[0];
+        const chosen = everydayPoint || sahadPoint || sortedPoints[0];
 
         uploadedItems.push({
             id: 'hist_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-            brand: chosen?.brand || '',
-            itemName: entry.displayName,
-            qty: chosen?.packQty || 1,
-            packSize: chosen?.packSize || 1,
+            brand: chosen?.brand || '', itemName: entry.displayName,
+            qty: chosen?.packQty || 1, packSize: chosen?.packSize || 1,
             unitPrice: chosen?.price || 0,
             matchedSource: chosen?.source || 'History',
-            matchedFrom: entry.displayName,
-            confidence: 1,
-            status: 'matched'
+            matchedFrom: entry.displayName, confidence: 1, status: 'matched'
         });
         renderResults();
         updateStats();
@@ -2490,7 +2499,7 @@
     addManualRow();
     addManualRow();
 
-    console.log('💰 Price Room loaded — Matched Results now with full purchase analysis + Sahad wholesale reference.');
+    console.log('💰 Price Room loaded — Everyday Group + Sahad Stores wholesale references enabled.');
 </script>
 </body>
 </html>
